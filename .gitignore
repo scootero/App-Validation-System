@@ -1,0 +1,6 @@
+# Local platform secrets — never commit
+.env
+
+# Service account keys if downloaded locally
+*-service-account*.json
+app-validation-*.json
