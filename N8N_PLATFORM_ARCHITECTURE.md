@@ -320,17 +320,23 @@ This section traces one app idea from creation through experiment decision and n
 3. On failure: no deploy, notify author, leave `status` at `ready` or revert to `draft`.
 4. On success: proceed to deploy stages.
 
-#### Stage D: Mockup Deploy
+#### Stage D: Mockup Deploy (WF1 v1)
 
-1. n8n reads `mockup.sourcePath`, runs `installCommand` + `buildCommand` + `deployCommand`.
-2. Deploys `mockup/` to its own Vercel project.
-3. Writes back to `app.json`:
+**Prerequisite:** GitHub repo and Vercel project for the mockup are already provisioned and connected. Human fills `source.*` in `app.json` before WF1 runs.
+
+1. **WF1** manual trigger with `appId`; read `App Validation/{appId}/app.json` from Drive.
+2. Gate on `status === "ready"`; validate `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and Vercel project ID or name.
+3. Trigger Vercel deployment API using `gitSource` from `source.*` (Vercel builds from GitHub — n8n never runs `npm` or pushes code).
+4. Poll until `readyState === "READY"`.
+5. Merge-write to `app.json`:
    - `mockup.previewUrl`
    - `deployment.mockup.vercelProjectId`
    - `deployment.mockup.url`
    - `deployment.mockup.lastDeployedAt`
 
-`mockup.previewUrl` and `deployment.mockup.url` MUST match.
+`mockup.previewUrl` and `deployment.mockup.url` MUST match. `status` stays `ready`.
+
+See [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) for the normative WF1 v1 flow.
 
 #### Stage E: Landing Generation
 
@@ -537,7 +543,12 @@ This section documents **where every important value originates**, who writes it
 
 | Value | Origin | Written by | Consumed by |
 |-------|--------|------------|-------------|
-| `deployment.mockup.vercelProjectId` | Vercel API response | n8n after mockup deploy | Infrastructure reference |
+| `source.mockupGithubRepo` | Human at infra setup | Human | WF1 (Vercel `gitSource`) |
+| `source.mockupBranch` | Human at infra setup | Human | WF1 (Vercel `gitSource.ref`) |
+| `source.mockupRootDirectory` | Human at infra setup; must match Vercel settings | Human | WF1 validation; Vercel build |
+| `source.vercelMockupProjectId` | Human from Vercel dashboard | Human | WF1 (Vercel deploy API) |
+| `source.vercelMockupProjectName` | Human from Vercel dashboard | Human | WF1 (Vercel deploy API fallback) |
+| `deployment.mockup.vercelProjectId` | Vercel API response | n8n WF1 after mockup deploy | Infrastructure reference |
 | `deployment.mockup.url` | Vercel deploy URL | n8n after mockup deploy | Transform → `mockup.embedUrl` |
 | `deployment.mockup.lastDeployedAt` | Deploy timestamp (ISO 8601) | n8n after mockup deploy | Audit; not used in tracking |
 | `deployment.landing.vercelProjectId` | Vercel API response | n8n after landing deploy | Transform → `tracking.deploymentId` |
@@ -785,16 +796,18 @@ No workflow JSON is implemented. This section defines **intended** workflows tha
 
 | Workflow | Trigger | Input | Output / Side Effects |
 |----------|---------|-------|---------------------|
-| **Package discovery** | Schedule (poll every N min) | Drive parent folder | List of `{appId}/` folders with `status` |
-| **Provisioning** | `status: provisioning` | `app.json` | `tracking.webhookUrl` written; `status: ready` |
+| **WF1 Mockup Deploy** (v1) | Manual (`appId`) | Drive `app.json` with `source.*` | Vercel deploy; `deployment.mockup.*` + `mockup.previewUrl` written; `status` stays `ready` |
+| **Package discovery** (future) | Schedule (poll every N min) | Drive parent folder | List of `{appId}/` folders with `status` |
+| **Provisioning** (WF3) | `status: provisioning` | `app.json` | `tracking.webhookUrl` written; `status: ready` |
 | **Validation** | `status: ready` | Full package | Pass → deploy; Fail → notify, block |
-| **Deploy mockup** | Post-validation | `mockup/` source | Vercel deploy; `deployment.mockup.*` written |
-| **Generate landing config** | Post-mockup-deploy | App Package files | `app-config.json` + images |
-| **Deploy landing** | Config generated | landing-template + app-data | Vercel deploy; `deployment.landing.*` written |
-| **Webhook receiver** | POST from landing | Tracking payload JSON | Append row to Google Sheets |
+| **Generate landing config** (WF2) | Post-mockup-deploy | App Package files | `app-config.json` + images |
+| **Deploy landing** (WF2) | Config generated | landing-template + app-data | Vercel deploy; `deployment.landing.*` written |
+| **Webhook receiver** (WF3) | POST from landing | Tracking payload JSON | Append row to Google Sheets |
 | **Metrics / decision** | Schedule during `validating` | Sheet aggregates + `experiment.decisionRules` | `status: winner` / `killed` / `paused` |
 | **Meta ads** (future) | Post-landing-deploy | `ads.*`, `deployment.landing.url` | Ad campaigns with UTM |
 | **Dashboard feed** (future) | Schedule or on-demand | Google Sheets | Human-readable metrics view |
+
+**WF1 v1 note:** GitHub is the deployable code SSOT; WF1 does not create repos, push code, or download `mockup/` from Drive. Schedule-based discovery is deferred — WF1 v1 is manual-trigger-only. See [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md).
 
 ### 7.2 Workflow Responsibilities (Detail)
 
@@ -822,24 +835,39 @@ No workflow JSON is implemented. This section defines **intended** workflows tha
 - On success: fire `tracking.webhooks.validationComplete` if set; proceed to deploy.
 - On failure: do not deploy; notify author; keep `status: ready` or revert to `draft`.
 
-#### Deploy Mockup
+#### Deploy Mockup (WF1 v1)
 
-- Read `mockup.installCommand`, `buildCommand`, `deployCommand`.
-- Execute in CI-like environment against `mockup.sourcePath`.
-- On success, write:
-  ```json
-  {
-    "mockup": { "previewUrl": "<url>" },
-    "deployment": {
-      "mockup": {
-        "vercelProjectId": "<id>",
-        "url": "<url>",
-        "lastDeployedAt": "<iso8601>"
-      }
-    }
-  }
-  ```
-- `previewUrl` MUST equal `deployment.mockup.url`.
+**Trigger:** Manual with `appId` input.
+
+**Prerequisites (human, one-time):** GitHub repo exists; Vercel project connected with root directory matching `source.mockupRootDirectory`; `source.*` populated in `app.json`.
+
+**Flow:**
+
+1. Read `App Validation/{appId}/app.json` from Drive.
+2. Gate: `status === "ready"`.
+3. Validate `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and at least one of `source.vercelMockupProjectId` or `source.vercelMockupProjectName`.
+4. `POST` Vercel `/v13/deployments` with `gitSource` from `source.*`.
+5. Poll until `readyState === "READY"`.
+6. Merge-write only:
+   ```json
+   {
+     "mockup": { "previewUrl": "<url>" },
+     "deployment": {
+       "mockup": {
+         "vercelProjectId": "<id>",
+         "url": "<url>",
+         "lastDeployedAt": "<iso8601>"
+       }
+     }
+   }
+   ```
+7. Leave `status` as `ready`. Do not modify `source.*`.
+
+**Out of scope for WF1:** GitHub repo creation, code push, Drive `mockup/` download, Vercel project creation, landing deploy, webhooks, Google Sheets.
+
+`previewUrl` MUST equal `deployment.mockup.url`.
+
+**Credentials:** Google Service Account + Vercel Bearer token only (no GitHub PAT for WF1).
 
 #### Generate + Deploy Landing
 
@@ -989,7 +1017,9 @@ All fields are `null` in new packages. n8n populates them after deploy.
 
 **Also written:** `mockup.previewUrl` at top level — MUST match `deployment.mockup.url`.
 
-**Source:** `{appId}/mockup/` built and deployed as standalone Vercel project.
+**Deploy input (human-set):** `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and Vercel project ID or name in `source.*`.
+
+**Build source:** GitHub repo referenced by `source.mockupGithubRepo`; Vercel builds from the connected project (root directory = `source.mockupRootDirectory`). WF1 does not upload package `mockup/` from Drive.
 
 ### 8.3 deployment.landing
 
@@ -1408,6 +1438,7 @@ Future agents MUST be aware of these cross-document conflicts:
 | **landingVersion is deploy timestamp** | Name suggests manual version number | Derived from `deployment.landing.lastDeployedAt` |
 | **deploymentId is landing-only** | Name is generic | Mockup has separate `deployment.mockup.vercelProjectId` not in tracking payload |
 | **TrackingProvider in components/, README says lib/** | Minor path inconsistency in README | Actual path: `components/TrackingProvider.tsx` |
+| **WF1 v1 pre-provisioned model** | Older docs assumed WF1 downloads `mockup/` from Drive and pushes to GitHub | [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) v1.4.0: infra pre-provisioned; WF1 reads `source.*` and triggers Vercel API only |
 
 ### 14.5 Verification Checklist
 

@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
-# commit-all-repos.sh — add, commit, push all platform git repos
+# commit-all-repos.sh — add, commit, push all platform git repos to origin/main
 #
+# No pull. Local changes win — pushes your work as the latest on GitHub.
 # Order: nested repos first, then parent (updates gitlink pointers).
 #
 # Usage:
 #   ./commit-all-repos.sh "your commit message"
-#   ./commit-all-repos.sh "your commit message" --include-human-lab
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 MSG="${1:-}"
-INCLUDE_HUMAN_LAB=false
-
-if [[ "${2:-}" == "--include-human-lab" ]]; then
-  INCLUDE_HUMAN_LAB=true
-fi
 
 if [[ -z "$MSG" ]]; then
-  echo "Usage: $0 \"commit message\" [--include-human-lab]"
+  echo "Usage: $0 \"commit message\""
   exit 1
 fi
 
@@ -26,11 +21,8 @@ REPOS=(
   "app-validation-spec"
   "landing-template"
   "app-package-starter"
+  "test-app-packages/human-lab"
 )
-
-if [[ "$INCLUDE_HUMAN_LAB" == true ]]; then
-  REPOS+=("test-app-packages/human-lab")
-fi
 
 commit_and_push() {
   local dir="$1"
@@ -44,35 +36,33 @@ commit_and_push() {
     return 0
   fi
 
-  cd "$dir"
-
-  if [[ -z "$(git status --porcelain)" ]]; then
-    echo "   ✓  Nothing to commit"
-    cd "$ROOT"
+  local branch
+  branch="$(git -C "$dir" branch --show-current)"
+  if [[ "$branch" != "main" ]]; then
+    echo "   ⚠  On branch '$branch' — expected main, skipping"
     return 0
   fi
 
-  git add -A
-  git commit -m "$MSG"
+  git -C "$dir" add -A
 
-  local branch
-  branch="$(git branch --show-current)"
-  if [[ "$branch" != "main" ]]; then
-    echo "   ⚠  On branch '$branch' (not main)"
+  if [[ -n "$(git -C "$dir" status --porcelain)" ]]; then
+    git -C "$dir" commit -m "$MSG"
+    echo "   ✓  Committed"
+  else
+    echo "   ✓  Nothing to commit"
   fi
 
-  git push -u origin "$branch"
-  echo "   ✓  Pushed $branch"
-  cd "$ROOT"
+  git -C "$dir" push origin main
+  echo "   ✓  Pushed to origin/main"
 }
 
-echo "Committing nested repos..."
+echo "Committing and pushing nested repos..."
 for name in "${REPOS[@]}"; do
   commit_and_push "$ROOT/$name" "$name"
 done
 
 echo ""
-echo "Committing parent workspace..."
+echo "Committing and pushing parent workspace..."
 commit_and_push "$ROOT" "App-Validation-System (parent)"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

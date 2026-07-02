@@ -6,7 +6,17 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 
 ## Build model
 
-**GitHub → Vercel build → n8n orchestration.** n8n Cloud does not run Node/npm locally. n8n triggers deploys via APIs, reads deploy URLs, and writes `deployment.*` back to the App Package on Google Drive.
+**GitHub → Vercel build → n8n orchestration.** n8n Cloud does not run Node/npm locally.
+
+WF1 v1 assumes GitHub repo and Vercel project are **already provisioned**. WF1 triggers Vercel deploy API only — no GitHub push from n8n.
+
+## Workflow map
+
+| Workflow | Scope |
+|----------|-------|
+| **WF1** | Mockup deploy only (manual trigger) → reads `source.*`, writes `deployment.mockup.*`, `mockup.previewUrl` |
+| **WF2** | Landing transform + deploy → writes `deployment.landing.*` |
+| **WF3** | Webhooks + Google Sheets analytics |
 
 ## Status legend
 
@@ -20,54 +30,51 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 
 | Item | Status | Value | Stored In | Used By | Notes |
 |------|--------|-------|-----------|---------|-------|
-| `VERCEL_API_TOKEN` | ✅ | *(redacted — n8n only)* | n8n Credentials | Mockup + landing deploy workflows | Rotate if ever exposed outside n8n |
-| `VERCEL_TEAM_ID` | ✅ | `team_CvzW7iL13TaNbaIiaCHfjafe` | PLATFORM_SETUP_VALUES.md, `.env` | Vercel API (team scope) | Non-secret |
-| `GOOGLE_CLOUD_PROJECT_ID` | ✅ | `app-validation-501106` | PLATFORM_SETUP_VALUES.md | Reference | Project name: app-validation |
-| `GOOGLE_DRIVE_API` | ✅ | Enabled | Google Cloud Console | Drive read/write | APIs & Services → Library |
-| `GOOGLE_SHEETS_API` | ✅ | Enabled | Google Cloud Console | Event log append | APIs & Services → Library |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | ✅ | `app-validation-sa@app-validation-501106.iam.gserviceaccount.com` | PLATFORM_SETUP_VALUES.md, `.env` | Share Drive folder + Sheet with this email | Editor access required |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | ✅ | *(full JSON in n8n only)* | n8n Credentials | Google Drive + Sheets nodes | Never commit; rotate key if exposed |
-| `DRIVE_PARENT_FOLDER_ID` | ✅ | `1O3RHwYFhJlPRBygNKxc7HGHmWtfiaB5A` | PLATFORM_SETUP_VALUES.md, `.env` | Package discovery workflow | Drive folder: App Validation |
-| `GOOGLE_SHEET_ID` | ❌ | | PLATFORM_SETUP_VALUES.md, `.env` | Event logger workflow | Create sheet; share with service account |
-| `GOOGLE_SHEET_TAB_NAME` | ❌ | `Sheet1` | PLATFORM_SETUP_VALUES.md, `.env` | Sheets append node | Default tab name |
-| `N8N_BASE_URL` | ❌ | | PLATFORM_SETUP_VALUES.md, `.env` | Webhook provisioning | Public HTTPS URL (n8n Cloud or self-hosted) |
-| `N8N_ADMIN_EMAIL` | ❌ | | PLATFORM_SETUP_VALUES.md | Admin login | |
-| `GITHUB_PAT` | ❌ | *(n8n only)* | n8n Credentials | Push artifacts / trigger Vercel via GitHub | Required for GitHub → Vercel build model |
-| `GITHUB_ORG_OR_USER` | ❌ | | PLATFORM_SETUP_VALUES.md, `.env` | Repo namespace | Where mockup/landing repos live |
-| `LANDING_TEMPLATE_REPO` | ❌ | | PLATFORM_SETUP_VALUES.md, `.env` | Landing deploy | e.g. `org/landing-template` on GitHub |
-| `ALERT_WEBHOOK_URL` | ❌ | *(optional)* | n8n Credentials | Failure notifications | Slack incoming webhook or similar |
-| `WEBHOOK_AUTH_SECRET` | ❌ | *(optional)* | n8n Credentials | Inbound landing event webhooks | Harden public webhook endpoints |
-| `DRIVE_POLL_INTERVAL_MIN` | ❌ | `5` | PLATFORM_SETUP_VALUES.md, `.env` | Package discovery schedule | Suggested default |
+| `VERCEL_API_TOKEN` | ✅ | *(n8n Credentials only)* | n8n Credentials | WF1, WF2 | Header Auth Bearer |
+| `VERCEL_TEAM_ID` | ✅ | `team_CvzW7iL13TaNbaIiaCHfjafe` | Config Set node, `.env` | Vercel API | Non-secret |
+| `GOOGLE_CLOUD_PROJECT_ID` | ✅ | `app-validation-501106` | `.env` | Reference | |
+| `GOOGLE_DRIVE_API` | ✅ | Enabled | Google Cloud | Drive | |
+| `GOOGLE_SHEETS_API` | ✅ | Enabled | Google Cloud | WF3 | Not WF1 |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | ✅ | `app-validation-sa@app-validation-501106.iam.gserviceaccount.com` | `.env` | Share Drive + Sheet | Editor on folder |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | ✅ | *(n8n only)* | n8n Credentials | Drive nodes | Never commit |
+| `DRIVE_PARENT_FOLDER_ID` | ✅ | `1O3RHwYFhJlPRBygNKxc7HGHmWtfiaB5A` | Config Set node, `.env` | WF1 | App Validation |
+| `GOOGLE_SHEET_ID` | ✅ | *(in .env)* | Config Set node, `.env` | WF3 only | Not WF1 |
+| `GOOGLE_SHEET_TAB_NAME` | ✅ | `Sheet1` | Config Set node, `.env` | WF3 | |
+| `N8N_BASE_URL` | ✅ | `https://scooter.app.n8n.cloud` | `.env` | WF3 webhooks | Not WF1 |
+| `N8N_ADMIN_EMAIL` | ✅ | *(in .env)* | `.env` | Admin | |
+| `GITHUB_PAT` | ✅ | *(n8n only)* | n8n Credentials | WF2 only | Not WF1 — WF1 does not push code |
+| `GITHUB_ORG_OR_USER` | ✅ | `scootero` | Config Set node, `.env` | WF2 | Not WF1 |
+| `LANDING_TEMPLATE_REPO` | ✅ | `scootero/Landing-Page-Template` | Config Set node, `.env` | WF2 only | Not WF1 |
+| `ALERT_WEBHOOK_URL` | ❌ | optional | n8n Credentials | Error alerts | |
+| `WEBHOOK_AUTH_SECRET` | ❌ | optional | n8n Credentials | WF3 | |
+| `VERCEL_POLL_INTERVAL_SECONDS` | ✅ | `15` | Config Set node, `.env` | WF1 | Poll deployment status |
+| `VERCEL_POLL_MAX_MINUTES` | ✅ | `10` | Config Set node, `.env` | WF1 | Max poll wait |
 
-## Google Sheet header (row 1)
+## Where values go
 
-Create one spreadsheet; append all events to one tab. Canonical column order:
+| Value | n8n Credentials | Config Set node | `.env` | This file | Drive app.json | Vercel / GitHub |
+|-------|-----------------|-----------------|--------|-----------|----------------|-----------------|
+| Google SA JSON | ✅ | — | optional | redacted | — | — |
+| Vercel token | ✅ | — | optional | redacted | — | — |
+| GitHub PAT | ✅ | — | optional | redacted | — | WF2 only |
+| Drive folder ID | — | ✅ | ✅ | ✅ | — | — |
+| Vercel team ID | — | ✅ | ✅ | ✅ | — | API param |
+| `source.mockupGithubRepo` etc. | — | — | — | — | human sets | repo must exist |
+| `deployment.mockup.*` | — | — | — | — | WF1 writes | — |
+| `tracking.webhookUrl` | — | — | — | — | WF3 writes | — |
+| `status: ready` | — | — | — | — | Human sets | — |
 
-```
-timestamp | eventType | appId | appName | experimentId | experimentRunId | projectId | deploymentId | landingVersion | landingVariantId | mockupVersionId | campaignName | visitorId | sessionId | email | price | pageUrl | referrer | utmSource | utmMedium | utmCampaign | utmContent | utmTerm | timeOnPageSeconds | mockupInteracted
-```
+## WF1 readiness checklist
 
-## n8n credential mapping
-
-| n8n credential type | Source variable | Workflows |
-|--------------------|-----------------|-----------|
-| Google Service Account | `GOOGLE_SERVICE_ACCOUNT_JSON` | Drive discovery, `app.json` read/write, Sheets append |
-| Vercel API / HTTP Bearer | `VERCEL_API_TOKEN` | Mockup deploy, landing deploy |
-| GitHub | `GITHUB_PAT` | Push build artifacts, repo management |
-| HTTP Webhook / Header Auth | `WEBHOOK_AUTH_SECRET` | Inbound tracking (optional) |
-| Slack / Email | `ALERT_WEBHOOK_URL` | Error alerts (optional) |
-
-## Still to do
-
-- [ ] Create Google Sheet with 25-column header; share with service account; record `GOOGLE_SHEET_ID`
-- [ ] Stand up n8n instance; record `N8N_BASE_URL`
-- [ ] Add credentials in n8n UI (Google SA JSON, Vercel token, GitHub PAT)
-- [ ] Connect GitHub repos to Vercel projects (per app: mockup + landing)
-- [ ] Build n8n workflows (discovery → provision → validate → deploy → track → sheet)
-- [ ] Upload first App Package to Drive; set `status: provisioning`
+- [ ] Google SA and Vercel token in **n8n Credentials** (no GitHub PAT for WF1)
+- [ ] Config Set node values in WF1 workflow (`driveParentFolderId`, `vercelTeamId`, poll settings)
+- [ ] GitHub repo exists with mockup code on `source.mockupBranch`
+- [ ] Vercel project connected to repo; root directory = `source.mockupRootDirectory`; manual deploy succeeded
+- [ ] Package on Drive with `source.*` filled and **`status: "ready"`**
+- [ ] Build WF1 using [WF1-N8N-AI-PROMPT.md](n8n-workflows/WF1-N8N-AI-PROMPT.md)
 
 ## Related docs
 
-- [N8N_PLATFORM_ARCHITECTURE.md](N8N_PLATFORM_ARCHITECTURE.md) — system design
-- [AI_IMPLEMENTATION_GUIDE.md](AI_IMPLEMENTATION_GUIDE.md) — onboarding for AI agents
-- [app-validation-spec/docs/n8n-integration-notes.md](app-validation-spec/docs/n8n-integration-notes.md) — workflow wiring
+- [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md)
+- [n8n-workflows/WF1-N8N-AI-PROMPT.md](n8n-workflows/WF1-N8N-AI-PROMPT.md)
+- [N8N_PLATFORM_ARCHITECTURE.md](N8N_PLATFORM_ARCHITECTURE.md)
