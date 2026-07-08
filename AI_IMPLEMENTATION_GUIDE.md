@@ -100,7 +100,7 @@ App-Validation-System/
 
 | Asset | Purpose |
 |-------|---------|
-| `APP_PACKAGE_SPEC.md` | Human-readable field reference (spec version **1.3.0**) |
+| `APP_PACKAGE_SPEC.md` | Human-readable field reference (spec version **1.4.0**) |
 | `schemas/app.schema.json` | Machine-readable JSON Schema |
 | `templates/` | Starter `app.json` and `copy/` files |
 | `examples/minimal-app/` | Smallest valid package (Focus Timer, `status: draft`) |
@@ -188,7 +188,7 @@ App-Validation-System/
 
 ### Phase 1: App Package Specification (complete)
 
-- Spec version **1.3.0** with JSON Schema
+- Spec version **1.4.0** with JSON Schema
 - Normative docs: design philosophy, workflow mapping, n8n integration notes, naming conventions, versioning, validator gate
 - Templates and two example packages (minimal and full)
 - Status lifecycle including `provisioning` stage
@@ -256,159 +256,112 @@ This is a **contract + renderer + starter** foundation. The data model, landing 
 
 # Upcoming Phase
 
-The immediate next phase is building the **n8n automation platform**. Expected build order:
+The immediate next phase is building the **n8n automation platform**. Canonical build order:
 
-| Step | Workflow | Purpose |
-|------|----------|---------|
-| 1 | **Package discovery** | Poll Google Drive parent folder; list `{appId}/` folders; read `app.json`; branch on `status` |
-| 2 | **Validation** | JSON Schema check; file existence; profile gates (`experiment` complete, analytics IDs present); block deploy on failure |
-| 3 | **Provisioning** | Create n8n webhook endpoint; write `tracking.webhookUrl`; promote `status` from `provisioning` → `ready` |
-| 4 | **Deployment** | Build and deploy mockup to Vercel; run landing transform; deploy landing page to Vercel; write back `deployment.*` URLs |
-| 5 | **Tracking** | Receive landing webhook POSTs; normalize payloads; route by `eventType` |
-| 6 | **Google Sheets** | Append one row per event to a unified sheet; canonical column order |
-| 7 | **Dashboard** | Aggregate sheet data; compare against `experiment.successCriteria` and `decisionRules` |
-| 8 | **Meta advertising** | Create campaigns from `ads` section; destination = `deployment.landing.url` + expanded UTM; respect `experiment.testBudget` |
-| 9 | **Automated iteration** | Evaluate experiment outcomes; set `status` to `winner` / `killed` / `paused`; optionally spawn variant packages |
+| Order | Workflow | Purpose |
+|-------|----------|---------|
+| 0 | **WF0** Provisioning | `tracking.webhookUrl`; `status: provisioning` → `ready` |
+| 1 | **WF1** Mockup Deploy | Vercel mockup deploy; `deployment.mockup.*` |
+| 2 | **WF2** Landing Deploy | Transform + landing Vercel deploy; `deployment.landing.*` |
+| 3 | **WF3** Tracking | Webhook receiver + Google Sheets append |
+| 4 | **WF-Ads** Meta | Paused Meta campaign; `ads.meta.*`; `status: validating` |
+| 5 | **WF-Decision** Monitoring | Metrics + reports; root `status` transitions |
 
-Each step should be a discrete n8n workflow or sub-workflow, callable independently for testing.
+**Pre-deploy validation** (JSON Schema, file checks) is a gate before WF1 — not a numbered workflow. **Package discovery** (Drive poll) is a future cross-cutting trigger.
+
+Each workflow is independently testable. See [N8N_PLATFORM_ARCHITECTURE.md](N8N_PLATFORM_ARCHITECTURE.md) §7 for the canonical reference.
 
 ---
 
 # Expected n8n Architecture
+
+> **Note:** Older versions of this guide used WF1–WF11 numbering (discovery, provisioning as WF2, validation as WF3, etc.). That numbering is **superseded**. Use the canonical map in [N8N_PLATFORM_ARCHITECTURE.md](N8N_PLATFORM_ARCHITECTURE.md) §7.
 
 ## High-level workflow graph
 
 ```mermaid
 flowchart TD
   drive[Google Drive: App Packages]
-  discover[WF1: Package Discovery]
-  provision[WF2: Provisioning]
-  validate[WF3: Validation]
-  mockupDeploy[WF4: Mockup Deploy]
-  landingGen[WF5: Landing Transform + Deploy]
-  ads[WF6: Meta Ads]
-  track[WF7: Event Tracking]
-  sheets[WF8: Google Sheets Logger]
-  dashboard[WF9: Dashboard / Metrics]
-  decide[WF10: Experiment Decision]
-  iterate[WF11: Iteration]
+  WF0[WF0: Provisioning]
+  gate[Pre-Deploy Validation]
+  WF1[WF1: Mockup Deploy]
+  WF2[WF2: Landing Deploy]
+  WF3[WF3: Tracking + Sheets]
+  WFAds[WF-Ads: Meta Paused]
+  WFDec[WF-Decision: Monitoring]
 
-  drive --> discover
-  discover -->|status: provisioning| provision
-  discover -->|status: ready| validate
-  provision -->|writes webhookUrl, status: ready| drive
-  validate -->|pass| mockupDeploy
-  mockupDeploy --> landingGen
-  landingGen --> ads
-  ads -->|status: validating| drive
-  track --> sheets
-  sheets --> dashboard
-  dashboard --> decide
-  decide -->|winner/killed/paused| drive
-  decide --> iterate
+  drive -->|status provisioning| WF0
+  WF0 -->|webhookUrl + ready| drive
+  drive -->|status ready| gate
+  gate --> WF1
+  WF1 --> WF2
+  WF2 --> WF3
+  WF3 --> WFAds
+  WFAds -->|status validating| drive
+  drive -->|status validating| WFDec
+  WFDec -->|winner/killed/paused| drive
+  WF3 -->|events| sheets[Google Sheets]
+  WFDec -->|reads| sheets
 ```
 
 ## Workflow responsibilities
 
-### WF1: Package Discovery
+### WF0: Provisioning
 
-- Schedule trigger (poll every N minutes) or manual trigger by `appId`
-- List child folders of configured Drive parent (`App Validation/{appId}/`)
-- Read `app.json`; confirm `appId === folderName`
-- Route by `status`:
-  - `provisioning` → WF2
-  - `ready` → WF3
-  - `validating` → WF9 (monitoring)
-  - `draft`, `paused`, `winner`, `killed`, `built` → skip (unless manual override)
+- Trigger: `status === "provisioning"` (poll or manual `appId`)
+- Create n8n webhook URL for landing events
+- Merge-write `tracking.webhookUrl`; set `status: "ready"`
+- Gate: `experiment`, `ads`, `analytics` complete before human sets `provisioning`
 
-### WF2: Provisioning
+### WF1: Mockup Deploy
 
-- Trigger: `status === "provisioning"`
-- Create n8n Webhook node URL
-- Merge-write `tracking.webhookUrl` to `app.json` on Drive
-- Set `status: "ready"`
-- Gate: full `experiment`, `ads`, and `analytics` sections must be complete (validator checks)
+- Manual trigger; gate `status === "ready"` and pre-deploy validation passed
+- Read `source.*`; trigger Vercel API deploy
+- Write `mockup.previewUrl`, `deployment.mockup.*`
+- See [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md)
 
-### WF3: Validation
+### WF2: Landing Transform + Deploy
 
-- JSON Schema validation against `schemas/app.schema.json`
-- Verify referenced files exist (`copy/*.md`, `media/*`, `mockup/` source)
-- Verify `tracking.webhookUrl` is non-null
-- On success: fire `tracking.webhooks.validationComplete` (if set); proceed to deploy
-- On failure: notify author; do not deploy; leave `status` at `ready` or revert to `draft`
-- Optionally set `status: "validating"` when ads launch
+- Manual trigger; gate WF1 mockup URL present
+- Transform package → `app-data/`; push GitHub; Vercel landing deploy
+- Write `deployment.landing.*`, `deployment.githubRepoUrl`
+- See [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md)
 
-### WF4: Mockup Deploy
+### WF3: Tracking + Google Sheets
 
-- Read `mockup.installCommand`, `buildCommand`, `deployCommand`
-- Build from `mockup.sourcePath`
-- Deploy to Vercel (one project per mockup)
-- Write back:
-  - `mockup.previewUrl`
-  - `deployment.mockup.url` (must match `previewUrl`)
-  - `deployment.mockup.vercelProjectId`
-  - `deployment.mockup.lastDeployedAt`
+- Always-on webhook POST from landing page
+- Validate `eventType`; append row to unified Google Sheet
+- Return 200 fast
+- See [WF3-TRACKING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF3-TRACKING-PIPELINE-BLUEPRINT.md)
 
-### WF5: Landing Transform + Deploy
+### WF-Ads: Meta/Facebook (paused by default)
 
-- Run equivalent of `generate-app-config.js` against package
-- Copy `media/screenshots/*`, logo, og-image to landing build
-- Set `mockup.embedUrl` from `deployment.mockup.url`
-- Deploy landing-template to Vercel (one project per landing page)
-- Write back:
-  - `deployment.landing.url` (canonical public URL — ad destination)
-  - `deployment.landing.deploymentUrl` (latest Vercel deployment URL)
-  - `deployment.landing.vercelProjectId`
-  - `deployment.landing.lastDeployedAt`
-- Fire `tracking.webhooks.deployComplete` (if set)
+- Manual trigger after WF2; gate `deployment.landing.url`
+- Read `ads.*`, `ads.targeting`, `experiment.testBudget`
+- Create Meta campaign/ad set/creative/ad — all **PAUSED**
+- Write `ads.meta.*`; set `status: "validating"`
+- See [WF-ADS-META-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-ADS-META-PIPELINE-BLUEPRINT.md)
 
-### WF6: Meta Ads
+### WF-Decision: Validation Monitoring
 
-- Read `ads.campaignName`, `headlines`, `primaryTexts`, `platforms`, `utmTemplate`
-- Destination: `deployment.landing.url` + expanded UTM params
-- Budget: `experiment.testBudget.amount`, `durationDays`
-- Use `media.ogImage` and screenshots for creatives
-
-### WF7: Event Tracking
-
-- Webhook trigger receiving landing page POSTs
-- Validate payload shape (`eventType`, `appId`, attribution fields)
-- Fan out to Google Sheets and optional per-event webhooks
-
-### WF8: Google Sheets Logger
-
-- Append one row per event
-- Canonical column order (see Tracking Philosophy below)
-- Never discard events — store everything
-
-### WF9: Dashboard / Metrics
-
-- Read sheet data filtered by `experimentId`, `experimentRunId`
-- Compute CPA, conversion rates, mockup interaction rate
-- Compare against `experiment.successCriteria` and `decisionRules`
-
-### WF10: Experiment Decision
-
-- Evaluate `winnerThreshold`, `killThreshold`, `minSampleSize`
-- Write `status: "winner"` or `status: "killed"` or `status: "paused"` to `app.json`
-- Stop or scale ads accordingly
-
-### WF11: Iteration (future)
-
-- Clone package with new `landingVariantId` or copy changes
-- Re-enter pipeline at `ready` or `provisioning`
+- Schedule during `status: validating` (e.g. every 6–12 hours)
+- Pull Meta metrics + Sheets signups; compute `validation.metrics`
+- Compare `experiment.thresholds` and `decisionRules`
+- Write `validation.*`; save `reports/validation-{date}.json`
+- Set root `status` to `winner`, `killed`, or `paused` (never `validation.status`)
+- See [WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md)
 
 ## Package write-backs
 
 n8n **merges** updates into `app.json` on Drive. Never replace the entire file blindly. Never modify `appId` or `specVersion`.
 
-| After step | Fields written |
-|------------|----------------|
-| Provisioning | `tracking.webhookUrl`, `status: "ready"` |
-| Mockup deploy | `mockup.previewUrl`, `deployment.mockup.*` |
-| Landing deploy | `deployment.landing.*`, optionally `deployment.githubRepoUrl` |
-| Ads launch | `status: "validating"` |
-| Decision | `status: "winner"` / `"killed"` / `"paused"` |
+| After workflow | Fields written |
+|----------------|----------------|
+| WF0 Provisioning | `tracking.webhookUrl`, `status: "ready"` |
+| WF1 Mockup deploy | `mockup.previewUrl`, `deployment.mockup.*` |
+| WF2 Landing deploy | `deployment.landing.*`, optionally `deployment.githubRepoUrl` |
+| WF-Ads | `ads.meta.*`, `status: "validating"` |
+| WF-Decision | `validation.*`, `status: "winner"` / `"killed"` / `"paused"` |
 
 Write-back safety: read full file → merge in memory → upload atomically → log previous values.
 
@@ -417,12 +370,13 @@ Write-back safety: read full file → merge in memory → upload atomically → 
 **v1 model:** one Vercel project per mockup, one Vercel project per landing page.
 
 ```
-1. Package at status: ready
-2. Validate → deploy mockup → write deployment.mockup.*
-3. Transform package → deploy landing → write deployment.landing.*
-4. deployment.landing.url becomes ad destination
-5. Mockup URL embedded in landing via mockup.embedUrl (from deployment.mockup.url)
-6. Landing never imports mockup source — iframe only
+1. Human completes package → status: provisioning
+2. WF0 → tracking.webhookUrl → status: ready
+3. Pre-deploy validation gate → WF1 → deployment.mockup.*
+4. WF2 → transform + deploy landing → deployment.landing.*
+5. WF3 receives landing events → Google Sheets
+6. WF-Ads → deployment.landing.url + UTM → ads.meta.* → status: validating
+7. WF-Decision monitors → validation.* → winner/killed/paused
 ```
 
 ---
@@ -580,7 +534,7 @@ Add optional fields with defaults. Do not remove fields without a spec version b
 - `generate-app-config.js` translates only—no app-specific content
 - Generic fallbacks are allowed (documented in `APP_PACKAGE_TRANSFORM.md`)
 - Copy `media/screenshots/*` to `app-data/images/` during transform
-- `mockup.embedUrl` comes from `deployment.mockup.url` or `mockup.previewUrl`
+- `mockup.embedUrl` comes from `deployment.mockup.url` or `mockup.previewUrl` (public alias only — never `deployment.mockup.deploymentUrl`)
 
 ---
 
@@ -609,7 +563,7 @@ Before adding a new field, workflow, folder, or mapping:
 ## 2. Verify schema
 
 - [ ] Check `app-validation-spec/schemas/app.schema.json` for field names, types, and required sections
-- [ ] Confirm `specVersion` is **1.3.0**
+- [ ] Confirm `specVersion` is **1.4.0**
 - [ ] If adding fields: update schema, spec, templates, examples, and CHANGELOG together
 
 ## 3. Verify transform

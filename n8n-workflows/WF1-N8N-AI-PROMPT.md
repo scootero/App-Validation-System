@@ -14,7 +14,7 @@ Copy everything in the **prompt box** below into n8n's AI workflow builder.
 | 4 | vercel.com | Create project → Import GitHub repo → Root Directory = `mockup` → deploy once manually |
 | 5 | drive.google.com | Upload `{appId}/` to **App Validation/** folder; service account has Editor |
 | 6 | Drive `app.json` | Fill `source.*` (repo, branch, root directory, Vercel project ID or name) |
-| 7 | Drive `app.json` | Set **`"status": "ready"`** (webhook NOT required for WF1) |
+| 7 | Drive `app.json` | Set **`"status": "ready"`** (run **WF0** first in production to provision `tracking.webhookUrl`; WF1 does not require webhook for v1 testing) |
 
 ---
 
@@ -32,6 +32,8 @@ Copy everything in the **prompt box** below into n8n's AI workflow builder.
 | Status tracker, no secrets | **`PLATFORM_SETUP_VALUES.md`** |
 | Deploy URLs after run | **Drive `app.json`** (written by workflow) |
 | GitHub repo + root directory | **Vercel project settings** (one-time) |
+
+**Prerequisite:** WF0 should have provisioned `tracking.webhookUrl` in production. WF1 gates on `status: ready` only.
 
 **n8n does NOT read `.env`.** Paste credentials in n8n UI. **Secrets never go in `app.json`.**
 
@@ -65,14 +67,25 @@ WF1 must:
 7. Poll GET /v13/deployments/{deploymentId}?teamId={vercelTeamId} until readyState === "READY"
    - interval: vercelPollIntervalSeconds (default 15)
    - max wait: vercelPollMaxMinutes (default 10)
-8. Re-read full app.json from Drive; merge-write ONLY these fields:
+8. Resolve public production alias — NEVER write raw deployment response url to deployment.mockup.url or mockup.previewUrl:
+   a. From deployment alias[] — pick hostname ending in .vercel.app that is NOT a team-protected pattern (*-{teamSlug}.vercel.app or hash-prefixed deployment hostnames)
+   b. Fallback if alias[] lacks public domain: GET /v9/projects/{source.vercelMockupProjectId}/domains?production=true&target=production&teamId={vercelTeamId} — first verified production domain
+   c. Normalize to https://{hostname} → this is publicUrl
+   d. Store raw deployment url as deploymentUrl: https://{response.url} (debug only)
+9. Verify publicUrl with unauthenticated HTTP HEAD or GET (no auth headers). FAIL if:
+   - status is not 200
+   - Location header redirects to vercel.com/sso-api
+   - response includes X-Frame-Options: DENY
+   On failure: alert with deploymentId, publicUrl, deploymentUrl; do NOT write to Drive
+10. Only if verification passes: re-read full app.json from Drive; merge-write ONLY:
    - deployment.mockup.vercelProjectId
-   - deployment.mockup.url
+   - deployment.mockup.url (= publicUrl)
+   - deployment.mockup.deploymentUrl (= raw deploymentUrl, optional debug)
    - deployment.mockup.lastDeployedAt (ISO 8601)
    - mockup.previewUrl (MUST equal deployment.mockup.url)
-9. Upload merged app.json back to Drive (same file path)
-10. Log success with appId and deployment.mockup.url
-11. Leave status as "ready" — do NOT change status
+11. Upload merged app.json back to Drive (same file path)
+12. Log success with appId and deployment.mockup.url (public alias)
+13. Leave status as "ready" — do NOT change status
 
 OUT OF SCOPE — do NOT build any of these:
 - Schedule trigger or Drive folder discovery loop
@@ -108,23 +121,53 @@ FLOW (node-by-node):
 6. Code → parse source.mockupGithubRepo into { org, repo }
 7. HTTP Request → POST Vercel /v13/deployments with gitSource
 8. Wait + HTTP Request loop → poll deployment until readyState === "READY"
-9. Code → extract url, projectId, timestamp from Vercel response
-10. Google Drive → re-download current app.json (fresh read for merge)
-11. Code → merge-write only the four output fields (see MERGE-WRITE below)
-12. Google Drive → upload merged app.json (overwrite same file)
+9. Code → Extract URLs: resolve publicUrl from alias[] (see step 8); set deploymentUrl from response.url; set projectId
+10. IF public alias not found in alias[] → HTTP GET /v9/projects/{projectId}/domains?production=true&target=production&teamId={vercelTeamId}; Code → pick first verified production domain as publicUrl
+11. HTTP Request → unauthenticated HEAD/GET to publicUrl (follow redirects=false or check Location)
+12. Code → verify: status 200, no SSO redirect, no X-Frame-Options DENY; throw if fail
+13. IF verification passed
+14. Google Drive → re-download current app.json (fresh read for merge)
+15. Code → merge-write only mockup fields (see MERGE-WRITE below)
+16. Google Drive → upload merged app.json (overwrite same file)
+
+EXTRACT URLS Code node pattern:
+const dep = $('Poll Vercel').first().json;
+const teamSlug = 'scooteros-projects'; // derive from vercelTeamId config if needed
+
+function isProtectedHost(host) {
+  return /-[a-z0-9]{5,}-/.test(host) || host.endsWith(`-${teamSlug}.vercel.app`);
+}
+
+function pickPublicAlias(aliases = []) {
+  const hosts = aliases
+    .map(a => (typeof a === 'string' ? a : a.domain || a))
+    .filter(Boolean)
+    .map(h => h.replace(/^https?:\\/\\//, ''));
+  return hosts.find(h => h.endsWith('.vercel.app') && !isProtectedHost(h)) || null;
+}
+
+let publicUrl = pickPublicAlias(dep.alias);
+const deploymentUrl = dep.url ? `https://${dep.url}` : null;
+
+return [{ json: {
+  publicUrl: publicUrl ? (publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`) : null,
+  deploymentUrl,
+  projectId: dep.projectId,
+  deploymentId: dep.id,
+  needsDomainsFallback: !publicUrl,
+}}];
 
 MERGE-WRITE Code node pattern:
-// Read existing app.json object (full document)
 const pkg = $input.first().json;
-const deployUrl = $('Extract URLs').first().json.url;
-const projectId = $('Extract URLs').first().json.projectId;
+const urls = $('Extract URLs').first().json;
 const deployedAt = new Date().toISOString();
 pkg.mockup = pkg.mockup || {};
-pkg.mockup.previewUrl = deployUrl;
+pkg.mockup.previewUrl = urls.publicUrl;
 pkg.deployment = pkg.deployment || {};
 pkg.deployment.mockup = pkg.deployment.mockup || {};
-pkg.deployment.mockup.vercelProjectId = projectId;
-pkg.deployment.mockup.url = deployUrl;
+pkg.deployment.mockup.vercelProjectId = urls.projectId;
+pkg.deployment.mockup.url = urls.publicUrl;
+pkg.deployment.mockup.deploymentUrl = urls.deploymentUrl;
 pkg.deployment.mockup.lastDeployedAt = deployedAt;
 // Do NOT modify: appId, specVersion, source, identity, copy, experiment, tracking, deployment.landing
 return [{ json: pkg }];
@@ -133,6 +176,8 @@ ERROR HANDLING:
 - status !== "ready" or missing source fields: stop with log; no deploy; status unchanged
 - Vercel API fail: retry 3x with exponential backoff, then alert
 - Poll timeout: alert; status stays ready
+- Public alias resolution fail: alert; no Drive write-back
+- Public URL verification fail: alert with deploymentId + publicUrl + deploymentUrl; no Drive write-back
 - Drive write-back fail: CRITICAL alert — deploy may be live but SSOT stale
 
 RULES:
@@ -140,6 +185,7 @@ RULES:
 - Per-app deploy inputs come from app.json source.* only
 - GitHub is deployable code source; Vercel builds from connected repo; n8n never runs npm
 - n8n Cloud does not read .env — credentials only in n8n Credentials UI
+- deployment.mockup.url and mockup.previewUrl MUST be the public production alias (e.g. https://human-lab.vercel.app), NEVER the raw SSO-protected deployment hostname
 
 Test with manual trigger appId=human-lab after source.* is filled and status is ready.
 ```
@@ -153,8 +199,10 @@ Test with manual trigger appId=human-lab after source.* is filled and status is 
 - [ ] Confirm no GitHub nodes exist in the workflow
 - [ ] Confirm no Schedule trigger exists (manual only for v1)
 - [ ] Manual test: `appId = human-lab`
-- [ ] Check Drive `app.json` for `deployment.mockup.url` and `mockup.previewUrl`
-- [ ] Open mockup URL in browser
+- [ ] Check Drive `app.json` for `deployment.mockup.url` and `mockup.previewUrl` — must be public alias (e.g. `https://human-lab.vercel.app`)
+- [ ] Confirm `deployment.mockup.deploymentUrl` holds raw deployment hostname (debug only)
+- [ ] Open mockup URL in **incognito** — no Vercel login
+- [ ] Open `{url}?embed=1` — mockup UI renders, nav bar hidden
 - [ ] Export workflow JSON to `n8n-workflows/WF1-mockup-deploy.json`
 
 ---
@@ -178,3 +226,9 @@ No. `.env` is your local cheat sheet. Paste secrets into **n8n Credentials**.
 
 **What does Vercel "connected" mean?**  
 Vercel project imports the GitHub repo from `source.mockupGithubRepo` and builds with Root Directory = `source.mockupRootDirectory`.
+
+**Why not write the deployment response url directly?**  
+Team projects with Deployment Protection use SSO-gated deployment hostnames that break incognito access and iframe embeds. WF1 resolves the public production alias instead.
+
+**What is deployment.mockup.deploymentUrl?**  
+The raw Vercel deployment hostname for debugging. WF2 must never use it for `mockup.embedUrl`.

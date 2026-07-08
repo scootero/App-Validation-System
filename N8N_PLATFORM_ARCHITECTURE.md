@@ -2,8 +2,8 @@
 
 **Status:** Canonical architecture and implementation handoff  
 **Audience:** Future AI agents (Cursor, ChatGPT, Codex, n8n builders)  
-**Spec version:** App Package Specification 1.3.0  
-**Last verified:** 2026-06-30
+**Spec version:** App Package Specification 1.4.0  
+**Last verified:** 2026-07-07
 
 This document is the **single entry point** for understanding the automated iOS app validation platform. It explains what the platform is, how every project fits together, where data originates, what may and may not be modified, and how automation is expected to work. It is **not** a user guide.
 
@@ -106,7 +106,7 @@ n8n is the automation layer that:
 - (Future) Creates Meta/Facebook ads
 - (Future) Evaluates experiment metrics and sets terminal `status`
 
-No n8n workflow JSON exists in the repository yet. [`n8n-workflows/`](n8n-workflows/) is a placeholder.
+No n8n workflow JSON exists in the repository yet. [`n8n-workflows/`](n8n-workflows/) contains **WF1 and WF2 blueprints and AI builder prompts** (no exported workflow JSON yet).
 
 #### Google Drive as Package Storage
 
@@ -138,7 +138,7 @@ Each app idea gets **two independent Vercel projects**:
 | Project | Source | Written to |
 |---------|--------|------------|
 | Mockup | `{appId}/mockup/` | `deployment.mockup.*` |
-| Landing | `landing-template/` + generated `app-data/` | `deployment.landing.*` |
+| Landing | `landing-template/` + generated `app-data/` in `{org}/{appId}-landing` GitHub repo | `deployment.landing.*` |
 
 Mockup deploys first. Landing embeds the mockup URL in an iframe. Ad destination URLs always point to `deployment.landing.url`.
 
@@ -207,13 +207,13 @@ The workspace at `App-Validation-System/` is a **multi-project folder**. There i
 | [`app-package-starter/`](app-package-starter/) | Copy-and-customize scaffold for new app ideas |
 | [`test-app-packages/`](test-app-packages/) | Local sandbox for real App Packages used in development |
 | [`landing-template/`](landing-template/) | Config-driven Next.js fake-door landing page renderer |
-| [`n8n-workflows/`](n8n-workflows/) | Placeholder for future n8n workflow JSON exports (currently empty) |
+| [`n8n-workflows/`](n8n-workflows/) | WF1/WF2 blueprints and AI prompts; workflow JSON exports pending |
 
 ### 2.2 app-validation-spec
 
 | Dimension | Detail |
 |-----------|--------|
-| **Purpose** | Defines what an App Package is. Ships JSON Schema, normative docs, templates, and minimal/full examples. Phase 1 (docs only) is complete at v1.3.0. |
+| **Purpose** | Defines what an App Package is. Ships JSON Schema, normative docs, templates, and minimal/full examples. Phase 1 (docs only) is complete at v1.4.0. |
 | **Owns** | `schemas/app.schema.json`, `APP_PACKAGE_SPEC.md`, `docs/*`, `templates/`, `examples/` |
 | **Consumes** | Nothing at runtime — it is the contract layer |
 | **Outputs** | Schema and documentation consumed by validators, AI agents, n8n builders, and transform scripts |
@@ -263,17 +263,20 @@ The workspace at `App-Validation-System/` is a **multi-project folder**. There i
 
 **Critical rule:** `app-data/app-config.json` is **generated and disposable**. Content changes MUST originate in the App Package and flow through the transform — not through direct edits to `app-config.json` (except temporary local dev).
 
-### 2.6 n8n-workflows (Future)
+### 2.6 n8n-workflows
 
 | Dimension | Detail |
 |-----------|--------|
-| **Purpose** | Version-controlled exports of n8n workflow JSON for discovery, provisioning, validation, deploy, tracking, and experiment decision. |
-| **Owns** | Workflow definitions (when implemented) |
+| **Purpose** | Version-controlled n8n workflow blueprints, AI builder prompts, and (future) workflow JSON exports for discovery, provisioning, validation, deploy, tracking, and experiment decision. |
+| **Owns** | Workflow definitions and build handoff docs |
 | **Consumes** | App Package spec, landing transform script, Vercel/Meta/Sheets APIs |
 | **Outputs** | Running automation; write-backs to Drive `app.json`; Sheet rows |
 | **Should never own** | App-specific content, landing UI, or the JSON Schema |
 
-**Current state:** Empty directory. All workflow behavior is documented in [Section 7](#7-n8n-architecture) as intended design.
+**Current state:** Blueprint docs exist for WF1 (mockup deploy) and WF2 (landing deploy). Exported workflow JSON is not yet committed. See [Section 7](#7-n8n-architecture) and:
+
+- [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md)
+- [n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md)
 
 ### 2.7 Cross-Project Ownership Rules
 
@@ -328,34 +331,38 @@ This section traces one app idea from creation through experiment decision and n
 2. Gate on `status === "ready"`; validate `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and Vercel project ID or name.
 3. Trigger Vercel deployment API using `gitSource` from `source.*` (Vercel builds from GitHub — n8n never runs `npm` or pushes code).
 4. Poll until `readyState === "READY"`.
-5. Merge-write to `app.json`:
+5. Resolve public production alias (not raw deployment hostname); verify incognito-safe and iframe-safe.
+6. Merge-write to `app.json` (only if verification passes):
    - `mockup.previewUrl`
    - `deployment.mockup.vercelProjectId`
-   - `deployment.mockup.url`
+   - `deployment.mockup.url` (public alias)
+   - `deployment.mockup.deploymentUrl` (raw deployment hostname; debug only)
    - `deployment.mockup.lastDeployedAt`
 
-`mockup.previewUrl` and `deployment.mockup.url` MUST match. `status` stays `ready`.
+`mockup.previewUrl` and `deployment.mockup.url` MUST match (public alias only). `status` stays `ready`.
 
 See [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) for the normative WF1 v1 flow.
 
-#### Stage E: Landing Generation
+#### Stage E–F: Landing Deploy (WF2 v1)
 
-1. n8n (or local dev) runs equivalent of `node scripts/generate-app-config.js {package-path}`.
-2. Transform reads `app.json`, `copy/*.md`, copies `media/*` to `app-data/images/`.
-3. Outputs `app-data/app-config.json` with `mockup.embedUrl` from `deployment.mockup.url`.
-4. Attribution IDs from `analytics.*` fold into `tracking.*` in config.
+**Prerequisite:** WF1 has written `deployment.mockup.url` or `mockup.previewUrl`. Vercel team GitHub integration installed (platform one-time). Landing repo and Vercel project are **created by WF2** on first run — no manual per-app vercel.com steps.
 
-#### Stage F: Landing Deploy
-
-1. n8n deploys `landing-template/` (with generated `app-data/`) to its own Vercel project.
-2. Writes back to `app.json`:
+1. **WF2** manual trigger with `appId`; read `App Validation/{appId}/app.json` from Drive.
+2. Gate on `status === "ready"` and WF1 mockup URL present.
+3. Download `app.json`, `copy/*.md`, and referenced `media/*` from Drive.
+4. Transform package → `app-data/app-config.json` (equivalent of `generate-app-config.js`); set `mockup.embedUrl` from WF1 output.
+5. Bootstrap landing GitHub repo from `landingTemplateRepo` if missing; push `app-data/` (GitHub PAT; n8n does not run npm).
+6. Trigger Vercel deployment API with `name` + `gitSource` (creates Vercel project on first run).
+7. Poll until `readyState === "READY"`.
+8. Merge-write to `app.json`:
    - `deployment.landing.vercelProjectId`
    - `deployment.landing.url` (canonical public URL — ad destination)
    - `deployment.landing.deploymentUrl` (latest Vercel deployment URL)
    - `deployment.landing.lastDeployedAt`
-   - `deployment.githubRepoUrl` (if repo created)
-3. Optionally sets `status: validating`.
-4. Fires `tracking.webhooks.deployComplete` if configured.
+   - `deployment.githubRepoUrl` (if still null)
+9. Leave `status` as `"ready"`.
+
+See [n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) for the normative WF2 v1 flow.
 
 #### Stage G: Ads (Future)
 
@@ -549,9 +556,12 @@ This section documents **where every important value originates**, who writes it
 | `source.vercelMockupProjectId` | Human from Vercel dashboard | Human | WF1 (Vercel deploy API) |
 | `source.vercelMockupProjectName` | Human from Vercel dashboard | Human | WF1 (Vercel deploy API fallback) |
 | `deployment.mockup.vercelProjectId` | Vercel API response | n8n WF1 after mockup deploy | Infrastructure reference |
-| `deployment.mockup.url` | Vercel deploy URL | n8n after mockup deploy | Transform → `mockup.embedUrl` |
-| `deployment.mockup.lastDeployedAt` | Deploy timestamp (ISO 8601) | n8n after mockup deploy | Audit; not used in tracking |
-| `deployment.landing.vercelProjectId` | Vercel API response | n8n after landing deploy | Transform → `tracking.deploymentId` |
+| `deployment.mockup.url` | Vercel deploy URL | n8n WF1 after mockup deploy | WF2 transform → `mockup.embedUrl` |
+| `deployment.mockup.lastDeployedAt` | Deploy timestamp (ISO 8601) | n8n WF1 after mockup deploy | Audit; not used in tracking |
+| Landing GitHub repo `{org}/{appId}-landing` | Derived from n8n Config Set + `appId` | Human provisions; WF2 pushes `app-data/` | Vercel `gitSource` |
+| Vercel landing project `{appId}-landing` | Derived from n8n Config Set + `appId` | Human provisions | WF2 Vercel deploy API |
+| `repoOverrides` (per-app) | n8n Config Set | Human | Nonstandard repo/project names |
+| `deployment.landing.vercelProjectId` | Vercel API response | n8n WF2 after landing deploy | Transform → `tracking.deploymentId` |
 | `deployment.landing.url` | Canonical public URL | n8n after landing deploy | Ad destination; human sharing |
 | `deployment.landing.deploymentUrl` | Latest Vercel deployment URL | n8n after landing deploy | Transform → `tracking.deploymentId` fallback |
 | `deployment.landing.lastDeployedAt` | Deploy timestamp (ISO 8601) | n8n after landing deploy | Transform → `tracking.landingVersion` |
@@ -638,11 +648,11 @@ Applies to `app-package-starter/`, `test-app-packages/{appId}/`, and Google Driv
 | `scripts/` | Transform and build scripts | App Packages | Script maintainers | App-specific mapping logic |
 | `.next/` | Build output | — | `next build` | — |
 
-### 5.5 n8n-workflows/ (Future)
+### 5.5 n8n-workflows/
 
 | Folder | Owns data | Reads | Writes | Must never modify |
 |--------|-----------|-------|--------|-------------------|
-| `n8n-workflows/` | Exported workflow JSON | — | n8n maintainers | App Package content |
+| `n8n-workflows/` | Blueprint docs and exported workflow JSON | Spec; APIs | n8n maintainers | App Package content |
 
 ---
 
@@ -792,22 +802,43 @@ These keys in `tracking.webhooks` are **not** used by the landing template:
 
 No workflow JSON is implemented. This section defines **intended** workflows that future agents MUST implement consistently.
 
+**Canonical workflow order:** WF0 → WF1 → WF2 → WF3 → WF-Ads → WF-Decision
+
+```mermaid
+flowchart LR
+  WF0[WF0_Provisioning] --> WF1[WF1_MockupDeploy]
+  WF1 --> WF2[WF2_LandingDeploy]
+  WF2 --> WF3[WF3_Tracking_Sheets]
+  WF3 --> WFAds[WF-Ads_MetaPaused]
+  WFAds --> WFDec[WF-Decision_Monitoring]
+```
+
 ### 7.1 Workflow Inventory
 
 | Workflow | Trigger | Input | Output / Side Effects |
 |----------|---------|-------|---------------------|
-| **WF1 Mockup Deploy** (v1) | Manual (`appId`) | Drive `app.json` with `source.*` | Vercel deploy; `deployment.mockup.*` + `mockup.previewUrl` written; `status` stays `ready` |
+| **WF0 Provisioning** | `status: provisioning` (poll or manual `appId`) | Complete `app.json` | `tracking.webhookUrl` written; `status: ready` |
+| **WF1 Mockup Deploy** (v1) | Manual (`appId`); gate `status: ready` | Drive `app.json` with `source.*` | Vercel deploy; `deployment.mockup.*` + `mockup.previewUrl`; `status` stays `ready` |
+| **WF2 Landing Deploy** (v1) | Manual (`appId`); gate WF1 mockup URL | Drive package + WF1 mockup URL | Transform + GitHub push `app-data/`; Vercel deploy; `deployment.landing.*`; `status` stays `ready` |
+| **WF3 Tracking** | Always-on POST from landing | Tracking payload JSON | Append row to Google Sheets; return 200 fast |
+| **WF-Ads Meta** | Manual (`appId`) after WF2 | `ads.*`, `deployment.landing.url` | Meta campaign **paused**; `ads.meta.*`; `status: validating` |
+| **WF-Decision Monitoring** | Schedule during `validating` | Sheets + Meta API + `experiment.*` | `validation.*`; root `status` (`winner`/`killed`/`paused`); `reports/*.json` |
 | **Package discovery** (future) | Schedule (poll every N min) | Drive parent folder | List of `{appId}/` folders with `status` |
-| **Provisioning** (WF3) | `status: provisioning` | `app.json` | `tracking.webhookUrl` written; `status: ready` |
-| **Validation** | `status: ready` | Full package | Pass → deploy; Fail → notify, block |
-| **Generate landing config** (WF2) | Post-mockup-deploy | App Package files | `app-config.json` + images |
-| **Deploy landing** (WF2) | Config generated | landing-template + app-data | Vercel deploy; `deployment.landing.*` written |
-| **Webhook receiver** (WF3) | POST from landing | Tracking payload JSON | Append row to Google Sheets |
-| **Metrics / decision** | Schedule during `validating` | Sheet aggregates + `experiment.decisionRules` | `status: winner` / `killed` / `paused` |
-| **Meta ads** (future) | Post-landing-deploy | `ads.*`, `deployment.landing.url` | Ad campaigns with UTM |
 | **Dashboard feed** (future) | Schedule or on-demand | Google Sheets | Human-readable metrics view |
 
-**WF1 v1 note:** GitHub is the deployable code SSOT; WF1 does not create repos, push code, or download `mockup/` from Drive. Schedule-based discovery is deferred — WF1 v1 is manual-trigger-only. See [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md).
+**Pre-deploy validation** is a documented gate before WF1 (see [Section 10](#10-validator-responsibilities)) — not a numbered workflow.
+
+**WF0 note:** Provisions `tracking.webhookUrl` during `provisioning` → `ready`. See [WF0-PROVISIONING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF0-PROVISIONING-PIPELINE-BLUEPRINT.md).
+
+**WF1 v1 note:** GitHub is the deployable code SSOT; WF1 does not create repos, push code, or download `mockup/` from Drive. See [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md).
+
+**WF2 v1 note:** Landing repo and Vercel project derived from Config Set; WF2 bootstraps on first run. See [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md).
+
+**WF3 note:** Webhook receiver + Sheets logger. See [WF3-TRACKING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF3-TRACKING-PIPELINE-BLUEPRINT.md).
+
+**WF-Ads note:** Campaign created paused by default. See [WF-ADS-META-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-ADS-META-PIPELINE-BLUEPRINT.md).
+
+**WF-Decision note:** Uses `validation.*` and root `status` — never `validation.status`. See [WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md).
 
 ### 7.2 Workflow Responsibilities (Detail)
 
@@ -820,20 +851,21 @@ No workflow JSON is implemented. This section defines **intended** workflows tha
 
 **Drive limitation:** No native push webhooks. Use scheduled polling, manual trigger, or external Drive webhook if available.
 
-#### Provisioning
+#### WF0 Provisioning
 
-- **Trigger:** `status: provisioning`
-- Create n8n Webhook node (or reuse per-app webhook pattern).
-- Merge-write `tracking.webhookUrl` into `app.json` on Drive.
-- Set `status: ready`.
-- **Gate:** Do not set `ready` without non-null `tracking.webhookUrl`.
+- **Trigger:** `status: provisioning` (schedule poll or manual `appId`)
+- Validate package completeness (`experiment`, `analytics`, `ads`)
+- Create n8n Webhook node URL for landing events
+- Merge-write `tracking.webhookUrl` into `app.json` on Drive
+- Set `status: ready`
+- **Gate:** Do not set `ready` without non-null `tracking.webhookUrl`
 
-#### Validation
+#### Pre-Deploy Validation (gate, not numbered)
 
-- **Trigger:** `status: ready`
-- Run Phase 2 validator checks (see [Section 10](#10-validator-responsibilities)).
-- On success: fire `tracking.webhooks.validationComplete` if set; proceed to deploy.
-- On failure: do not deploy; notify author; keep `status: ready` or revert to `draft`.
+- **Trigger:** Before WF1 (manual or Phase 2 validator)
+- Run Phase 2 validator checks (see [Section 10](#10-validator-responsibilities))
+- On success: fire `tracking.webhooks.validationComplete` if set; proceed to WF1
+- On failure: do not deploy; notify author; keep `status: ready` or revert to `draft`
 
 #### Deploy Mockup (WF1 v1)
 
@@ -848,20 +880,22 @@ No workflow JSON is implemented. This section defines **intended** workflows tha
 3. Validate `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and at least one of `source.vercelMockupProjectId` or `source.vercelMockupProjectName`.
 4. `POST` Vercel `/v13/deployments` with `gitSource` from `source.*`.
 5. Poll until `readyState === "READY"`.
-6. Merge-write only:
+6. Resolve public production alias; verify unauthenticated access (200, no SSO redirect, no `X-Frame-Options: DENY`).
+7. Merge-write only (if verification passes):
    ```json
    {
-     "mockup": { "previewUrl": "<url>" },
+     "mockup": { "previewUrl": "<publicAlias>" },
      "deployment": {
        "mockup": {
          "vercelProjectId": "<id>",
-         "url": "<url>",
+         "url": "<publicAlias>",
+         "deploymentUrl": "<rawDeploymentUrl>",
          "lastDeployedAt": "<iso8601>"
        }
      }
    }
    ```
-7. Leave `status` as `ready`. Do not modify `source.*`.
+8. Leave `status` as `ready`. Do not modify `source.*`.
 
 **Out of scope for WF1:** GitHub repo creation, code push, Drive `mockup/` download, Vercel project creation, landing deploy, webhooks, Google Sheets.
 
@@ -869,31 +903,74 @@ No workflow JSON is implemented. This section defines **intended** workflows tha
 
 **Credentials:** Google Service Account + Vercel Bearer token only (no GitHub PAT for WF1).
 
-#### Generate + Deploy Landing
+#### Deploy Landing (WF2 v1)
 
-- Run transform equivalent to `generate-app-config.js`.
-- Copy media to `app-data/images/`.
-- Deploy landing-template to Vercel (separate project from mockup).
-- Write `deployment.landing.*` and optional `deployment.githubRepoUrl`.
-- Set `status: validating` when ads launch (or after deploy if ads are manual).
-- Fire `tracking.webhooks.deployComplete` if set.
+**Trigger:** Manual with `appId` input.
 
-#### Webhook Receiver
+**Prerequisites (platform, one-time):** Vercel team GitHub integration. n8n Credentials (Google SA, Vercel token, GitHub PAT). WF1 completed for the app.
 
-- **Trigger:** HTTP POST `application/json` from landing page.
-- Validate `eventType` is one of four canonical values.
-- Map payload fields to Sheet columns in canonical order.
-- Append row. Do not block client — return 200 quickly.
+**Flow:**
 
-#### Metrics / Decision
+1. Read `App Validation/{appId}/app.json` from Drive.
+2. Gate: `status === "ready"`.
+3. Gate: WF1 mockup URL present (`deployment.mockup.url` or `mockup.previewUrl`).
+4. Resolve landing repo and Vercel project name from Config Set + `appId` (or `repoOverrides`).
+5. Download `copy/*.md` and `media/*` from Drive.
+6. Transform → `app-data/app-config.json` + images (port `generate-app-config.js`).
+7. Bootstrap landing GitHub repo if missing; commit `app-data/`.
+8. `POST` Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run).
+9. Poll until `readyState === "READY"`.
+10. Merge-write only:
+    ```json
+    {
+      "deployment": {
+        "landing": {
+          "vercelProjectId": "<id>",
+          "url": "<canonical>",
+          "deploymentUrl": "<latest>",
+          "lastDeployedAt": "<iso8601>"
+        },
+        "githubRepoUrl": "https://github.com/<org>/<repo>"
+      }
+    }
+    ```
+11. Leave `status` as `ready`. Do not modify `deployment.mockup.*` or `mockup.previewUrl`.
 
-- **Trigger:** `status: validating`; schedule (e.g. daily).
-- Aggregate Sheet rows by `experimentId` / `experimentRunId`.
-- Compute: visitors, email capture rate, buy-now rate, CPA estimates.
-- Compare against `experiment.decisionRules.winnerThreshold`, `killThreshold`, `minSampleSize`.
-- Respect `experiment.testBudget.amount` and `durationDays`.
-- Write terminal `status` to `app.json`.
-- On `killed`: stop ads (future workflow).
+**Out of scope for WF2:** Mockup deploy, WF1 re-run, webhook provisioning, Google Sheets, Meta ads, npm in n8n, changing package copy, setting `status: validating`.
+
+**Credentials:** Google Service Account + Vercel Bearer token + GitHub PAT (WF2 only).
+
+#### WF3 Tracking (webhook receiver + Sheets)
+
+- **Trigger:** HTTP POST `application/json` from landing page to `tracking.webhookUrl`
+- Validate `eventType` is one of four canonical values
+- Map payload fields to Sheet columns in canonical order
+- Append row to unified Google Sheet
+- Return 200 quickly — do not block client
+
+**Runtime only:** WF3 does not routinely write `app.json` except optional health/debug fields on `tracking`.
+
+**Credentials:** Google Service Account + Sheet ID in Config Set.
+
+#### WF-Ads Meta (paused by default)
+
+- **Trigger:** Manual with `appId` after WF2; gate `deployment.landing.url`
+- Read `ads.*` (copy), `ads.targeting`, `experiment.testBudget`
+- Expand `ads.utmTemplate` → destination URL
+- Create Meta campaign, ad set, creative, ad — all **PAUSED**
+- Merge-write `ads.meta.*` only; set `status: validating`
+- Campaign remains paused until human activates in Meta Ads Manager
+
+#### WF-Decision Monitoring
+
+- **Trigger:** `status: validating`; schedule (e.g. every 6–12 hours)
+- Pull Meta metrics (spend, impressions, clicks) and Sheets signups
+- Compute `validation.metrics`; compare `experiment.thresholds` and `decisionRules`
+- Merge-write `validation.*`; save `reports/validation-{date}.json` on Drive
+- Set root `status` to `winner`, `killed`, or `paused` when criteria met
+- On `killed`: pause/stop Meta ads via API
+
+**Do not** write `validation.status` — use root `status` only.
 
 ### 7.3 Status State Machine
 
@@ -909,8 +986,8 @@ draft → provisioning → ready → validating → winner → built
 stateDiagram-v2
   [*] --> draft
   draft --> provisioning: Human completes package
-  provisioning --> ready: n8n provisions webhookUrl
-  ready --> validating: n8n validates deploys launches ads
+  provisioning --> ready: WF0 provisions webhookUrl
+  ready --> validating: WF-Ads creates Meta campaign
   ready --> draft: Validation fails
   validating --> winner: Meets success criteria
   validating --> killed: Meets kill criteria
@@ -927,11 +1004,11 @@ stateDiagram-v2
 |------------|--------|
 | → `draft` | Human (initial); n8n/validator (revert on failure) |
 | → `provisioning` | Human (package complete) |
-| → `ready` | n8n (after webhook provisioned) |
-| → `validating` | n8n (after deploy + ads live) |
-| → `paused` | Human or n8n (budget hold, inconclusive) |
-| → `winner` | n8n or human (decision workflow) |
-| → `killed` | n8n or human (decision workflow) |
+| → `ready` | **WF0** (after webhook provisioned) |
+| → `validating` | **WF-Ads** (Meta campaign created; may still be paused) |
+| → `paused` | Human or **WF-Decision** (budget hold, inconclusive) |
+| → `winner` | **WF-Decision** or human |
+| → `killed` | **WF-Decision** or human |
 | → `built` | Human (after shipping real app) |
 
 #### Terminology Mapping (Non-Canonical Names)
@@ -949,9 +1026,9 @@ Some documents use alternate terms. **Only the enum values above are valid in `a
 | Status | Default behavior |
 |--------|------------------|
 | `draft` | Skip — no automation |
-| `provisioning` | Run provisioning workflow |
-| `ready` | Run validation → deploy pipeline |
-| `validating` | Run metrics/decision; monitor budget |
+| `provisioning` | Run **WF0** provisioning |
+| `ready` | Pre-deploy validation gate; manual WF1 → WF2 → WF-Ads |
+| `validating` | Run **WF-Decision**; monitor budget |
 | `paused` | Skip ad changes; optional alert |
 | `winner` | Notify build team; optional `appStore` prep |
 | `killed` | Stop ads; archive; notify author |
@@ -982,11 +1059,22 @@ A workflow is not complete until it meets all of the following criteria:
 
 Workflow JSON exports in [`n8n-workflows/`](n8n-workflows/) should include a brief comment or companion note stating which criteria were verified.
 
+### 7.7 Workflow Write-Back Ownership
+
+| Workflow | Merge-writes | Never modifies |
+|----------|--------------|----------------|
+| **WF0** | `tracking.webhookUrl`, `status` → `ready` | `deployment.*`, `ads.meta`, `validation` |
+| **WF1** | `deployment.mockup.*`, `mockup.previewUrl` | `source.*`, `deployment.landing.*`, author content |
+| **WF2** | `deployment.landing.*`, `deployment.githubRepoUrl` | `deployment.mockup.*`, `landingPage`, `copy` |
+| **WF3** | *(runtime)* Google Sheets rows | Author `ads` copy |
+| **WF-Ads** | `ads.meta.*`, `status` → `validating` | `ads.headlines`, `experiment`, `deployment.*` |
+| **WF-Decision** | `validation.*`, root `status` | Author sections; no `validation.status` |
+
 ---
 
 ## 8. Deployment Model
 
-### 8.1 Nested Deployment Structure (v1.3.0)
+### 8.1 Nested Deployment Structure (v1.3.0+) and Validation Runtime (v1.4.0)
 
 ```json
 "deployment": {
@@ -1012,10 +1100,11 @@ All fields are `null` in new packages. n8n populates them after deploy.
 | Field | Purpose |
 |-------|---------|
 | `vercelProjectId` | Vercel project identifier for mockup app |
-| `url` | Public URL of deployed mockup (iframe target) |
+| `url` | **Public production alias** — iframe target (e.g. `https://human-lab.vercel.app`) |
+| `deploymentUrl` | Latest raw Vercel deployment URL (debug only; may be SSO-protected) |
 | `lastDeployedAt` | ISO 8601 timestamp of last mockup deploy |
 
-**Also written:** `mockup.previewUrl` at top level — MUST match `deployment.mockup.url`.
+**Also written:** `mockup.previewUrl` at top level — MUST match `deployment.mockup.url` (public alias only).
 
 **Deploy input (human-set):** `source.mockupGithubRepo`, `source.mockupBranch`, `source.mockupRootDirectory`, and Vercel project ID or name in `source.*`.
 
@@ -1030,7 +1119,7 @@ All fields are `null` in new packages. n8n populates them after deploy.
 | `deploymentUrl` | Latest Vercel deployment URL (may differ during preview deploys) |
 | `lastDeployedAt` | ISO 8601 timestamp; becomes `tracking.landingVersion` in transform |
 
-**Source:** `landing-template/` with generated `app-data/` deployed as separate Vercel project.
+**Source:** `landing-template/` tree in per-app GitHub repo `{org}/{appId}-landing`, with generated `app-data/` pushed by WF2. Vercel builds via GitHub (separate project from mockup).
 
 ### 8.4 Why Two Deployments
 
@@ -1048,7 +1137,8 @@ All fields are `null` in new packages. n8n populates them after deploy.
 |-----|---------|
 | `deployment.landing.url` | Ad destination, UTM base, public sharing |
 | `deployment.landing.deploymentUrl` | Debugging specific deploy; fallback for `tracking.deploymentId` |
-| `deployment.mockup.url` | iframe `embedUrl` only |
+| `deployment.mockup.url` | iframe `embedUrl` only (public production alias) |
+| `deployment.mockup.deploymentUrl` | Debug only; WF2/WF3 never consume |
 | `deployment.githubRepoUrl` | Source repo link if n8n creates per-app landing repo |
 
 ### 8.6 Legacy Flat Fields (Backward Compatibility)
@@ -1382,7 +1472,7 @@ These are secondary references — consult when needed, not before understanding
 
 | Component | Status | Evidence |
 |-----------|--------|----------|
-| App Package Specification v1.3.0 | ✅ Complete | `app-validation-spec/`, `schemas/app.schema.json` |
+| App Package Specification v1.4.0 | ✅ Complete | `app-validation-spec/`, `schemas/app.schema.json` |
 | JSON Schema with status enum, nested deployment | ✅ Complete | `app.schema.json` |
 | Normative docs (workflow, validator-gate, n8n notes, design philosophy) | ✅ Complete | `app-validation-spec/docs/` |
 | app-package-starter scaffold | ✅ Complete | `app-package-starter/` |
@@ -1399,7 +1489,8 @@ These are secondary references — consult when needed, not before understanding
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| n8n workflow JSON | ❌ Not started | `n8n-workflows/` is empty |
+| WF0 / WF1 / WF2 / WF3 / WF-Ads / WF-Decision blueprint docs | ✅ Complete | `n8n-workflows/WF0-*`, `WF1-*`, `WF2-*`, `WF3-*`, `WF-ADS-*`, `WF-DECISION-*` |
+| n8n workflow JSON | ❌ Not started | Blueprints exist; JSON export pending |
 | Phase 2 validator CLI | ❌ Not started | Rules documented only |
 | Google Drive automation | ❌ Not started | Local `test-app-packages/` used for dev |
 | Vercel deploy automation | ❌ Not started | Manual deploy possible |
@@ -1427,7 +1518,7 @@ Future agents MUST be aware of these cross-document conflicts:
 | Issue | Detail | Canonical source |
 |-------|--------|------------------|
 | **Status: `provisioning` omitted in Phase-1-Build-Plan** | `Phase-1-Build-Plan.md` lifecycle table skips `provisioning` | `APP_PACKAGE_SPEC.md` and `app.schema.json` |
-| **workflow.md human sets `ready`** | Stage table says "Pre-flight approval \| Human \| ready" | v1.3.0: Human → `provisioning`; n8n → `ready` after webhook |
+| **workflow.md human sets `ready`** | ~~Stage table said Human sets `ready`~~ | **Resolved in 1.4.0:** Human → `provisioning`; WF0 → `ready` |
 | **`running` / `completed` / `archived` not in schema** | Informal terms sometimes used in planning | Use `validating`, `winner`/`killed`/`built`, and `killed` respectively |
 | **Dashboard referenced but unbuilt** | Multiple docs mention "analytics dashboard" | v1 analytics = Google Sheets rows |
 | **No root git repo** | Workspace is a folder collection | `app-validation-spec` and `landing-template` have separate repos |
@@ -1439,6 +1530,9 @@ Future agents MUST be aware of these cross-document conflicts:
 | **deploymentId is landing-only** | Name is generic | Mockup has separate `deployment.mockup.vercelProjectId` not in tracking payload |
 | **TrackingProvider in components/, README says lib/** | Minor path inconsistency in README | Actual path: `components/TrackingProvider.tsx` |
 | **WF1 v1 pre-provisioned model** | Older docs assumed WF1 downloads `mockup/` from Drive and pushes to GitHub | [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) v1.4.0: infra pre-provisioned; WF1 reads `source.*` and triggers Vercel API only |
+| **WF2 v1 config-derived landing repo** | Older docs implied per-app `source.landing*` fields or inline Vercel deploy without GitHub push | [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) v1.4.0: repo/project derived from Config Set; WF2 bootstraps repo and creates Vercel project via deploy API |
+| **WF2 no manual Vercel per app** | Older WF2 docs required manual Vercel project + first deploy | WF2 v1: first `POST /v13/deployments` with `name` + `gitSource` creates project when team GitHub integration is installed |
+| **WF2 leaves status at ready** | Stage F previously said "optionally sets validating" | WF2 v1 does not change `status`; WF-Ads or operator promotes to `validating` later |
 
 ### 14.5 Verification Checklist
 
@@ -1450,6 +1544,12 @@ This document was cross-checked against:
 - [x] `APP_PACKAGE_TRANSFORM.md` — field mapping and generic fallbacks
 - [x] `n8n-integration-notes.md` — Sheet columns, write-back conventions, webhook shape
 - [x] `validator-gate.md` — lifecycle gates and check categories
+- [x] `WF0-PROVISIONING-PIPELINE-BLUEPRINT.md` — provisioning v1 flow
+- [x] `WF1-DEPLOY-PIPELINE-BLUEPRINT.md` — mockup deploy v1 flow
+- [x] `WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md` — landing deploy v1 flow
+- [x] `WF3-TRACKING-PIPELINE-BLUEPRINT.md` — tracking + Sheets flow
+- [x] `WF-ADS-META-PIPELINE-BLUEPRINT.md` — Meta ads paused-by-default flow
+- [x] `WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md` — validation monitoring flow
 
 ---
 
@@ -1467,6 +1567,8 @@ This document was cross-checked against:
 ├── media/                # Images, video (SSOT)
 │   └── screenshots/
 ├── mockup/               # Interactive prototype source
+├── reports/              # WF-Decision validation reports (automation writes)
+├── logs/                 # Optional workflow run logs
 ├── package.json          # Delegates to mockup/
 └── README.md             # Human notes — NOT validated
 ```
