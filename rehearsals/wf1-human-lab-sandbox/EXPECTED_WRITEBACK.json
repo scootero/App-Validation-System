@@ -1,0 +1,13 @@
+{
+  "mockup": {
+    "previewUrl": "https://human-lab-wf1-sandbox.vercel.app"
+  },
+  "deployment": {
+    "mockup": {
+      "vercelProjectId": "prj_6Ip7DfE186vPbDnR1VXrgmR8rsTM",
+      "url": "https://human-lab-wf1-sandbox.vercel.app",
+      "deploymentUrl": "https://human-lab-wf1-sandbox-67h6xq0nz-scooteros-projects.vercel.app",
+      "lastDeployedAt": "ISO8601_SET_ON_WRITEBACK"
+    }
+  }
+}

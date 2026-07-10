@@ -3,7 +3,7 @@
 **Status:** Canonical architecture and implementation handoff  
 **Audience:** Future AI agents (Cursor, ChatGPT, Codex, n8n builders)  
 **Spec version:** App Package Specification 1.5.0  
-**Last verified:** 2026-07-07
+**Last verified:** 2026-07-10 after WF1/WF2 sandbox rehearsals
 
 This document is the **single entry point** for understanding the automated iOS app validation platform. It explains what the platform is, how every project fits together, where data originates, what may and may not be modified, and how automation is expected to work. It is **not** a user guide.
 
@@ -196,7 +196,7 @@ flowchart TB
 
 ## 2. Repository Overview
 
-The workspace at `App-Validation-System/` is a **multi-project folder**. There is no root-level git repository. `app-validation-spec/` and `landing-template/` each maintain separate `.git` repos.
+The workspace at `App-Validation-System/` is a **multi-project folder** with a root git repository plus several nested project repositories used for source packages and rehearsals. Treat each project boundary explicitly; do not rely on a single `git status` to describe every nested repo.
 
 ### 2.1 Top-Level Projects
 
@@ -212,7 +212,7 @@ The workspace at `App-Validation-System/` is a **multi-project folder**. There i
 
 | Dimension | Detail |
 |-----------|--------|
-| **Purpose** | Defines what an App Package is. Ships JSON Schema, normative docs, templates, and minimal/full examples. Phase 1 (docs only) is complete at v1.4.0. |
+| **Purpose** | Defines what an App Package is. Ships JSON Schema, normative docs, templates, and minimal/full examples for Spec 1.5.0. |
 | **Owns** | `schemas/app.schema.json`, `APP_PACKAGE_SPEC.md`, `docs/*`, `templates/`, `examples/` |
 | **Consumes** | Nothing at runtime — it is the contract layer |
 | **Outputs** | Schema and documentation consumed by validators, AI agents, n8n builders, and transform scripts |
@@ -230,7 +230,7 @@ The workspace at `App-Validation-System/` is a **multi-project folder**. There i
 
 | Dimension | Detail |
 |-----------|--------|
-| **Purpose** | Reusable scaffold. Copy to `test-app-packages/{appId}/` or Google Drive, rename folder, replace `your-app-id` placeholders, fill TODOs. |
+| **Purpose** | Reusable scaffold. Copy locally or to a GitHub app repo, rename folder, replace `your-app-id` placeholders, fill TODOs, then upload only `app.json` to production Drive. |
 | **Owns** | Template `app.json`, empty `copy/` files, `docs/` planning templates, minimal React+Vite mockup scaffold, [`START_HERE.md`](app-package-starter/START_HERE.md) |
 | **Consumes** | Spec conventions from `app-validation-spec` |
 | **Outputs** | New App Package instances (via copy) |
@@ -345,15 +345,15 @@ See [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PI
 
 #### Stage E–F: Landing Deploy (WF2 v1)
 
-**Prerequisite:** WF1 has written `deployment.mockup.url` or `mockup.previewUrl`. Vercel team GitHub integration installed (platform one-time). Landing repo and Vercel project are **created by WF2** on first run — no manual per-app vercel.com steps.
+**Prerequisite:** WF1 has written `deployment.mockup.url` or `mockup.previewUrl`. The landing GitHub repo and Vercel landing project must exist before WF2 performs external writes. Creating those resources is an approval-gated setup step, not an automatic n8n side effect in the frozen WF2 v1 path.
 
 1. **WF2** manual trigger with `appId`; read `App Validation/{appId}/app.json` from Drive (**only** file).
 2. Gate on `status === "ready"` and WF1 mockup URL present.
 3. Read landing copy from inline `landingPage.sections[].inline` + `landingPage.content` (never Drive `copy/`).
 4. Resolve media via `url` / `githubPath` from `source.assetsGithubRepo ?? source.mockupGithubRepo` (declared assets only — never mockup source).
 5. Transform package → `app-data/app-config.json` (equivalent of `generate-app-config.js`); set `mockup.embedUrl` from WF1 output.
-6. Bootstrap landing GitHub repo from `landingTemplateRepo` if missing; push `app-data/` (GitHub PAT; n8n does not run npm).
-7. Trigger Vercel deployment API with `name` + `gitSource` (creates Vercel project on first run).
+6. Duplicate/seed the landing-template into the prepared landing GitHub repo and commit generated `app-data/` (GitHub PAT; n8n does not run npm).
+7. Trigger Vercel deployment API against the prepared landing project with `project` + `gitSource`; the Vercel project root directory is repository root/default.
 8. Poll until `readyState === "READY"`.
 9. Merge-write to `app.json`:
    - `deployment.landing.vercelProjectId`
@@ -559,9 +559,9 @@ This section documents **where every important value originates**, who writes it
 | `deployment.mockup.vercelProjectId` | Vercel API response | n8n WF1 after mockup deploy | Infrastructure reference |
 | `deployment.mockup.url` | Vercel deploy URL | n8n WF1 after mockup deploy | WF2 transform → `mockup.embedUrl` |
 | `deployment.mockup.lastDeployedAt` | Deploy timestamp (ISO 8601) | n8n WF1 after mockup deploy | Audit; not used in tracking |
-| Landing GitHub repo `{org}/{appId}-landing` | Derived from n8n Config Set + `appId` | Human provisions; WF2 pushes `app-data/` | Vercel `gitSource` |
-| Vercel landing project `{appId}-landing` | Derived from n8n Config Set + `appId` | Human provisions | WF2 Vercel deploy API |
-| `repoOverrides` (per-app) | n8n Config Set | Human | Nonstandard repo/project names |
+| Landing GitHub repo | Derived from n8n Config Set + `appId`, or supplied by an approval-gated setup value | Human/setup provisions; WF2 pushes template + generated `app-data/` | Vercel `gitSource` |
+| Vercel landing project | Derived from n8n Config Set + `appId`, or supplied by an approval-gated setup value | Human/setup provisions; WF2 deploys | WF2 Vercel deploy API |
+| Landing target overrides (per-app) | n8n Config Set / setup values | Human/setup | Nonstandard repo/project names and project IDs |
 | `deployment.landing.vercelProjectId` | Vercel API response | n8n WF2 after landing deploy | Transform → `tracking.deploymentId` |
 | `deployment.landing.url` | Canonical public URL | n8n after landing deploy | Ad destination; human sharing |
 | `deployment.landing.deploymentUrl` | Latest Vercel deployment URL | n8n after landing deploy | Transform → `tracking.deploymentId` fallback |
@@ -825,7 +825,7 @@ flowchart LR
 |----------|---------|-------|---------------------|
 | **WF0 Provisioning** | `status: provisioning` (poll or manual `appId`) | Complete `app.json` | `tracking.webhookUrl` written; `status: ready` |
 | **WF1 Mockup Deploy** (v1) | Manual (`appId`); gate `status: ready` | Drive `app.json` with `source.*` | Vercel deploy; `deployment.mockup.*` + `mockup.previewUrl`; `status` stays `ready` |
-| **WF2 Landing Deploy** (v1) | Manual (`appId`); gate WF1 mockup URL | Drive package + WF1 mockup URL | Transform + GitHub push `app-data/`; Vercel deploy; `deployment.landing.*`; `status` stays `ready` |
+| **WF2 Landing Deploy** (v1) | Manual (`appId`); gate WF1 mockup URL | Drive package + WF1 mockup URL | Transform + GitHub push landing tree + `app-data/`; Vercel deploy; `deployment.landing.*`; `status` stays `ready` |
 | **WF3 Tracking** | Always-on POST from landing | Tracking payload JSON | Append row to Google Sheets; return 200 fast |
 | **WF-Ads Meta** | Manual (`appId`) after WF2 | `ads.*`, `deployment.landing.url` | Meta campaign **paused**; `ads.meta.*`; `status: validating` |
 | **WF-Decision Monitoring** | Schedule during `validating` | Sheets + Meta API + `experiment.*` | `validation.*` (+ `latestReportUrl`); root `status` (`winner`/`killed`/`paused`); no Drive `reports/` |
@@ -838,7 +838,7 @@ flowchart LR
 
 **WF1 v1 note:** GitHub is the deployable code SSOT; WF1 does not create repos, push code, or download `mockup/` from Drive. See [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md).
 
-**WF2 v1 note:** Landing repo and Vercel project derived from Config Set; WF2 bootstraps on first run. See [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md).
+**WF2 v1 note:** Landing repo and Vercel project are derived from Config Set or supplied as approval-gated setup targets; WF2 pushes generated landing source and deploys the prepared project. See [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md).
 
 **WF3 note:** Webhook receiver + Sheets logger. See [WF3-TRACKING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF3-TRACKING-PIPELINE-BLUEPRINT.md).
 
@@ -920,11 +920,11 @@ flowchart LR
 1. Read `App Validation/{appId}/app.json` from Drive (**only** file).
 2. Gate: `status === "ready"`.
 3. Gate: WF1 mockup URL present (`deployment.mockup.url` or `mockup.previewUrl`).
-4. Resolve landing repo and Vercel project name from Config Set + `appId` (or `repoOverrides`).
+4. Resolve the prepared landing repo and Vercel project from Config Set + `appId` (or explicit setup overrides).
 5. Read inline `landingPage` copy; fetch media via `url`/`githubPath` (never Drive `copy/`/`media/`).
 6. Transform → `app-data/app-config.json` + images (port `generate-app-config.js`).
-7. Bootstrap landing GitHub repo if missing; commit `app-data/`.
-8. `POST` Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run).
+7. Commit the landing-template tree plus generated `app-data/` to the prepared landing repo.
+8. `POST` Vercel `/v13/deployments` with `project` + `gitSource`; omit root directory because Vercel uses repository root/default.
 9. Poll until `readyState === "READY"`.
 10. Merge-write only:
     ```json
@@ -1081,7 +1081,7 @@ Workflow JSON exports in [`n8n-workflows/`](n8n-workflows/) should include a bri
 
 ## 8. Deployment Model
 
-### 8.1 Nested Deployment Structure (v1.3.0+) and Validation Runtime (v1.4.0)
+### 8.1 Nested Deployment Structure (Spec 1.5.0)
 
 ```json
 "deployment": {
@@ -1240,17 +1240,19 @@ The validator gates all deploy and ad spend. Phase 2 CLI is planned; rules are n
 
 #### Copy Checks
 
-- Every `landingPage.sections[]` with `source: "file"` and `enabled: true` resolves to existing file
+- Production Drive packages use `landingPage.content` and `sections[].inline`; enabled `source: "file"` is rejected for production Drive
+- Local-dev packages may use `source: "file"` when the referenced file exists
 - `landingPage.content.benefits` present when landing expects benefits (production); local `copy/benefits.md` for local-dev only
 
 #### Media Checks
 
-- Every path in `media.screenshots`, `media.logo`, `media.icon`, `media.ogImage` resolves to file
+- Production Drive media refs use `url` or `githubPath`
+- Local-dev `media.path` refs resolve to package files
 
 #### Mockup Checks
 
 - When `mockup` present: `sourcePath`, `entryPoint` resolve
-- `mockup.buildCommand` succeeds in CI/automation
+- `mockup.buildCommand` succeeds in local/CI validation when run by developers; WF1 n8n does not run npm
 
 #### Landing Generation Checks
 
@@ -1404,9 +1406,9 @@ Each decision includes rationale so future agents understand **why**, not just *
 
 ### 12.13 copy/benefits.md Outside sections[]
 
-**Decision:** Benefits live in `copy/benefits.md`, not referenced in `landingPage.sections[].file`.
+**Decision:** In local-dev packages, benefits may live in `copy/benefits.md`, not referenced in `landingPage.sections[].file`.
 
-**Why:** Benefits appear in hero and benefit grid. Independent consumption avoids bloating `app.json` and simplifies transform. Transform always reads `copy/benefits.md` when present.
+**Why:** Benefits appear in hero and benefit grid. Independent local consumption avoids bloating authoring files and simplifies transform. Production WF2 reads inline `landingPage.content.benefits` from Drive `app.json`; local transforms may read `copy/benefits.md` when present.
 
 ### 12.14 docs/ Not in Pipeline
 
@@ -1500,7 +1502,7 @@ These are secondary references — consult when needed, not before understanding
 | n8n workflow JSON | ❌ Not started | Blueprints exist; JSON export pending |
 | Phase 2 validator CLI | ❌ Not started | Rules documented only |
 | Google Drive automation | ❌ Not started | Local `test-app-packages/` used for dev |
-| Vercel deploy automation | ❌ Not started | Manual deploy possible |
+| Vercel deploy automation | ⚠️ Rehearsed for WF1/WF2 | Manual sandbox runs proved payloads, polling, verification, and write-backs; n8n workflow JSON is not built |
 | Meta/Facebook ads automation | ❌ Not started | Documented in workflow.md |
 | Google Sheets integration | ❌ Not started | Schema documented |
 | Analytics dashboard | ❌ Not started | Sheets is planned v1 store |
@@ -1512,8 +1514,8 @@ These are secondary references — consult when needed, not before understanding
 
 | Gap | Impact | Workaround |
 |-----|--------|------------|
-| human-lab has no media PNG binaries | Transform/validation file checks will fail | Add placeholder images or run `generate-placeholder-images.js` |
-| human-lab `mockup.embedUrl` empty | Landing shows mockup placeholder | Deploy mockup manually; write URL to package |
+| Production-quality media binaries | Placeholder media is sufficient for sandbox only | Replace placeholders before real validation traffic |
+| n8n workflow JSON exports | Cannot run inside n8n yet | Build after Spec 1.5.0 freeze |
 | human-lab `tracking.webhookUrl` null | Events log to console only in dev | Configure webhook in app-config for local testing |
 | Transform gaps: how-it-works, testimonials, socialProof inline, fontFamily | Those landing sections stay disabled or unstyled | Enable only mapped sections |
 | No validator enforcement | Invalid packages can reach manual deploy | Manual review until Phase 2 |
@@ -1537,8 +1539,8 @@ Future agents MUST be aware of these cross-document conflicts:
 | **deploymentId is landing-only** | Name is generic | Mockup has separate `deployment.mockup.vercelProjectId` not in tracking payload |
 | **TrackingProvider in components/, README says lib/** | Minor path inconsistency in README | Actual path: `components/TrackingProvider.tsx` |
 | **WF1 v1 pre-provisioned model** | Older docs assumed WF1 downloads `mockup/` from Drive and pushes to GitHub | [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) v1.5.0: Drive `app.json` only; full app GitHub repo; WF1 triggers Vercel API only |
-| **WF2 v1 config-derived landing repo** | Older docs downloaded Drive `copy/`/`media/` | [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) v1.5.0: inline `landingPage` + GitHub/HTTP media; repo/project derived from Config Set |
-| **WF2 no manual Vercel per app** | Older WF2 docs required manual Vercel project + first deploy | WF2 v1: first `POST /v13/deployments` with `name` + `gitSource` creates project when team GitHub integration is installed |
+| **WF2 v1 prepared landing targets** | Older docs downloaded Drive `copy/`/`media/` or auto-created landing infrastructure | [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) v1.5.0: inline `landingPage` + GitHub/HTTP media; prepared repo/project from Config Set or approved setup values |
+| **WF2 Vercel root** | Older docs were ambiguous about generated repo root | WF2 v1 pushes `landing-project/` as repository root; Vercel Root Directory is empty/default repository root, never `..` |
 | **WF2 leaves status at ready** | Stage F previously said "optionally sets validating" | WF2 v1 does not change `status`; WF-Ads or operator promotes to `validating` later |
 
 ### 14.5 Verification Checklist

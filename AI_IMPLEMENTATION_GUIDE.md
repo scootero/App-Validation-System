@@ -162,9 +162,9 @@ App-Validation-System/
 **Owns:** Local App Packages used for development and testing.
 
 **Current contents:**
-- `human-lab/` — reference implementation (`appId: human-lab`, `status: draft`, `specVersion: 1.3.0`)
+- `human-lab/` — local reference package. Treat the completed WF1/WF2 rehearsals under `rehearsals/` as the canonical proof of Spec 1.5.0 deployment behavior.
 
-**Consumes:** Same structure as any App Package on Google Drive.
+**Consumes:** Full local/GitHub App Package layout. Production Google Drive contains only `App Validation/{appId}/app.json`.
 
 **Outputs:** Built mockup (`mockup/dist/`), transformed landing config (when transform is run).
 
@@ -172,9 +172,9 @@ App-Validation-System/
 
 ## n8n-workflows
 
-**Owns:** Future n8n workflow JSON exports.
+**Owns:** n8n blueprint docs, AI builder prompts, and future workflow JSON exports.
 
-**Current state:** Empty placeholder directory. No workflows have been built yet.
+**Current state:** Blueprint docs and builder prompts exist for WF0, WF1, WF2, WF3, WF-Ads, and WF-Decision. No executable workflow JSON has been built yet.
 
 **Will consume:** App Packages from Google Drive, Vercel/Meta/Sheets APIs.
 
@@ -213,13 +213,12 @@ App-Validation-System/
 - Root `package.json` delegating to `mockup/` for `npm run dev` / `npm run build`
 - Embed mode support in mockup (`?embed=1`)
 
-### Reference App Package: human-lab
+### Reference App Package And Rehearsals
 
-- Complete `app.json` with all major sections
-- File-based copy (`copy/hero.md`, `benefits.md`, `features.md`, `faq.md`)
-- Working mockup source
-- Internal docs (validation plan, testing strategies)
-- `status: draft` — not yet through provisioning pipeline
+- `test-app-packages/human-lab/` remains a local development reference.
+- `rehearsals/wf1-human-lab-sandbox/` proves WF1: Drive `app.json` only → mockup deploy → `deployment.mockup.*` and `mockup.previewUrl`.
+- `rehearsals/wf2-human-lab-sandbox/` proves WF2: Drive `app.json` only → inline landing content + declared GitHub media → generated landing repo/project → `deployment.landing.*` and `deployment.githubRepoUrl`.
+- Use the rehearsal behavior as canonical when docs or older examples disagree.
 
 ### Local development workflow (manual)
 

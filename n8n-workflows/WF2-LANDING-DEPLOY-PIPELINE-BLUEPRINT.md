@@ -21,13 +21,14 @@ WF2 deploys the **landing page only** for App Packages on Google Drive. It runs 
 - n8n Credentials: Google Service Account, Vercel API token, GitHub PAT
 - WF1 has already written `deployment.mockup.url` or `mockup.previewUrl` for this `appId`
 
-**WF2 handles per-app infrastructure on first run (no manual Vercel dashboard steps):**
+**WF2 uses approval-gated per-app infrastructure:**
 
-- Bootstrap landing GitHub repo `{githubOrgOrUser}/{appId}-landing` from `landingTemplateRepo` if missing
-- Push generated `app-data/` to that repo
-- **Create and deploy** Vercel landing project via API (`name` + `gitSource`) — first run creates the project; subsequent runs redeploy
+- Landing GitHub repo exists before WF2 external writes
+- Vercel landing project exists and is linked to that repo before WF2 deploys
+- Vercel Root Directory is repository root/default (empty/unset); never `..`
+- WF2 pushes the landing-template tree plus generated `app-data/` to that prepared repo, then deploys the prepared Vercel project
 
-**WF2 does NOT require:** manual Vercel project creation, manual first deploy in vercel.com, or `tracking.webhookUrl` (WF0 owns webhook URL; WF3 receives events).
+**WF2 does NOT require:** Drive `copy/`/`media/` folders, mockup source downloads, npm inside n8n Cloud, or `tracking.webhookUrl` (WF0 owns webhook URL; WF3 receives events).
 
 **WF2 does:**
 
@@ -40,8 +41,8 @@ WF2 deploys the **landing page only** for App Packages on Google Drive. It runs 
 7. Transform into `app-data/app-config.json` (equivalent of `generate-app-config.js`)
 8. Set `mockup.embedUrl` from WF1's deployed mockup URL
 9. Stage resolved media into `app-data/images/`
-10. Bootstrap landing GitHub repo if missing; push template + generated `app-data/`
-11. Trigger Vercel landing deployment via Vercel API (`name` + `gitSource` from GitHub)
+10. Push template + generated `app-data/` to the prepared landing GitHub repo
+11. Trigger Vercel landing deployment via Vercel API (`project` + `gitSource` from GitHub)
 12. Poll deployment until `readyState === "READY"`
 13. **Merge-write** only `deployment.landing.*` and related deployment metadata back to Drive `app.json`
 14. Leave `status` as `"ready"`
@@ -59,7 +60,7 @@ WF2 deploys the **landing page only** for App Packages on Google Drive. It runs 
 | Download Drive `copy/`, `media/`, or mockup code | Spec 1.5.0 — not on production Drive |
 | Use npm/local build inside n8n Cloud | GitHub → Vercel handles builds |
 | Set `status: validating` | WF-Ads or operator sets later |
-| Manual per-app Vercel setup | WF2 triggers deploy API; project auto-created on first run |
+| Create landing GitHub repo or Vercel landing project without approval | Human/setup step before WF2 external writes |
 
 **Drive `app.json` remains control-plane SSOT.** WF2 never changes `appId`, `specVersion`, `source.*`, author `landingPage`, `experiment`, `tracking`, or `deployment.mockup.*`.
 
@@ -88,11 +89,11 @@ WF2 reads `deployment.mockup.url ?? mockup.previewUrl` only — **never** `deplo
 | Drive folder ID | — | ✅ | ✅ | ✅ | — | — |
 | Vercel team ID | — | ✅ | ✅ | ✅ | — | query param on API |
 | `githubOrgOrUser` | — | ✅ | ✅ | ✅ | — | repo org/user |
-| `landingTemplateRepo` | — | ✅ | ✅ | ✅ | — | bootstrap source |
-| `landingTemplateBranch` | — | ✅ | ✅ | ✅ | — | bootstrap branch |
-| `repoOverrides` | — | ✅ | — | — | — | nonstandard repo/project |
-| Landing repo `{org}/{appId}-landing` | — | **derived** | — | — | — | WF2 bootstraps if missing |
-| Vercel project `{appId}-landing` | — | **derived** | — | — | — | WF2 creates via deploy API on first run |
+| `landingTemplateRepo` | — | ✅ | ✅ | ✅ | — | source template to seed landing repo |
+| `landingTemplateBranch` | — | ✅ | ✅ | ✅ | — | template branch |
+| `landingTargets` / overrides | — | ✅ | — | — | — | prepared landing repo/project values |
+| Landing repo `{org}/{appId}-landing` | — | **derived or supplied** | — | — | — | must exist before external write |
+| Vercel project `{appId}-landing` | — | **derived or supplied** | — | — | — | must exist before deploy |
 | Landing copy (`landingPage.*`) | — | — | — | — | ✅ **human sets** (inline) | — |
 | Media refs (`media.*` url/githubPath) | — | — | — | — | ✅ **human sets** | binaries in assets/mockup GitHub |
 | `deployment.mockup.*`, `mockup.previewUrl` | — | — | — | — | ✅ **written by WF1** | WF2 reads only |
@@ -113,7 +114,7 @@ WF2 reads `deployment.mockup.url ?? mockup.previewUrl` only — **never** `deplo
 ### Repo and project resolution
 
 ```javascript
-const override = repoOverrides[appId] ?? {};
+const override = landingTargets[appId] ?? repoOverrides[appId] ?? {};
 const landingGithubRepo =
   override.landingGithubRepo ?? `${githubOrgOrUser}/${appId}-landing`;
 const vercelLandingProjectName =
@@ -121,10 +122,10 @@ const vercelLandingProjectName =
 const vercelLandingProjectId = override.vercelLandingProjectId ?? null;
 ```
 
-`repoOverrides` example (Workflow Config Set node):
+`landingTargets` example (Workflow Config Set node):
 
 ```json
-"repoOverrides": {
+"landingTargets": {
   "human-lab": {
     "landingGithubRepo": "scootero/custom-landing-repo",
     "vercelLandingProjectName": "custom-vercel-name",
@@ -141,7 +142,7 @@ const vercelLandingProjectId = override.vercelLandingProjectId ?? null;
 | n8n Credentials (Google SA, Vercel token, GitHub PAT) | Human in n8n UI |
 | `landingTemplateRepo` in Config Set | Human in workflow Config |
 
-No per-app steps in vercel.com or github.com are required before the first WF2 run. WF2 bootstraps the landing repo and triggers the first Vercel deployment via API.
+Per-app landing repo/project creation is an approval-gated setup step. WF2 must stop with a clear setup error if the prepared repo or Vercel project ID/name is missing.
 
 **Recovery only:** If Vercel deploy fails with a GitHub permission error, confirm the Vercel GitHub app has access to `{githubOrgOrUser}/{appId}-landing` — this is a platform fix, not a per-app manual deploy step.
 
@@ -166,11 +167,12 @@ No per-app steps in vercel.com or github.com are required before the first WF2 r
   "landingTemplateBranch": "main",
   "vercelPollIntervalSeconds": 15,
   "vercelPollMaxMinutes": 10,
+  "landingTargets": {},
   "repoOverrides": {}
 }
 ```
 
-Per-app landing repo and Vercel project are **derived** from `appId` + config above — not stored in `app.json` `source.*` for WF2 v1.
+Per-app landing repo and Vercel project are **derived** from `appId` + config above or supplied in `landingTargets`. They are not stored in Drive `app.json` before WF2; WF2 writes only `deployment.landing.*` and `deployment.githubRepoUrl` after deployment succeeds.
 
 ---
 
@@ -187,8 +189,8 @@ flowchart TD
   G2 -->|yes| COPY[Read inline landingPage copy]
   COPY --> MEDIA[Fetch media url or githubPath]
   MEDIA --> XFORM[Code transform to app-config.json]
-  XFORM --> GH[Bootstrap repo if needed + push app-data]
-  GH --> VC[POST Vercel deployment API]
+  XFORM --> GH[Push template + app-data to prepared repo]
+  GH --> VC[POST Vercel deployment API for prepared project]
   VC --> POLL[Poll until READY]
   POLL --> WB[Merge-write deployment.landing.*]
   WB --> DONE[Done — status stays ready]
@@ -204,8 +206,8 @@ flowchart TD
 6. Transform package → `app-data/app-config.json`
 7. Set `mockup.embedUrl` from WF1 mockup URL
 8. Stage images for `app-data/images/`
-9. Bootstrap landing GitHub repo if missing; commit `app-data/` (and template tree on first run)
-10. POST Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run)
+9. Commit landing-template tree + generated `app-data/` to the prepared landing GitHub repo
+10. POST Vercel `/v13/deployments` with `project` + `gitSource` (project exists before deploy)
 11. Poll until `readyState === "READY"`
 12. Merge-write `deployment.landing.*` (+ `githubRepoUrl` if null) to Drive `app.json`
 13. Leave `status` unchanged (`ready`)
@@ -227,8 +229,8 @@ flowchart TD
 | 9 | Resolve assets repo | Code (`assetsGithubRepo ?? mockupGithubRepo`) |
 | 10 | Fetch media assets | HTTP / GitHub Contents (declared `url`/`githubPath` only) |
 | 11 | Transform to app-config | Code (port `generate-app-config.js`; inline copy) |
-| 12 | GitHub: bootstrap repo if missing | GitHub API / GitHub node |
-| 13 | GitHub: commit app-data | GitHub API / GitHub node |
+| 12 | GitHub: verify prepared landing repo | GitHub API / GitHub node |
+| 13 | GitHub: commit landing tree + app-data | GitHub API / GitHub node |
 | 14 | Trigger Vercel Deploy | HTTP Request |
 | 15 | Poll Vercel | HTTP + Wait |
 | 16 | Extract landing URLs | Code |
@@ -352,24 +354,22 @@ Real human-lab example after WF1:
 
 ## 8. GitHub push strategy
 
-### First run — bootstrap repo if missing
+### Prepared repo requirement
 
-If `{githubOrgOrUser}/{appId}-landing` does not exist:
+The landing GitHub repo must exist before WF2 performs external writes. If it does not exist, WF2 stops and reports the exact repo to create. Creating the repo is an approval-gated setup step.
 
-1. Create repo via GitHub API (`POST /user/repos` or org equivalent)
-2. Copy landing template tree from `landingTemplateRepo@landingTemplateBranch` (GitHub API or archive fetch)
-3. Commit initial template + generated `app-data/` in one or more commits
-
-If repo exists but is empty, seed template tree the same way before committing `app-data/`.
+If the repo exists but is empty, WF2 seeds the landing-template tree and generated `app-data/` in the first commit.
 
 ### Every run
 
-1. Resolve `landingGithubRepo` from config + `repoOverrides`
-2. Commit `app-data/app-config.json` (UTF-8 JSON, pretty-printed)
-3. Commit binary files under `app-data/images/` (base64 via GitHub Contents API)
-4. Commit message: `WF2 deploy {appId} {ISO8601}`
+1. Resolve `landingGithubRepo` from config + `landingTargets` / overrides
+2. Verify the repo exists and the GitHub credential can write to it
+3. Commit the landing-template tree when seeding an empty repo
+4. Commit `app-data/app-config.json` (UTF-8 JSON, pretty-printed)
+5. Commit binary files under `app-data/images/` (base64 via GitHub Contents API)
+6. Commit message: `WF2 deploy {appId} {ISO8601}`
 
-No human GitHub setup per app is required when WF2 bootstraps from `landingTemplateRepo`.
+The pushed repository root is the landing project root. Vercel Root Directory must remain empty/default (`.`), never `..`.
 
 ### deployment.githubRepoUrl
 
@@ -383,9 +383,7 @@ If `deployment.githubRepoUrl` is still `null` after a successful push, merge-wri
 
 Parse `landingGithubRepo` into `org` and `repo` (strip `https://github.com/` prefix if present).
 
-**First run:** omit `project` — Vercel creates the project from `name` + `gitSource` when the team GitHub integration is installed.
-
-**Subsequent runs:** use `project` when `deployment.landing.vercelProjectId` is already on Drive or `repoOverrides.vercelLandingProjectId` is set; otherwise keep using `name`.
+WF2 deploys an existing prepared Vercel project. Use `project` from `landingTargets[appId].vercelLandingProjectId`, `deployment.landing.vercelProjectId`, or the approved setup value. Do not rely on first-run project creation.
 
 ```http
 POST https://api.vercel.com/v13/deployments?teamId={vercelTeamId}
@@ -393,6 +391,7 @@ Authorization: Bearer {VERCEL_API_TOKEN}
 
 {
   "name": "{vercelLandingProjectName}",
+  "project": "{vercelLandingProjectId}",
   "target": "production",
   "gitSource": {
     "type": "github",
@@ -403,9 +402,7 @@ Authorization: Bearer {VERCEL_API_TOKEN}
 }
 ```
 
-When `vercelLandingProjectId` is known (re-deploy or override), add `"project": "{vercelLandingProjectId}"` and you may omit `name`.
-
-Use `ref` from `landingTemplateBranch` (default `main`) for the landing repo branch WF2 commits to.
+Root Directory is intentionally absent from the deployment body; Vercel project settings use repository root/default. Use the landing repo branch WF2 commits to (default `main`) for `gitSource.ref`.
 
 Poll `GET /v13/deployments/{id}?teamId={vercelTeamId}` until `readyState === "READY"` (interval: `vercelPollIntervalSeconds`, max: `vercelPollMaxMinutes`).
 
@@ -464,9 +461,9 @@ On success, capture from response:
 ## 12. Idempotency / re-run behavior
 
 - **Safe to re-trigger** with the same `appId` while `status` is `ready` and WF1 URL is present.
-- Each run regenerates `app-config.json`, re-commits `app-data/`, triggers a new Vercel deployment, and updates `deployment.landing.lastDeployedAt`.
+- Each run regenerates `app-config.json`, re-commits the landing tree/app-data, triggers a new Vercel deployment, and updates `deployment.landing.lastDeployedAt`.
 - Does **not** re-deploy the mockup or modify `deployment.mockup.*` / `mockup.previewUrl`.
-- `repoOverrides` in Config Set are stable across runs.
+- `landingTargets` / overrides in Config Set are stable across runs.
 - Re-running after inline copy or GitHub media changes picks up latest package content.
 
 ---
@@ -500,11 +497,11 @@ WF2 transform uses `deployment.mockup.url ?? mockup.previewUrl` for `mockup.embe
 2. `status: "ready"` on Drive `app.json`
 3. Drive folder is **`app.json` only**; landing copy is inline; media uses `url`/`githubPath`
 
-**Not required:** pre-created GitHub landing repo, pre-created Vercel project, manual Vercel deploy, or Drive `copy/`/`media/` folders.
+**Required before external writes:** prepared landing GitHub repo and Vercel landing project. **Not required:** Drive `copy/`/`media/` folders, manual npm build inside n8n, or mockup source downloads.
 
 **Test steps:**
 
-1. Manual trigger WF2 with `appId=human-lab` (first run bootstraps repo + creates Vercel project)
+1. Manual trigger WF2 with `appId=human-lab` after landing repo/project setup values are available
 2. Verify GitHub commit updating `app-data/app-config.json` and `app-data/images/`
 3. Verify Drive `deployment.landing.url` and `deployment.landing.deploymentUrl`
 4. Open `deployment.landing.url` in browser
@@ -524,15 +521,15 @@ WF2 transform uses `deployment.mockup.url ?? mockup.previewUrl` for `mockup.embe
 - [ ] Fetches media via `url`/`githubPath` from assets repo only (never mockup code)
 - [ ] Transform matches `generate-app-config.js` behavior (no app-specific hardcoding)
 - [ ] Sets `mockup.embedUrl` from WF1 output
-- [ ] Bootstrap landing GitHub repo from `landingTemplateRepo` when missing
-- [ ] Pushes `app-data/` to config-derived `{org}/{appId}-landing` repo
+- [ ] Verifies prepared landing GitHub repo/project values before external writes
+- [ ] Pushes landing-template tree + generated `app-data/` to the prepared landing repo
 - [ ] No npm / Execute Command nodes
-- [ ] Landing deploys via Vercel API (`name` + `gitSource`; no manual Vercel setup per app)
-- [ ] First run creates Vercel project via API; subsequent runs redeploy
+- [ ] Landing deploys via Vercel API (`project` + `gitSource`; root directory omitted/default repo root)
+- [ ] Prepared project is reused on subsequent runs
 - [ ] Merge-write `deployment.landing.*` (+ `githubRepoUrl` if null) only
 - [ ] `appId`, `specVersion`, `status`, `source`, and WF1 fields unchanged
 - [ ] No mockup deploy, webhook provisioning, Sheets, or ads logic
-- [ ] `repoOverrides` supported in Config Set
+- [ ] `landingTargets` / overrides supported in Config Set
 - [ ] Export JSON to `n8n-workflows/WF2-landing-deploy.json` when built
 
 ---

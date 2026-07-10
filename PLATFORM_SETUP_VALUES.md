@@ -12,7 +12,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 
 **WF1** assumes mockup GitHub repo and Vercel project are **already provisioned**. WF1 triggers Vercel deploy API only — no GitHub push from n8n.
 
-**WF2** requires platform-level setup: Vercel team GitHub integration + n8n credentials. WF2 bootstraps `{githubOrgOrUser}/{appId}-landing` from `landingTemplateRepo` if missing. WF2 requires WF1 mockup URL on Drive first.
+**WF2** requires platform-level setup plus approval-gated per-app landing targets: Vercel team GitHub integration, n8n credentials, a prepared landing GitHub repo, and a prepared Vercel landing project with Root Directory unset/default repository root. WF2 requires WF1 mockup URL on Drive first.
 
 ## Workflow map
 
@@ -46,7 +46,8 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | ✅ | *(n8n only)* | n8n Credentials | Drive nodes | Never commit |
 | `DRIVE_PARENT_FOLDER_ID` | ✅ | `1O3RHwYFhJlPRBygNKxc7HGHmWtfiaB5A` | Config Set node, `.env` | WF0–WF-Decision | App Validation |
 | `LANDING_TEMPLATE_BRANCH` | ✅ | `main` | Config Set node, `.env` | WF2 | Bootstrap source branch |
-| `REPO_OVERRIDES` | ✅ | `{}` | Config Set node | WF2 | Per-app repo/project overrides |
+| `LANDING_TARGETS` | ✅ | `{}` | Config Set node | WF2 | Per-app prepared repo/project IDs |
+| `REPO_OVERRIDES` | ✅ | `{}` | Config Set node | WF2 | Legacy name for per-app repo/project overrides |
 | `GOOGLE_SHEET_ID` | ✅ | *(in .env)* | Config Set node, `.env` | WF3, WF-Decision | Unified event log |
 | `GOOGLE_SHEET_TAB_NAME` | ✅ | `Sheet1` | Config Set node, `.env` | WF3, WF-Decision | |
 | `N8N_BASE_URL` | ✅ | `https://scooter.app.n8n.cloud` | `.env` | WF0, WF3 | Webhook URL base |
@@ -71,7 +72,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 | Meta API token | ✅ | — | optional | redacted | — | WF-Ads, WF-Decision |
 | Drive folder ID | — | ✅ | ✅ | ✅ | — | — |
 | Vercel team ID | — | ✅ | ✅ | ✅ | — | API param |
-| `githubOrgOrUser`, `landingTemplateRepo`, `repoOverrides` | — | ✅ | ✅ | ✅ | — | WF2 derived repo/project |
+| `githubOrgOrUser`, `landingTemplateRepo`, `landingTargets`, `repoOverrides` | — | ✅ | ✅ | ✅ | — | WF2 prepared repo/project |
 | `source.mockupGithubRepo` etc. | — | — | — | — | human sets | WF1 mockup repo |
 | `tracking.webhookUrl` | — | — | — | — | WF0 writes | WF3 receives |
 | `deployment.mockup.*`, `mockup.previewUrl` | — | — | — | — | WF1 writes | WF2 reads |
@@ -104,6 +105,8 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 - [ ] Vercel team **GitHub integration** installed (one-time platform setup)
 - [ ] Google SA, Vercel token, and **GitHub PAT** in **n8n Credentials**
 - [ ] Config Set node values in WF2 workflow
+- [ ] Prepared landing GitHub repo exists and is writable
+- [ ] Prepared Vercel landing project exists, linked to the landing repo, with Root Directory empty/default repository root
 - [ ] WF1 completed — `deployment.mockup.url` or `mockup.previewUrl` on Drive
 - [ ] Package on Drive with **`app.json` only**, inline `landingPage`, media via `url`/`githubPath`, and **`status: "ready"`**
 - [ ] Build WF2 using [WF2-N8N-AI-PROMPT.md](n8n-workflows/WF2-N8N-AI-PROMPT.md)

@@ -1,0 +1,115 @@
+{
+  "mode": "dry_run",
+  "appId": "human-lab-wf1-sandbox",
+  "metaApiVersion": "VERIFY_CURRENT_VERSION_BEFORE_LIVE_USE",
+  "adAccountIdRef": "n8n.credentials.META_AD_ACCOUNT_ID",
+  "pageIdRef": "n8n.config.META_PAGE_ID",
+  "wf3Gate": {
+    "required": true,
+    "status": "blocked_until_wf3_sheet_rows_exist",
+    "requiredEvents": [
+      "page_view",
+      "email_captured",
+      "buy_now_clicked",
+      "mockup_interacted"
+    ]
+  },
+  "source": {
+    "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+    "creative": {
+      "kind": "githubPath",
+      "value": "media/og-image.png",
+      "role": "primary",
+      "fallbackSource": "ads.media[0]"
+    }
+  },
+  "computed": {
+    "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+    "dailyBudget": 35.71,
+    "currency": "USD",
+    "totalBudget": 500,
+    "durationDays": 14,
+    "statusForAllCreatedEntities": "PAUSED"
+  },
+  "requests": {
+    "campaign": {
+      "name": "human-lab-validation",
+      "objective": "VERIFY_META_OBJECTIVE_MAPPING",
+      "status": "PAUSED",
+      "special_ad_categories": "VERIFY_BEFORE_LIVE_USE"
+    },
+    "adSet": {
+      "name": "human-lab-validation-adset-v1",
+      "status": "PAUSED",
+      "daily_budget": "VERIFY_MINOR_UNITS_BEFORE_LIVE_USE",
+      "billing_event": "VERIFY_FOR_OBJECTIVE",
+      "optimization_goal": "VERIFY_FOR_OBJECTIVE",
+      "targeting": {
+        "geo_locations": {
+          "countries": [
+            "US"
+          ]
+        },
+        "age_min": 25,
+        "age_max": 55,
+        "interests": [
+          "fitness",
+          "productivity",
+          "self-improvement"
+        ],
+        "publisher_platforms": [
+          "facebook",
+          "instagram"
+        ]
+      }
+    },
+    "creative": {
+      "name": "human-lab-validation-creative-a",
+      "object_story_spec": {
+        "page_id": "CONFIG_META_PAGE_ID",
+        "link_data": {
+          "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+          "message": "Discover what actually works for your stress, sleep, and habits.",
+          "name": "Stop guessing. Start testing.",
+          "description": "Human Lab turns self-improvement into structured experiments.",
+          "call_to_action": {
+            "type": "SIGN_UP",
+            "value": {
+              "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+            }
+          },
+          "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+        }
+      }
+    },
+    "ad": {
+      "name": "human-lab-validation-ad-a",
+      "status": "PAUSED",
+      "creative": {
+        "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+      }
+    }
+  },
+  "writeBackAfterCreatePausedOnly": {
+    "ads": {
+      "meta": {
+        "status": "created_paused",
+        "campaignId": "<campaign-id>",
+        "adSetId": "<ad-set-id>",
+        "creativeId": "<creative-id>",
+        "adId": "<ad-id>",
+        "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+        "dailyBudget": 35.71,
+        "createdAt": "<iso8601>",
+        "lastSyncedAt": null
+      }
+    },
+    "status": "validating"
+  },
+  "safety": {
+    "externalWritePerformed": false,
+    "liveAdsCreated": false,
+    "spendPossible": false,
+    "requiresExplicitApprovalBeforeCreatePaused": true
+  }
+}

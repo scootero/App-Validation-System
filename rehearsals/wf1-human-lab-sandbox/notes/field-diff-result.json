@@ -1,0 +1,32 @@
+{
+  "changed": [
+    {
+      "path": "deployment.mockup.deploymentUrl",
+      "before": null,
+      "after": "https://human-lab-wf1-sandbox-nngh0tvrb-scooteros-projects.vercel.app"
+    },
+    {
+      "path": "deployment.mockup.lastDeployedAt",
+      "before": null,
+      "after": "2026-07-10T03:39:17.017Z"
+    },
+    {
+      "path": "deployment.mockup.url",
+      "before": null,
+      "after": "https://human-lab-wf1-sandbox.vercel.app"
+    },
+    {
+      "path": "deployment.mockup.vercelProjectId",
+      "before": null,
+      "after": "prj_6Ip7DfE186vPbDnR1VXrgmR8rsTM"
+    },
+    {
+      "path": "mockup.previewUrl",
+      "before": null,
+      "after": "https://human-lab-wf1-sandbox.vercel.app"
+    }
+  ],
+  "unexpected": [],
+  "writeBackAt": "2026-07-10T03:39:17.017Z",
+  "deploymentId": "dpl_F2ektZCrb5h8Lm9RoMiPsByaQbo7"
+}

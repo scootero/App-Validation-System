@@ -1,0 +1,24 @@
+# WF3 Production Implementation Checklist
+
+- [x] WF3 local rehearsal passes (33-column schema).
+- [ ] Sandbox Google Sheet exists with canonical **33** headers.
+- [ ] Google service account has Sheet Editor access.
+- [ ] WF3 n8n workflow is built, published, and exported.
+- [ ] Direct webhook tests append rows for all four event types.
+- [ ] Sandbox landing browser test appends rows for all four event types.
+- [ ] `experimentRunId` in rows matches sandbox `app.json`.
+- [ ] `eventId` is present on every row (client-generated or n8n fallback).
+- [ ] `receivedAt` is set by n8n on every row.
+- [ ] `fbclid` and UTM fields persist from first landing URL into every event.
+- [ ] `consentStatus` defaults to `unknown` when not supplied.
+- [ ] Meta columns (`metaCampaignId`, `metaAdSetId`, `metaAdId`, `placement`) are blank until WF4.
+- [ ] `mockupInteracted` is `false` before mockup engagement and `true` after.
+- [ ] Malformed payloads return HTTP 200 and are logged (IF skips Append).
+- [ ] Invalid Bearer auth returns HTTP 401 only if auth is enabled.
+- [ ] Sheet append failures retry and alert without blocking the browser client.
+- [ ] WF3 does not write `app.json`.
+- [ ] WF3 does not modify `ads`, `deployment`, `validation`, or `status`.
+- [ ] Production `landing-template` synced with sandbox attribution/`eventId` behavior (Spec 1.5.0).
+- [ ] No production Sheet, Drive file, n8n workflow, or landing repo was modified during rehearsal.
+- [ ] Shared validation/row mapping is recorded for final Spec 1.5.0 update.
+- [x] External setup handoff frozen (`EXTERNAL-SETUP-HANDOFF.md`).

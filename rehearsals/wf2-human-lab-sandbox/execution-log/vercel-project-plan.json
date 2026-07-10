@@ -1,0 +1,14 @@
+{
+  "projectName": "human-lab-wf2-sandbox",
+  "projectId": "prj_9gbSkYZTlRMF3iLVxOIM40OswVMU",
+  "teamId": "team_CvzW7iL13TaNbaIiaCHfjafe",
+  "framework": "nextjs",
+  "gitRepository": "scootero/Human-Lab-WF2-Sandbox",
+  "productionBranch": "main",
+  "rootDirectory": "",
+  "rootDirectoryNote": "Use repository root/default. Vercel setting is empty/unset; do not use '..'.",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "status": "created externally and linked; no production deployment yet because repository is empty",
+  "externalWritePerformed": false
+}

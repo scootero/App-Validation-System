@@ -1,0 +1,20 @@
+{
+  "remote": "https://github.com/scootero/Human-Lab-WF2-Sandbox",
+  "sourceDirectory": "landing-project",
+  "branch": "main",
+  "commands": [
+    "cd rehearsals/wf2-human-lab-sandbox/landing-project",
+    "git init",
+    "git branch -M main",
+    "git remote add origin https://github.com/scootero/Human-Lab-WF2-Sandbox.git",
+    "git add .",
+    "git commit -m \"Create WF2 sandbox landing project\"",
+    "git push -u origin main"
+  ],
+  "notes": [
+    "Prepared only; do not run until external approval.",
+    "Do not include node_modules, .next, .vercel, credentials, or tokens.",
+    "Repository root is the landing-project directory itself."
+  ],
+  "externalWritePerformed": false
+}

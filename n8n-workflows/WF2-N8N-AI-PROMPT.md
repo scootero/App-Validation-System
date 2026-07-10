@@ -17,12 +17,13 @@ Copy everything in each **prompt box** below into n8n's AI workflow builder.
 | 2 | n8n → **Credentials** | Add **Header Auth** — Name: `Authorization`, Value: `Bearer YOUR_VERCEL_TOKEN` |
 | 3 | n8n → **Credentials** | Add **GitHub PAT** (repo scope: `contents`, `metadata`) — WF2 only |
 | 4 | vercel.com → **Team settings** | Install **GitHub integration** for your Vercel team (one-time platform setup) |
-| 5 | WF1 | Run WF1 for the app; confirm `deployment.mockup.url` on Drive (e.g. `https://human-lab.vercel.app`); verify incognito + `?embed=1` |
-| 6 | drive.google.com | Package at `App Validation/{appId}/` with **`app.json` ONLY** and **`status: "ready"`** (inline `landingPage`; media via `url`/`githubPath`) |
+| 5 | github.com / vercel.com | Create the landing GitHub repo and Vercel landing project after approval; Vercel Root Directory = repository root/default |
+| 6 | WF1 | Run WF1 for the app; confirm `deployment.mockup.url` on Drive (e.g. `https://human-lab.vercel.app`); verify incognito + `?embed=1` |
+| 7 | drive.google.com | Package at `App Validation/{appId}/` with **`app.json` ONLY** and **`status: "ready"`** (inline `landingPage`; media via `url`/`githubPath`) |
 
 **Upstream:** **WF0** should provision `tracking.webhookUrl` before production runs. **WF1** must have written mockup URL before WF2.
 
-**Not required for WF2:** creating a GitHub landing repo manually, creating a Vercel project manually, manual first deploy in vercel.com, Drive `copy/`/`media/` folders, or `tracking.webhookUrl` (WF0 writes URL; WF3 receives events).
+**Required before WF2 external writes:** prepared landing GitHub repo and Vercel landing project. **Not required for WF2:** Drive `copy/`/`media/` folders, npm inside n8n, mockup source downloads, or `tracking.webhookUrl` (WF0 writes URL; WF3 receives events).
 
 ---
 
@@ -34,8 +35,8 @@ Copy everything in each **prompt box** below into n8n's AI workflow builder.
 | Vercel API token | **n8n Credentials** → Header Auth (`Bearer …`) |
 | GitHub PAT | **n8n Credentials** → GitHub API / HTTP Auth — WF2 only |
 | Drive folder ID, Vercel team ID, GitHub org, template repo | **Workflow Config Set node** |
-| Landing repo `{org}/{appId}-landing` | **Derived**; WF2 bootstraps from `landingTemplateRepo` if missing |
-| Vercel landing project `{appId}-landing` | **Derived**; WF2 creates via deploy API on first run |
+| Landing repo `{org}/{appId}-landing` | **Derived or supplied in `landingTargets`**; must exist before WF2 push |
+| Vercel landing project `{appId}-landing` | **Derived or supplied in `landingTargets`**; must exist before WF2 deploy |
 | WF1 mockup URL | **Drive `app.json`** — `deployment.mockup.url` or `mockup.previewUrl` |
 | Package landing copy | **Drive `app.json`** — `landingPage.sections[].inline` + `landingPage.content` |
 | Media binaries | **GitHub** via `url`/`githubPath` (`assetsGithubRepo ?? mockupGithubRepo`) — not Drive |
@@ -78,9 +79,10 @@ SCOPE — stage 1 only (spec 1.5.0):
    - reject URLs whose hostname matches *-scooteros-projects.vercel.app (team-protected deployment pattern)
    - if missing, throw error: "Run WF1 first — mockup URL required"
 6. Code → resolve landing targets from config + appId:
-   - landingGithubRepo = repoOverrides[appId]?.landingGithubRepo ?? `${githubOrgOrUser}/${appId}-landing`
-   - vercelLandingProjectName = repoOverrides[appId]?.vercelLandingProjectName ?? `${appId}-landing`
-   - vercelLandingProjectId = repoOverrides[appId]?.vercelLandingProjectId ?? null
+   - override = landingTargets[appId] ?? repoOverrides[appId] ?? {}
+   - landingGithubRepo = override.landingGithubRepo ?? `${githubOrgOrUser}/${appId}-landing`
+   - vercelLandingProjectName = override.vercelLandingProjectName ?? `${appId}-landing`
+   - vercelLandingProjectId = override.vercelLandingProjectId ?? null
    - parse landingGithubRepo into { org, repo }
 7. IF node → continue only when status ready AND mockup URL present
 8. Log resolved appId, mockupUrl, landingGithubRepo, vercelLandingProjectName
@@ -104,10 +106,11 @@ WORKFLOW CONFIG — Set node (NO secrets):
   "landingTemplateBranch": "main",
   "vercelPollIntervalSeconds": 15,
   "vercelPollMaxMinutes": 10,
+  "landingTargets": {},
   "repoOverrides": {}
 }
 
-repoOverrides example (optional per-app overrides):
+landingTargets example (optional per-app prepared targets):
 {
   "human-lab": {
     "landingGithubRepo": "scootero/custom-landing-repo",
@@ -244,18 +247,18 @@ Extend the existing "WF2 Landing Deploy" workflow — STAGE 3 ONLY (push, deploy
 Stages 1 (load/gate) and 2 (transform/assets) already exist. Add ONLY the nodes below after stage 2 output. Complete the end-to-end pipeline.
 
 SCOPE — stage 3 only:
-1. If landingGithubRepo does not exist (GitHub API 404): create repo and seed from landingTemplateRepo@landingTemplateBranch
+1. Verify landingGithubRepo exists and is writable; if missing, fail with setup instructions
 2. GitHub → commit to landingGithubRepo:
    - app-data/app-config.json (pretty JSON from stage 2 appConfig)
    - app-data/images/* (binaries from stage 2 images array)
-   - On first bootstrap: commit landing template tree + app-data/
+   - If repo is empty: commit landing template tree + app-data/
    - Commit message: "WF2 deploy {appId} {ISO8601}"
 3. POST https://api.vercel.com/v13/deployments?teamId={vercelTeamId} with:
-   - name: vercelLandingProjectName (required on first run — creates project)
-   - project: vercelLandingProjectId OR deployment.landing.vercelProjectId from Drive (subsequent runs, if known)
+   - name: vercelLandingProjectName
+   - project: vercelLandingProjectId OR deployment.landing.vercelProjectId from Drive (required)
    - target: production
-   - gitSource: { type: github, org, repo, ref: landingTemplateBranch or "main" }
-   - Do NOT require manual Vercel project setup — first deploy creates the project via API
+   - gitSource: { type: github, org, repo, ref: "main" }
+   - Do NOT include rootDirectory; Vercel project uses repository root/default
 4. Poll GET /v13/deployments/{deploymentId}?teamId={vercelTeamId} until readyState === "READY"
    - interval: vercelPollIntervalSeconds (default 15)
    - max wait: vercelPollMaxMinutes (default 10)
@@ -340,14 +343,12 @@ Production Drive: App Validation/{appId}/app.json ONLY.
 - NEVER download Drive copy/, media/, mockup/, or reports/
 - NEVER fetch mockup application source — declared media assets only
 
-WF2 assumes PLATFORM setup only (not per-app):
+WF2 assumes platform setup and approved per-app landing targets:
 - Vercel team GitHub integration installed (one-time)
 - n8n Credentials attached
-
-WF2 handles per-app on every run (no manual Vercel dashboard steps):
-- Bootstrap landing GitHub repo from landingTemplateRepo if missing
-- Push app-data/ to {githubOrgOrUser}/{appId}-landing
-- POST Vercel /v13/deployments with name + gitSource (creates project on first run)
+- Landing GitHub repo exists before WF2 external writes
+- Vercel landing project exists and is linked to that repo
+- Vercel Root Directory is repository root/default, not ..
 
 WF2 must:
 1. Manual trigger only with input appId (string, required)
@@ -358,16 +359,17 @@ WF2 must:
    - reject team-protected deployment hostnames (*-scooteros-projects.vercel.app)
    - if missing, throw "Run WF1 first — mockup URL required"
 5. Resolve landing targets from config:
-   - landingGithubRepo = repoOverrides[appId]?.landingGithubRepo ?? `${githubOrgOrUser}/${appId}-landing`
-   - vercelLandingProjectName = repoOverrides[appId]?.vercelLandingProjectName ?? `${appId}-landing`
-   - vercelLandingProjectId = repoOverrides[appId]?.vercelLandingProjectId ?? null
+   - override = landingTargets[appId] ?? repoOverrides[appId] ?? {}
+   - landingGithubRepo = override.landingGithubRepo ?? `${githubOrgOrUser}/${appId}-landing`
+   - vercelLandingProjectName = override.vercelLandingProjectName ?? `${appId}-landing`
+   - vercelLandingProjectId = override.vercelLandingProjectId ?? deployment.landing.vercelProjectId
 6. Read inline landing copy from app.json (sections[].inline + landingPage.content)
 7. Fetch media via url or githubPath from assets repo; stage to app-data/images/
 8. Code transform → app-data/app-config.json (port generate-app-config.js + APP_PACKAGE_TRANSFORM.md)
 9. Set mockup.embedUrl = deployment.mockup.url ?? mockup.previewUrl (WF1 public alias only — never deployment.mockup.deploymentUrl)
-10. Bootstrap landing GitHub repo from landingTemplateRepo if missing (GitHub API)
-11. GitHub commit template (first run) + app-data/app-config.json + app-data/images/*
-12. POST https://api.vercel.com/v13/deployments?teamId={vercelTeamId} with name + gitSource (omit project on first run; use project ID when known)
+10. Verify prepared landing GitHub repo exists and is writable
+11. GitHub commit landing template tree (when repo is empty) + app-data/app-config.json + app-data/images/*
+12. POST https://api.vercel.com/v13/deployments?teamId={vercelTeamId} with project + gitSource; omit rootDirectory from body
 13. Poll GET /v13/deployments/{id}?teamId={vercelTeamId} until readyState === "READY"
 14. Re-read full app.json from Drive; merge-write ONLY:
     - deployment.landing.vercelProjectId
@@ -388,7 +390,7 @@ OUT OF SCOPE — do NOT build any of these:
 - Google Sheets or analytics
 - Meta ads
 - npm / Execute Command / local build nodes
-- Manual per-app Vercel or GitHub repo setup in dashboards
+- Creating landing GitHub/Vercel resources without prior approval
 - Changing App Package landingPage content on Drive
 
 CREDENTIALS (I will attach in n8n UI):
@@ -405,6 +407,7 @@ WORKFLOW CONFIG — Set node immediately after Manual Trigger (NO secrets):
   "landingTemplateBranch": "main",
   "vercelPollIntervalSeconds": 15,
   "vercelPollMaxMinutes": 10,
+  "landingTargets": {},
   "repoOverrides": {}
 }
 
@@ -421,8 +424,8 @@ FLOW (node-by-node):
 7. Code → extract inline landing copy; resolve assets repo
 8. HTTP/GitHub → fetch media (url or githubPath only)
 9. Code → transform to appConfig + images (generate-app-config.js equivalent)
-10. GitHub → bootstrap repo if missing; commit app-data/app-config.json and app-data/images/*
-11. HTTP Request → POST Vercel /v13/deployments with name + gitSource (project ID when known)
+10. GitHub → verify prepared repo; commit landing template tree when empty plus app-data/app-config.json and app-data/images/*
+11. HTTP Request → POST Vercel /v13/deployments with project + gitSource
 12. Wait + HTTP Request loop → poll until readyState === "READY"
 13. Code → extract canonicalUrl, deploymentUrl, projectId, deployedAt
 14. Google Drive → re-download current app.json
@@ -436,7 +439,7 @@ TRANSFORM rules:
 - mockup.embedUrl from WF1 public alias only (e.g. https://human-lab.vercel.app) — never deployment.mockup.deploymentUrl
 - tracking.webhookUrl may be "" until WF0
 - Generic fallbacks per APP_PACKAGE_TRANSFORM.md only
-- Push app-data/ only — Vercel prebuild mirrors images to public/
+- Push generated app-data/images; Vercel prebuild mirrors images to public/
 
 MERGE-WRITE Code node pattern:
 const pkg = $input.first().json;
@@ -466,7 +469,7 @@ ERROR HANDLING:
 
 RULES:
 - Drive app.json is control-plane SSOT — no hardcoded app names or URLs in Code nodes
-- Landing repo and Vercel project derived from config + appId (repoOverrides for exceptions)
+- Landing repo and Vercel project derived from config + appId, or supplied in landingTargets / overrides
 - GitHub → Vercel builds; n8n never runs npm
 - WF2 is idempotent — safe to re-run after inline copy or GitHub media updates
 - n8n Cloud does not read .env — credentials only in n8n Credentials UI
@@ -479,7 +482,7 @@ Test with manual trigger appId=human-lab after WF1 has written deployment.mockup
 ## After n8n builds it
 
 - [ ] Attach Google Service Account, Vercel Header Auth, and GitHub PAT to the right nodes
-- [ ] Confirm Workflow Config Set node has the JSON above (including `repoOverrides: {}`)
+- [ ] Confirm Workflow Config Set node has the JSON above (including `landingTargets` / overrides)
 - [ ] Confirm no Schedule trigger exists (manual only for v1)
 - [ ] Confirm no npm / Execute Command nodes exist
 - [ ] Confirm no Drive downloads of `copy/` or `media/`
@@ -507,16 +510,16 @@ Inline in Drive `app.json`: `landingPage.sections[].inline` + `landingPage.conte
 Referenced by `url` or `githubPath` in `app.json` → `media.*`. Fetched from `source.assetsGithubRepo ?? source.mockupGithubRepo`. Declared assets only.
 
 **Where is the landing GitHub repo name?**  
-Derived from Workflow Config: `{githubOrgOrUser}/{appId}-landing` (e.g. `scootero/human-lab-landing`). Override per app via `repoOverrides` in the Config Set node.
+Derived from Workflow Config: `{githubOrgOrUser}/{appId}-landing` (e.g. `scootero/human-lab-landing`) or supplied per app via `landingTargets` / overrides. The repo must exist before WF2 pushes.
 
 **Where is the Vercel landing project name?**  
-Derived: `{appId}-landing` (e.g. `human-lab-landing`). Override via `repoOverrides.vercelLandingProjectName`.
+Derived: `{appId}-landing` (e.g. `human-lab-landing`) or supplied via `landingTargets`. The Vercel project must exist before WF2 deploys.
 
 **Do I need to create a Vercel project manually?**  
-No. WF2 triggers `POST /v13/deployments` with `name: {appId}-landing` and `gitSource`. The first run creates the Vercel project when the team GitHub integration is installed. No manual deploy in vercel.com is required.
+Yes, as an approval-gated setup step before WF2 external writes. WF2 deploys the prepared project with `project` + `gitSource`; the root directory stays repository root/default.
 
 **Do I need to create the GitHub landing repo manually?**  
-No. WF2 bootstraps `{githubOrgOrUser}/{appId}-landing` from `landingTemplateRepo` when the repo is missing.
+Yes, as an approval-gated setup step before WF2 external writes. WF2 can seed an empty prepared repo with the landing-template tree and generated `app-data/`.
 
 **Do I need a webhook URL for WF2?**  
 No. **WF0** provisions `tracking.webhookUrl`. WF3 receives POSTs. Generated config may have empty webhook until WF0.
@@ -531,7 +534,7 @@ No. WF2 never deploys or writes mockup fields. It only **reads** the WF1 public 
 The public production alias (e.g. `https://human-lab.vercel.app`), verified incognito-safe and iframe-safe before Drive write-back. See WF1 blueprint Pre-WF2 gate.
 
 **Can I override the repo for one app?**  
-Yes. Set `repoOverrides.{appId}` in the Workflow Config Set node.
+Yes. Set `landingTargets.{appId}` or `repoOverrides.{appId}` in the Workflow Config Set node.
 
 **Does n8n run npm?**  
 No. WF2 pushes `app-data/` to GitHub; Vercel runs `npm run build` (including `prebuild` image copy).

@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "https://api.vercel.com/v13/deployments?teamId=team_CvzW7iL13TaNbaIiaCHfjafe",
+  "headersNote": "Authorization: Bearer {VERCEL_API_TOKEN} — from n8n Credentials / env only; never commit token",
+  "body": {
+    "name": "human-lab-wf2-sandbox",
+    "project": "prj_9gbSkYZTlRMF3iLVxOIM40OswVMU",
+    "target": "production",
+    "gitSource": {
+      "type": "github",
+      "org": "scootero",
+      "repo": "Human-Lab-WF2-Sandbox",
+      "ref": "main"
+    }
+  },
+  "notes": [
+    "Prepared only; do not POST until external approval.",
+    "Root Directory is intentionally absent from this body; Vercel project uses repository root/default.",
+    "The first production deployment can also be triggered automatically by pushing main to the linked repo.",
+    "After READY: write public alias URL to deployment.landing.url and raw deployment URL to deployment.landing.deploymentUrl."
+  ],
+  "externalWritePerformed": false
+}

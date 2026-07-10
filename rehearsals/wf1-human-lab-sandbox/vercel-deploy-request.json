@@ -1,0 +1,25 @@
+{
+  "method": "POST",
+  "url": "https://api.vercel.com/v13/deployments?teamId=team_CvzW7iL13TaNbaIiaCHfjafe",
+  "headersNote": "Authorization: Bearer {VERCEL_API_TOKEN} — from n8n Credentials / env only; never commit token",
+  "body": {
+    "name": "human-lab-wf1-sandbox",
+    "project": "prj_6Ip7DfE186vPbDnR1VXrgmR8rsTM",
+    "target": "production",
+    "gitSource": {
+      "type": "github",
+      "org": "scootero",
+      "repo": "Human-Lab-WF1-Sandbox",
+      "ref": "main"
+    }
+  },
+  "notes": [
+    "Root Directory is NOT in this body — Vercel project must already use mockup",
+    "Do not POST until Phase C / user approval",
+    "After READY: write publicAliasUrl to deployment.mockup.url and mockup.previewUrl; raw deploymentUrl to deployment.mockup.deploymentUrl only"
+  ],
+  "knownUrlsFromManualSetup": {
+    "publicAliasUrl": "https://human-lab-wf1-sandbox.vercel.app",
+    "deploymentUrl": "https://human-lab-wf1-sandbox-67h6xq0nz-scooteros-projects.vercel.app"
+  }
+}

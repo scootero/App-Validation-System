@@ -1,0 +1,429 @@
+{
+  "specVersion": "1.5.0",
+  "appId": "human-lab-wf1-sandbox",
+  "status": "ready",
+  "identity": {
+    "appName": "Human Lab",
+    "tagline": "Stop guessing. Start testing.",
+    "badgeText": "Coming soon to the App Store",
+    "description": "Human Lab helps you run short, science-backed experiments on yourself. Pick a category, follow a structured study, check in daily, and discover what actually works for your stress, sleep, energy, and habits.",
+    "category": "health-fitness",
+    "platform": "ios",
+    "tags": [
+      "self-experimentation",
+      "wellness",
+      "habits",
+      "quantified-self",
+      "science-backed"
+    ]
+  },
+  "audience": {
+    "landingPhrase": "curious self-improvers who want evidence—not guesswork",
+    "primary": "Curious self-improvers and quantified-self enthusiasts who want evidence—not guesswork—about what changes actually improve their wellbeing.",
+    "secondary": "Wellness app users who have tried habit trackers or biohacking tools but abandoned them because results felt anecdotal or unsustainable.",
+    "painPoints": [
+      "Trying interventions without knowing whether they actually work for you",
+      "Abandoning multi-day experiments before completion because adherence is hard",
+      "Wellness advice that sounds convincing but lacks personal data or rigorous structure",
+      "No single place to run structured n-of-1 experiments with daily check-ins and clear results"
+    ],
+    "personas": [
+      {
+        "name": "Quantified Self Explorer",
+        "summary": "Tracks sleep, mood, and habits already. Wants a structured way to test one change at a time and see whether it moves the needle."
+      },
+      {
+        "name": "Skeptical Optimizer",
+        "summary": "Tried meditation apps, supplements, and morning routines. Needs a playful, low-friction lab to prove what is worth keeping."
+      }
+    ]
+  },
+  "commerce": {
+    "pricing": {
+      "model": "subscription",
+      "currency": "USD",
+      "amount": 6.99,
+      "period": "monthly",
+      "trialDays": 7
+    },
+    "cta": {
+      "primaryText": "Buy Now",
+      "secondaryText": "See how it works",
+      "buyNowText": "Buy Now on the App Store",
+      "waitlistText": "Keep Me Updated"
+    }
+  },
+  "branding": {
+    "theme": {
+      "mode": "dark",
+      "landingStyle": "midnight",
+      "primaryColor": "#3b82f6",
+      "accentColor": "#06d6a0",
+      "accentName": "emerald",
+      "fontFamily": "DM Sans, Syne, system-ui, sans-serif"
+    },
+    "style": {
+      "tone": "playful",
+      "styleNotes": "Mad-scientist lab aesthetic with neon accents. Encouraging and curious—not clinical or preachy. Celebrate experiments completed, not perfection."
+    }
+  },
+  "mockup": {
+    "type": "interactive",
+    "sourcePath": "mockup/",
+    "framework": "react-vite",
+    "entryPoint": "mockup/src/App.jsx",
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "devCommand": "npm run dev",
+    "deployCommand": "npx vercel deploy --prod",
+    "baseWidth": 375,
+    "baseHeight": 820,
+    "clipBottomPx": 0,
+    "previewUrl": null,
+    "notes": "Interactive prototype demonstrating welcome flow, category selection, experiment detail, active dashboard, daily check-in, and results screens."
+  },
+  "media": {
+    "icon": {
+      "alt": "Human Lab app icon",
+      "githubPath": "media/icon.png"
+    },
+    "logo": {
+      "alt": "Human Lab logo",
+      "githubPath": "media/logo.png"
+    },
+    "ogImage": {
+      "alt": "Human Lab — Stop guessing. Start testing.",
+      "width": 1200,
+      "height": 630,
+      "githubPath": "media/og-image.png"
+    },
+    "screenshots": [
+      {
+        "alt": "Welcome screen",
+        "title": "Stop guessing. Start testing.",
+        "description": "Choose a category and enter the lab.",
+        "githubPath": "media/screenshots/01-home.png"
+      },
+      {
+        "alt": "Active experiment dashboard",
+        "title": "Run structured experiments",
+        "description": "Daily check-ins and progress tracking.",
+        "githubPath": "media/screenshots/02-feature.png"
+      },
+      {
+        "alt": "Experiment results",
+        "title": "See what actually worked",
+        "description": "Review outcomes backed by your data.",
+        "githubPath": "media/screenshots/03-results.png"
+      }
+    ],
+    "demoVideo": {
+      "alt": "Human Lab product demo",
+      "githubPath": "media/demo.mp4"
+    }
+  },
+  "landingPage": {
+    "slug": "human-lab-wf1-sandbox",
+    "sections": [
+      {
+        "id": "hero",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "headline": "Stop guessing. Start testing.",
+          "subheadline": "Run short experiments on yourself and discover what actually works.",
+          "body": "Human Lab turns self-improvement into structured, science-backed experiments. Pick a category—stress, sleep, energy, or habits—follow a guided study for 7 to 45 days, check in daily, and see whether the change made a real difference for you.\n\nNo miracle claims. No generic advice. Just your data, your experiments, and an AI scientist in your corner."
+        }
+      },
+      {
+        "id": "features",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "headline": "Your personal evidence lab",
+          "subheadline": "Science-backed experiments, daily check-ins, and clear results."
+        }
+      },
+      {
+        "id": "screenshots",
+        "enabled": true,
+        "source": "media"
+      },
+      {
+        "id": "socialProof",
+        "enabled": false,
+        "source": "inline",
+        "inline": {
+          "headline": "Built for people who want proof",
+          "body": "Add testimonials or beta feedback here when available."
+        }
+      },
+      {
+        "id": "pricing",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "headline": "Simple pricing",
+          "subheadline": "$6.99/month after a 7-day free trial. Cancel anytime."
+        }
+      },
+      {
+        "id": "faq",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "headline": "Frequently asked questions"
+        }
+      },
+      {
+        "id": "cta",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "headline": "Ready to run your first experiment?",
+          "subheadline": "Start testing what actually works—for you.",
+          "placeholder": "Enter your email"
+        }
+      },
+      {
+        "id": "footer",
+        "enabled": true,
+        "source": "inline",
+        "inline": {
+          "body": "© 2026 Human Lab. Privacy · Terms · Contact"
+        }
+      }
+    ],
+    "seo": {
+      "title": "Human Lab — Stop guessing. Start testing.",
+      "description": "Run short science-backed experiments on yourself. Discover what actually works for stress, sleep, energy, and habits.",
+      "keywords": [
+        "self-experimentation",
+        "habit tracker",
+        "wellness app",
+        "quantified self",
+        "n-of-1 experiments"
+      ]
+    },
+    "content": {
+      "benefits": [
+        {
+          "title": "7–45 day studies",
+          "description": "Structured experiments with clear start and end dates.",
+          "icon": "sparkles"
+        },
+        {
+          "title": "Real data",
+          "description": "Daily check-ins build a personal evidence base.",
+          "icon": "check"
+        },
+        {
+          "title": "AI lab scientist",
+          "description": "Guidance and encouragement grounded in research.",
+          "icon": "star"
+        }
+      ],
+      "features": [
+        {
+          "title": "Science-backed experiment catalog",
+          "description": "Browse curated experiments with peer-reviewed sources—not influencer hype. Each study links to real research so you know why you're testing something."
+        },
+        {
+          "title": "Structured daily check-ins",
+          "description": "Complete short check-ins during your experiment. Track adherence, mood, and outcomes without spreadsheets or guesswork."
+        },
+        {
+          "title": "Category-based lab",
+          "description": "Choose what you want to improve—stress, sleep, energy, nutrition, focus, and more. Each category offers experiments sized for real life."
+        },
+        {
+          "title": "Your AI lab scientist",
+          "description": "Get guidance, encouragement, and context as you run experiments. The mad-scientist mascot keeps the process playful while staying grounded in evidence."
+        },
+        {
+          "title": "Clear results",
+          "description": "When your experiment ends, review what happened. See whether the intervention worked for you—not for an average user in a marketing slide."
+        }
+      ],
+      "faq": [
+        {
+          "question": "What is Human Lab?",
+          "answer": "Human Lab is a self-experimentation app for iOS. You pick a science-backed experiment, run it for a set number of days, check in daily, and review whether it actually improved your target outcome."
+        },
+        {
+          "question": "How is this different from a habit tracker?",
+          "answer": "Habit trackers help you repeat behaviors. Human Lab helps you test whether a specific intervention works for you—with a start date, end date, daily data, and a results summary. Think n-of-1 experiment, not endless streaks."
+        },
+        {
+          "question": "Do I need to be a scientist to use it?",
+          "answer": "No. Experiments are pre-designed with plain-language instructions and linked research. You follow the protocol, log check-ins, and review results when the study completes."
+        },
+        {
+          "question": "How much does it cost?",
+          "answer": "Human Lab offers a 7-day free trial, then $6.99/month. Cancel anytime from your account settings. Pricing may change before public launch—see the landing page for current terms."
+        },
+        {
+          "question": "Is my data private?",
+          "answer": "Your experiment data is yours. We do not sell personal health data. A full privacy policy will be published before launch."
+        },
+        {
+          "question": "What platforms are supported?",
+          "answer": "The full product targets iOS. This package includes an interactive web mockup for validation—the landing page embeds the deployed mockup URL; it does not import mockup source code directly."
+        }
+      ],
+      "testimonials": []
+    }
+  },
+  "ads": {
+    "campaignName": "human-lab-validation",
+    "objective": "conversions",
+    "platforms": [
+      "facebook",
+      "instagram"
+    ],
+    "headlines": [
+      "Stop guessing. Start testing.",
+      "Run science-backed experiments on yourself"
+    ],
+    "primaryTexts": [
+      "Discover what actually works for your stress, sleep, and habits."
+    ],
+    "descriptions": [
+      "Human Lab turns self-improvement into structured experiments."
+    ],
+    "callToAction": "SIGN_UP",
+    "utmTemplate": {
+      "source": "facebook",
+      "medium": "paid_social",
+      "campaign": "human-lab-validation"
+    },
+    "targeting": {
+      "locations": [
+        "United States"
+      ],
+      "ageMin": 25,
+      "ageMax": 55,
+      "interests": [
+        "fitness",
+        "productivity",
+        "self-improvement"
+      ]
+    },
+    "meta": {
+      "status": null,
+      "campaignId": null,
+      "adSetId": null,
+      "creativeId": null,
+      "adId": null,
+      "landingUrl": null,
+      "dailyBudget": null,
+      "createdAt": null,
+      "lastSyncedAt": null
+    },
+    "media": [
+      {
+        "githubPath": "media/og-image.png",
+        "alt": "Human Lab — Stop guessing. Start testing.",
+        "role": "primary"
+      }
+    ]
+  },
+  "tracking": {
+    "webhookUrl": null,
+    "webhooks": {
+      "validationComplete": null,
+      "deployComplete": null,
+      "emailCaptured": null,
+      "buyNowClicked": null
+    },
+    "events": [
+      {
+        "name": "page_view",
+        "description": "Landing page viewed"
+      },
+      {
+        "name": "email_captured",
+        "description": "User submitted email on landing page"
+      },
+      {
+        "name": "buy_now_clicked",
+        "description": "User clicked Buy Now / purchase CTA"
+      },
+      {
+        "name": "mockup_interacted",
+        "description": "User opened or interacted with live mockup preview"
+      }
+    ]
+  },
+  "analytics": {
+    "projectId": "proj_human-lab",
+    "experimentId": "exp_human-lab_2026q2_001",
+    "experimentRunId": "run_human-lab_2026q2_001",
+    "landingVariantId": "v1",
+    "mockupVersionId": "v1",
+    "funnelName": "validation_funnel"
+  },
+  "experiment": {
+    "experimentName": "Human Lab — Q2 2026 Validation",
+    "hypothesis": "We believe curious self-improvers will submit email and express buy intent at a CPA below $8 because Human Lab offers structured, science-backed n-of-1 experiments instead of generic habit advice.",
+    "successCriteria": [
+      "Cost per email signup below $5",
+      "Buy Now click rate above 2.5%",
+      "At least 200 unique landing page visitors"
+    ],
+    "testBudget": {
+      "currency": "USD",
+      "amount": 500,
+      "durationDays": 14
+    },
+    "decisionRules": {
+      "winnerThreshold": "CPA below $8 AND buy-now rate above 2.5% after min sample size",
+      "killThreshold": "CPA above $20 after 50% of budget spent with fewer than 10 email signups",
+      "minSampleSize": 200,
+      "notes": "Pause for manual review if CPA is $8–$15 at day 10 with positive engagement but low conversions."
+    },
+    "thresholds": {
+      "minClicks": 200,
+      "minSignupRate": 0.05,
+      "maxCostPerSignup": 8
+    }
+  },
+  "source": {
+    "mockupGithubRepo": "scootero/Human-Lab-WF1-Sandbox",
+    "mockupBranch": "main",
+    "mockupRootDirectory": "mockup",
+    "vercelMockupProjectId": "prj_6Ip7DfE186vPbDnR1VXrgmR8rsTM",
+    "vercelMockupProjectName": "human-lab-wf1-sandbox"
+  },
+  "deployment": {
+    "mockup": {
+      "vercelProjectId": null,
+      "url": null,
+      "deploymentUrl": null,
+      "lastDeployedAt": null
+    },
+    "landing": {
+      "vercelProjectId": null,
+      "url": null,
+      "deploymentUrl": null,
+      "lastDeployedAt": null
+    },
+    "githubRepoUrl": null
+  },
+  "validation": {
+    "lastCheckedAt": null,
+    "metrics": {
+      "spend": null,
+      "impressions": null,
+      "clicks": null,
+      "ctr": null,
+      "cpc": null,
+      "signups": null,
+      "signupRate": null,
+      "costPerSignup": null
+    },
+    "recommendation": null,
+    "latestReportFile": null,
+    "latestReportUrl": null
+  }
+}

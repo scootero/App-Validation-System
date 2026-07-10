@@ -1,0 +1,212 @@
+{
+  "generatedAt": "2026-07-10T07:49:35.777Z",
+  "appJsonPath": "/Users/scott/Desktop/App-Validation-System/rehearsals/wf2-human-lab-sandbox/drive-fixture/App Validation/human-lab-wf1-sandbox/app.json",
+  "landingProjectPath": "/Users/scott/Desktop/App-Validation-System/rehearsals/wf2-human-lab-sandbox/landing-project",
+  "mockupUrl": "https://human-lab-wf1-sandbox.vercel.app",
+  "assetsRepo": {
+    "repo": "scootero/Human-Lab-WF1-Sandbox",
+    "branch": "main"
+  },
+  "localAssetsDir": "/Users/scott/Desktop/App-Validation-System/rehearsals/github/Human-Lab-WF1-Sandbox",
+  "contentChecks": [
+    {
+      "key": "hero",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires hero headline, subheadline, and body from landingPage.sections[hero].inline."
+    },
+    {
+      "key": "benefits",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires landingPage.content.benefits[]."
+    },
+    {
+      "key": "features",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires landingPage.content.features[]."
+    },
+    {
+      "key": "faq",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires landingPage.content.faq[]."
+    },
+    {
+      "key": "pricing",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires commerce.pricing currency, amount, and period."
+    },
+    {
+      "key": "cta",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires commerce.cta primary, buy-now, and waitlist labels."
+    },
+    {
+      "key": "social proof/testimonials",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Not required because socialProof.enabled is false."
+    },
+    {
+      "key": "seo",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires landingPage.seo title, description, and keywords."
+    },
+    {
+      "key": "font family",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires branding.theme.fontFamily."
+    },
+    {
+      "key": "tracking configuration",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Requires tracking.events[] and analytics experiment identifiers."
+    },
+    {
+      "key": "logo",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/logo.png."
+    },
+    {
+      "key": "icon/favicon",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/icon.png."
+    },
+    {
+      "key": "og image",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/og-image.png."
+    },
+    {
+      "key": "screenshot 1",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/01-home.png."
+    },
+    {
+      "key": "screenshot 2",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/02-feature.png."
+    },
+    {
+      "key": "screenshot 3",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved to /app-data/images/03-results.png."
+    },
+    {
+      "key": "mockup embed",
+      "ok": true,
+      "severity": "ok",
+      "detail": "Resolved from deployment.mockup.url: https://human-lab-wf1-sandbox.vercel.app"
+    }
+  ],
+  "assetResults": [
+    {
+      "key": "logo",
+      "required": true,
+      "publicName": "logo.png",
+      "publicPath": "/app-data/images/logo.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/logo.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/logo.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    },
+    {
+      "key": "icon/favicon",
+      "required": true,
+      "publicName": "icon.png",
+      "publicPath": "/app-data/images/icon.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/icon.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/icon.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    },
+    {
+      "key": "og image",
+      "required": true,
+      "publicName": "og-image.png",
+      "publicPath": "/app-data/images/og-image.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/og-image.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    },
+    {
+      "key": "screenshot 1",
+      "required": true,
+      "publicName": "01-home.png",
+      "publicPath": "/app-data/images/01-home.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/screenshots/01-home.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/screenshots/01-home.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    },
+    {
+      "key": "screenshot 2",
+      "required": true,
+      "publicName": "02-feature.png",
+      "publicPath": "/app-data/images/02-feature.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/screenshots/02-feature.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/screenshots/02-feature.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    },
+    {
+      "key": "screenshot 3",
+      "required": true,
+      "publicName": "03-results.png",
+      "publicPath": "/app-data/images/03-results.png",
+      "locator": {
+        "kind": "githubPath",
+        "value": "media/screenshots/03-results.png"
+      },
+      "sourceUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/screenshots/03-results.png",
+      "resolved": true,
+      "error": "",
+      "resolution": "local sandbox GitHub copy"
+    }
+  ],
+  "generatedFiles": [
+    "app-data/app-config.json",
+    "app-data/images/",
+    "../execution-log/wf2-verification-report.md",
+    "../execution-log/asset-resolution-report.json",
+    "../execution-log/github-repo-plan.json",
+    "../execution-log/git-push-plan.json",
+    "../execution-log/vercel-project-plan.json",
+    "../execution-log/vercel-deploy-request.json",
+    "../execution-log/expected-drive-writeback-fields.json"
+  ]
+}

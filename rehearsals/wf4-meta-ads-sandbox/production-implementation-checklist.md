@@ -1,0 +1,49 @@
+# WF4 Production Implementation Checklist
+
+## WF3 Gate
+
+- [ ] WF3 local rehearsal passed.
+- [ ] WF3 external sandbox rehearsal passed.
+- [ ] Google Sheets contains one row for each required event.
+- [ ] WF-Decision can filter signup-intent events.
+
+## Meta Readiness
+
+- [ ] Current Meta Marketing API version verified.
+- [ ] Objective names verified.
+- [ ] Billing event and optimization goal mapping verified.
+- [ ] Daily budget minimums and units verified.
+- [ ] Meta token permissions verified.
+- [ ] Ad account ownership and billing verified.
+- [ ] Facebook Page actor verified.
+- [ ] Instagram actor verified if Instagram placements are used.
+- [ ] Special ad category decision documented.
+- [ ] Creative asset can be resolved and uploaded.
+
+## Workflow Safety
+
+- [ ] Default mode is `dry_run`.
+- [ ] Create-paused mode requires explicit human approval.
+- [ ] Campaign status is `PAUSED`.
+- [ ] Ad set status is `PAUSED`.
+- [ ] Ad status is `PAUSED`.
+- [ ] No `status: validating` write-back occurs until all Meta IDs exist.
+- [ ] Partial-create failure alerts operator and does not corrupt `app.json`.
+- [ ] `ads` author copy is never overwritten.
+- [ ] `deployment.*` is never modified by WF4.
+- [ ] No spend-bearing resource is activated by automation.
+
+## Write-Back
+
+- [ ] Merge-write only `ads.meta.*`.
+- [ ] Set root `status: validating` only after successful paused creation.
+- [ ] Preserve `appId` and `specVersion`.
+- [ ] Preserve all author-owned fields.
+
+## External Evidence
+
+- [ ] Dry-run bundle reviewed.
+- [ ] Paused campaign visible in Meta Ads Manager, if create-paused mode is approved later.
+- [ ] Destination URL includes UTM params.
+- [ ] Landing URL points to `deployment.landing.url`.
+- [ ] Human confirms no campaign was activated by automation.

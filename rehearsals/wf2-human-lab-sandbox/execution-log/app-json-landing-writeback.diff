@@ -1,0 +1,20 @@
+--- rehearsals/wf2-human-lab-sandbox/execution-log/app-json-before-landing-writeback.json	2026-07-10 02:55:25
++++ rehearsals/wf2-human-lab-sandbox/execution-log/app-json-after-landing-writeback.json	2026-07-10 02:55:25
+@@ -403,12 +403,12 @@
+       "lastDeployedAt": "2026-07-10T03:39:17.017Z"
+     },
+     "landing": {
+-      "vercelProjectId": null,
+-      "url": null,
+-      "deploymentUrl": null,
+-      "lastDeployedAt": null
++      "vercelProjectId": "prj_9gbSkYZTlRMF3iLVxOIM40OswVMU",
++      "url": "https://human-lab-wf2-sandbox.vercel.app",
++      "deploymentUrl": "https://human-lab-wf2-sandbox-cflf01xjk-scooteros-projects.vercel.app",
++      "lastDeployedAt": "2026-07-10T07:53:46Z"
+     },
+-    "githubRepoUrl": null
++    "githubRepoUrl": "https://github.com/scootero/Human-Lab-WF2-Sandbox"
+   },
+   "validation": {
+     "lastCheckedAt": null,
