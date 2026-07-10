@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-07  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud  
 **Upstream:** [WF2 — Landing Deploy](./WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) must have written `deployment.landing.url`
 
@@ -13,16 +13,19 @@
 
 WF-Ads creates a **paused** Meta/Facebook ad campaign that sends traffic to the deployed landing page. No ad spend occurs until a human activates the campaign in Meta Ads Manager.
 
+**Production Drive (1.5.0):** `App Validation/{appId}/app.json` only. Creative assets resolve via `url` / `githubPath` — not Drive `media/`.
+
 **WF-Ads does:**
 
 1. Manual trigger with input `appId`
 2. Read `App Validation/{appId}/app.json` from Google Drive
 3. Gate: `deployment.landing.url` exists (HTTPS)
 4. Read `ads.*` (copy), `ads.targeting`, `experiment.testBudget`
-5. Expand `ads.utmTemplate` → destination URL
-6. Create Meta campaign, ad set, creative, ad — all **PAUSED**
-7. Merge-write `ads.meta.*` only
-8. Set `status` to `"validating"`
+5. **Select creative** per priority below — fail if none resolve
+6. Expand `ads.utmTemplate` → destination URL
+7. Create Meta campaign, ad set, creative, ad — all **PAUSED**
+8. Merge-write `ads.meta.*` only
+9. Set `status` to `"validating"`
 
 **WF-Ads does NOT:**
 
@@ -43,6 +46,8 @@ WF-Ads creates a **paused** Meta/Facebook ad campaign that sends traffic to the 
 | Meta API access token | ✅ | — | — |
 | Meta ad account ID | ✅ | ✅ | — |
 | `ads.*` (copy) | — | — | ✅ human sets |
+| `ads.media[]` | — | — | ✅ human sets (preferred creative) |
+| `media.ogImage` | — | — | ✅ human sets (fallback creative) |
 | `ads.targeting` | — | — | ✅ human sets |
 | `ads.meta.*` | — | — | ✅ **written by WF-Ads** |
 | `deployment.landing.url` | — | — | ✅ read (WF2 writes) |
@@ -73,7 +78,9 @@ flowchart TD
   G1 -->|no| ERR1[Fail — run WF2 first]
   G1 -->|yes| G2{ads complete?}
   G2 -->|no| ERR2[Alert — incomplete ads]
-  G2 -->|yes| UTM[Expand UTM destination URL]
+  G2 -->|yes| CRSEL[Select creative ads.media then ogImage]
+  CRSEL -->|none| ERR3[Fail — no creative asset]
+  CRSEL -->|ok| UTM[Expand UTM destination URL]
   UTM --> MC[Create Campaign PAUSED]
   MC --> AS[Create Ad Set PAUSED]
   AS --> CR[Create Creative]
@@ -93,14 +100,15 @@ flowchart TD
 | 3 | Read app.json | Google Drive |
 | 4 | Gate landing URL | Code + IF |
 | 5 | Validate ads section | Code + IF |
-| 6 | Expand UTM | Code |
-| 7 | Create Campaign | HTTP Request (Meta API) |
-| 8 | Create Ad Set | HTTP Request |
-| 9 | Create Ad Creative | HTTP Request |
-| 10 | Create Ad | HTTP Request |
-| 11 | Re-read app.json | Google Drive |
-| 12 | Merge-Write app.json | Code + Drive Upload |
-| 13 | Notify Failure | HTTP (optional) |
+| 6 | Select creative asset | Code + IF |
+| 7 | Expand UTM | Code |
+| 8 | Create Campaign | HTTP Request (Meta API) |
+| 9 | Create Ad Set | HTTP Request |
+| 10 | Create Ad Creative | HTTP Request |
+| 11 | Create Ad | HTTP Request |
+| 12 | Re-read app.json | Google Drive |
+| 13 | Merge-Write app.json | Code + Drive Upload |
+| 14 | Notify Failure | HTTP (optional) |
 
 ---
 
@@ -112,8 +120,19 @@ flowchart TD
 | `ads.campaignName` | Non-empty |
 | `ads.platforms` | Includes `facebook` and/or `instagram` |
 | `ads.headlines`, `ads.primaryTexts` | At least one variant each |
+| Creative asset | See **Creative selection priority** below |
 | `experiment.testBudget` | `amount` > 0, `durationDays` set |
 | `ads.targeting` | Recommended: locations, ageMin, ageMax |
+
+### Creative selection priority (1.5.0)
+
+Resolve in order — **do not** silently fall back to text-only creatives unless the Meta ad format explicitly supports text-only:
+
+1. **`ads.media[]`** — first usable asset (or all for carousel when `role` indicates); each entry must resolve via `url` or `githubPath`
+2. **`media.ogImage`** — if `ads.media[]` is empty/missing
+3. **FAIL** with a clear error (e.g. `"No creative asset: set ads.media[] or media.ogImage"`)
+
+Fetch declared assets only from `source.assetsGithubRepo ?? source.mockupGithubRepo` when using `githubPath`. Never download Drive `media/`.
 
 **Destination URL:**
 
@@ -170,6 +189,7 @@ Human activates in Meta Ads Manager after reviewing copy, targeting, and landing
 |-------|--------|
 | Missing landing URL | Fail: "Run WF2 first" |
 | Incomplete `ads` | Alert; no Meta API calls |
+| No creative (`ads.media[]` and `media.ogImage` both missing/unresolvable) | **Fail** with clear error — do not create text-only ad unless format supports it |
 | Meta API error | Retry 3× with backoff; do not change `status` |
 | Partial Meta create | Log IDs created; alert for manual cleanup |
 | Drive write-back fail | **Critical alert** — ads may exist but SSOT stale |
@@ -182,15 +202,18 @@ Human activates in Meta Ads Manager after reviewing copy, targeting, and landing
 
 1. WF2 completed — `deployment.landing.url` live
 2. Complete `ads` + `ads.targeting` on Drive
-3. Meta credentials in n8n
+3. Creative resolves: `ads.media[]` or `media.ogImage` (`url`/`githubPath`)
+4. Meta credentials in n8n
 
 **Test steps:**
 
 1. Manual trigger WF-Ads with `appId=human-lab`
-2. Verify `ads.meta` on Drive with all IDs
-3. Verify `status: validating`
-4. Confirm in Meta Ads Manager: campaign **paused**, destination URL correct
-5. Confirm `ads.headlines` unchanged on Drive
+2. Verify creative selection used `ads.media[]` when present, else `ogImage`
+3. Verify `ads.meta` on Drive with all IDs
+4. Verify `status: validating`
+5. Confirm in Meta Ads Manager: campaign **paused**, destination URL correct, image creative present
+6. Confirm `ads.headlines` unchanged on Drive
+7. Confirm fail path when both creative sources missing
 
 ---
 
@@ -210,6 +233,7 @@ flowchart LR
 
 - [ ] Manual trigger with `appId`
 - [ ] Gates on `deployment.landing.url`
+- [ ] Creative priority: `ads.media[]` → `media.ogImage` → **fail** (no silent text-only)
 - [ ] Reads author `ads` copy; writes `ads.meta` only
 - [ ] UTM expansion from `ads.utmTemplate`
 - [ ] Creates campaign/ad set/ad **PAUSED**

@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-07  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud  
 **Upstream:** [WF0 — Provisioning](./WF0-PROVISIONING-PIPELINE-BLUEPRINT.md) writes `tracking.webhookUrl`; [WF2](./WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) embeds URL in landing config
 
@@ -13,23 +13,27 @@
 
 WF3 is the **always-on event receiver** for deployed landing pages. It validates tracking payloads and appends one row per event to the unified Google Sheet.
 
+**Auth strategy (1.5.0):** Production default is **no auth** (`webhookAuthSecret: null`). Secrets must **never** be stored in Drive `app.json`. Future Bearer auth (if enabled) lives in **n8n Credentials / environment only**.
+
 **WF3 does:**
 
 1. Expose n8n Webhook trigger (POST `application/json`)
-2. Validate `eventType` and required attribution fields
-3. Map payload to canonical Sheet column order
-4. Append row to Google Sheets
-5. Return HTTP 200 immediately (do not block client)
+2. Optionally validate Bearer auth when `webhookAuthSecret` is set in n8n env (default: skip / null)
+3. Validate `eventType` and required attribution fields
+4. Map payload to canonical Sheet column order
+5. Append row to Google Sheets
+6. Return HTTP 200 immediately (do not block client)
 
 **WF3 does NOT:**
 
 | Out of scope | Owned by |
 |--------------|----------|
-| Provision `tracking.webhookUrl` | **WF0** |
+| Provision `tracking.webhookUrl` | **WF0** (sole owner) |
 | Deploy mockup or landing | **WF1**, **WF2** |
 | Create Meta ads | **WF-Ads** |
 | Write `validation.*` or change root `status` | **WF-Decision** |
 | Overwrite author `ads` copy in `app.json` | Human / **WF-Ads** (`ads.meta` only) |
+| Store secrets in Drive `app.json` | — |
 
 **Runtime model:** WF3 is primarily a webhook receiver workflow. It does not routinely write `app.json` except optional health/debug fields on `tracking`.
 
@@ -42,8 +46,8 @@ WF3 is the **always-on event receiver** for deployed landing pages. It validates
 | Google Service Account JSON | ✅ | — | — |
 | `GOOGLE_SHEET_ID` | — | ✅ | — |
 | `GOOGLE_SHEET_TAB_NAME` | — | ✅ | — |
-| `WEBHOOK_AUTH_SECRET` | ✅ optional | — | — |
-| `tracking.webhookUrl` | — | — | ✅ read (set by WF0) |
+| `WEBHOOK_AUTH_SECRET` | ✅ optional (n8n env / Credentials) | default `null` | **never** |
+| `tracking.webhookUrl` | — | — | ✅ read only (set by **WF0**) |
 
 ---
 
@@ -57,6 +61,12 @@ WF3 is the **always-on event receiver** for deployed landing pages. It validates
 }
 ```
 
+**Auth rules:**
+
+- Default: `webhookAuthSecret: null` — accept POSTs without Bearer (production v1)
+- If set later: compare `Authorization: Bearer …` against the secret from **n8n Credentials / env**
+- Never read or write auth secrets from Drive `app.json`
+
 ---
 
 ## 4. Flow
@@ -64,9 +74,10 @@ WF3 is the **always-on event receiver** for deployed landing pages. It validates
 ```mermaid
 flowchart TD
   LP[Landing Page POST] --> WH[Webhook Trigger]
-  WH --> AUTH{Auth valid?}
-  AUTH -->|no| E401[401 reject]
-  AUTH -->|yes| VAL[Validate eventType + fields]
+  WH --> AUTH{Auth required?}
+  AUTH -->|secret null| VAL[Validate eventType + fields]
+  AUTH -->|secret set + invalid| E401[401 reject]
+  AUTH -->|secret set + valid| VAL
   VAL -->|fail| E400[400 log + 200 ok]
   VAL -->|pass| MAP[Map to Sheet columns]
   MAP --> APP[Google Sheets Append]
@@ -81,7 +92,7 @@ flowchart TD
 |---|------|------|
 | 1 | Landing Event Webhook | Webhook (POST, production URL) |
 | 2 | Workflow Config | Set |
-| 3 | Validate Auth | Code (optional `WEBHOOK_AUTH_SECRET`) |
+| 3 | Validate Auth | Code — skip when `webhookAuthSecret` is null; else Bearer from n8n env |
 | 4 | Validate Payload | Code |
 | 5 | Map to Sheet Row | Code |
 | 6 | Append Row | Google Sheets |
@@ -140,7 +151,8 @@ Only if explicitly added to spec later — v1 blueprint avoids Drive writes from
 
 | Error | Action |
 |-------|--------|
-| Invalid auth | 401 |
+| Invalid auth (only when secret configured) | 401 |
+| Auth secret present in Drive `app.json` | Ignore Drive value; use n8n env only; alert if found |
 | Unknown `eventType` | Log; return 200 |
 | Sheets append fail | Retry 3×; alert; return 200 (event may be lost — monitor alerts) |
 | Missing `appId` | Log; return 200 |
@@ -173,10 +185,13 @@ flowchart LR
 ## 12. Definition of done
 
 - [ ] Webhook trigger accepts POST JSON from landing template
+- [ ] Default auth: `webhookAuthSecret: null` (no Bearer required)
+- [ ] Future Bearer secret from n8n env only — never Drive `app.json`
 - [ ] Validates four canonical `eventType` values
 - [ ] Appends rows in canonical column order
 - [ ] Returns 200 within 2 seconds
 - [ ] Does not write author `ads` copy to Drive
+- [ ] Does not provision or overwrite `tracking.webhookUrl` (WF0)
 - [ ] Export JSON to `n8n-workflows/WF3-tracking.json` when built
 
 ---

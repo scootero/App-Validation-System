@@ -34,7 +34,7 @@ These architectural principles are already decided. Do not violate them without 
 
 ## App Package owns app-specific data
 
-Each app idea is a folder (`{appId}/`) with `app.json` as the canonical manifest, plus `copy/`, `media/`, `mockup/`, and optional `docs/`. All identity, audience, commerce, branding, experiment, ads, and tracking configuration live here.
+Each app idea’s **production control plane** is Drive `App Validation/{appId}/app.json` only (spec **1.5.0**). Local/GitHub authoring may use `copy/`, `media/`, `mockup/`, and optional `docs/` scaffolds before syncing inline fields and media refs to Drive. All identity, audience, commerce, branding, experiment, ads, and tracking configuration live in `app.json`; mockup source lives in the full app GitHub repo.
 
 ## Landing Template renders only
 
@@ -74,9 +74,9 @@ draft → provisioning → ready → validating → winner → built
 
 `deployment.mockup.*`, `deployment.landing.*`, `mockup.previewUrl`, and `tracking.webhookUrl` start as `null`. n8n writes them after provisioning and deploy steps. Humans should not hand-edit these except for recovery.
 
-## Copy lives outside JSON when long-form
+## Landing copy lives inline in production
 
-`copy/*.md` holds hero, benefits, features, and FAQ prose. `app.json` declares structure and references. This keeps the manifest scannable and AI-friendly.
+Production packages put hero/CTA/footer in `landingPage.sections[].inline` and long-form lists in `landingPage.content`. Local `copy/*.md` is a local-dev scaffold only — convert before Drive sync. This keeps the Drive control plane to one file.
 
 ---
 
@@ -100,7 +100,7 @@ App-Validation-System/
 
 | Asset | Purpose |
 |-------|---------|
-| `APP_PACKAGE_SPEC.md` | Human-readable field reference (spec version **1.4.0**) |
+| `APP_PACKAGE_SPEC.md` | Human-readable field reference (spec version **1.5.0**) |
 | `schemas/app.schema.json` | Machine-readable JSON Schema |
 | `templates/` | Starter `app.json` and `copy/` files |
 | `examples/minimal-app/` | Smallest valid package (Focus Timer, `status: draft`) |
@@ -188,7 +188,7 @@ App-Validation-System/
 
 ### Phase 1: App Package Specification (complete)
 
-- Spec version **1.4.0** with JSON Schema
+- Spec version **1.5.0** with JSON Schema
 - Normative docs: design philosophy, workflow mapping, n8n integration notes, naming conventions, versioning, validator gate
 - Templates and two example packages (minimal and full)
 - Status lifecycle including `provisioning` stage
@@ -347,7 +347,7 @@ flowchart TD
 - Schedule during `status: validating` (e.g. every 6–12 hours)
 - Pull Meta metrics + Sheets signups; compute `validation.metrics`
 - Compare `experiment.thresholds` and `decisionRules`
-- Write `validation.*`; save `reports/validation-{date}.json`
+- Write `validation.*` summary; set `validation.latestReportUrl` (Sheets / external) — not Drive `reports/`
 - Set root `status` to `winner`, `killed`, or `paused` (never `validation.status`)
 - See [WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md)
 
@@ -524,7 +524,9 @@ Add optional fields with defaults. Do not remove fields without a spec version b
 
 - Read `app-package-starter/START_HERE.md` first
 - Ask the user for app name, audience, pricing, features, theme, hypothesis before generating
-- Use generic folder names: `copy/`, `media/`, `mockup/`, `docs/`
+- Use generic folder names locally: `copy/`, `media/`, `mockup/`, `docs/` — production Drive gets **`app.json` only**
+- Put landing copy in `landingPage.content` + `sections[].inline` before Drive sync
+- Media refs use `url` or `githubPath` (not Drive `path`)
 - Record framework in `app.json` → `mockup.framework` only
 - Leave `deployment.*`, `tracking.webhookUrl`, and `mockup.previewUrl` as `null`
 - Keep `status: draft` until the package is complete
@@ -533,7 +535,7 @@ Add optional fields with defaults. Do not remove fields without a spec version b
 
 - `generate-app-config.js` translates only—no app-specific content
 - Generic fallbacks are allowed (documented in `APP_PACKAGE_TRANSFORM.md`)
-- Copy `media/screenshots/*` to `app-data/images/` during transform
+- Production: stage media from `url`/`githubPath` into `app-data/images/`; local-dev may still copy from package `media/`
 - `mockup.embedUrl` comes from `deployment.mockup.url` or `mockup.previewUrl` (public alias only — never `deployment.mockup.deploymentUrl`)
 
 ---
@@ -563,7 +565,7 @@ Before adding a new field, workflow, folder, or mapping:
 ## 2. Verify schema
 
 - [ ] Check `app-validation-spec/schemas/app.schema.json` for field names, types, and required sections
-- [ ] Confirm `specVersion` is **1.4.0**
+- [ ] Confirm `specVersion` is **1.5.0**
 - [ ] If adding fields: update schema, spec, templates, examples, and CHANGELOG together
 
 ## 3. Verify transform
@@ -575,7 +577,7 @@ Before adding a new field, workflow, folder, or mapping:
 ## 4. Verify starter
 
 - [ ] Check `app-package-starter/START_HERE.md` for authoring conventions
-- [ ] Confirm folder structure matches spec (`copy/`, `media/`, `mockup/`)
+- [ ] Confirm local folder structure matches starter (`copy/`, `media/`, `mockup/`); production Drive is `app.json` only
 - [ ] Confirm mockup builds: `npm run build` from package root
 
 ## 5. Verify landing
@@ -603,13 +605,13 @@ Before adding a new field, workflow, folder, or mapping:
 
 The end goal is a platform where someone can **create a new App Package** and have the entire validation pipeline run automatically with minimal manual work:
 
-1. Author completes `app.json`, `copy/`, `mockup/`, and `media/`
+1. Author completes `app.json` (inline landing + media refs), GitHub mockup/media, then uploads Drive `app.json` only
 2. Sets `status: provisioning`
 3. n8n provisions webhooks, validates, deploys mockup and landing page, launches Meta ads
 4. Traffic flows to the landing page; events stream to Google Sheets
 5. Dashboard evaluates results against `experiment.decisionRules`
 6. Winner is promoted (`status: winner`); losers are killed (`status: killed`)
-7. Iteration spawns new variants automatically (new copy, new mockup, new `landingVariantId`)
+7. Iteration spawns new variants automatically (new inline copy, new mockup, new `landingVariantId`)
 8. Winning app proceeds to real development (`status: built`; `appStore` metadata populated)
 
 The human's job shrinks to **idea quality**: writing a compelling hypothesis, choosing audience and pricing, reviewing generated copy and mockups. The system's job is everything operational—deploy, track, measure, decide, iterate.

@@ -95,7 +95,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 - [ ] WF0 completed — `tracking.webhookUrl` on Drive (recommended for production)
 - [ ] GitHub repo exists with mockup code on `source.mockupBranch`
 - [ ] Vercel project connected to repo; root directory = `source.mockupRootDirectory`
-- [ ] Package on Drive with `source.*` filled and **`status: "ready"`**
+- [ ] Package on Drive with `source.*` filled and **`status: "ready"`** (Drive = `app.json` only; full app repo on GitHub with `/mockup` Vercel root)
 - [ ] Build WF1 using [WF1-N8N-AI-PROMPT.md](n8n-workflows/WF1-N8N-AI-PROMPT.md)
 - [ ] After WF1: mockup URL is public alias; verified incognito + `?embed=1` before WF2
 
@@ -105,7 +105,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 - [ ] Google SA, Vercel token, and **GitHub PAT** in **n8n Credentials**
 - [ ] Config Set node values in WF2 workflow
 - [ ] WF1 completed — `deployment.mockup.url` or `mockup.previewUrl` on Drive
-- [ ] Package on Drive with `copy/`, `media/`, and **`status: "ready"`**
+- [ ] Package on Drive with **`app.json` only**, inline `landingPage`, media via `url`/`githubPath`, and **`status: "ready"`**
 - [ ] Build WF2 using [WF2-N8N-AI-PROMPT.md](n8n-workflows/WF2-N8N-AI-PROMPT.md)
 
 ## WF3 readiness checklist
@@ -120,7 +120,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 
 - [ ] WF2 completed — `deployment.landing.url` on Drive
 - [ ] Meta API credentials in n8n (access token, ad account ID)
-- [ ] Package has complete `ads` section and optional `ads.targeting`
+- [ ] Package has complete `ads` section, optional `ads.targeting`, and creative (`ads.media[]` or `media.ogImage`)
 - [ ] Build WF-Ads using [WF-ADS-META-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-ADS-META-PIPELINE-BLUEPRINT.md)
 - [ ] Verify campaign created **paused** in Meta Ads Manager
 
@@ -131,6 +131,7 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 - [ ] Meta API read credentials configured
 - [ ] `experiment.thresholds` recommended in `app.json`
 - [ ] Build WF-Decision using [WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md)
+- [ ] Confirm write-back uses `validation.latestReportUrl` (no Drive `reports/`)
 
 ## Related docs
 

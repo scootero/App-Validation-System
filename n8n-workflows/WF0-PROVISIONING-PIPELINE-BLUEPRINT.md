@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-07  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud
 
 ---
@@ -12,11 +12,15 @@
 
 WF0 provisions **tracking infrastructure** for App Packages on Google Drive before the deploy pipeline runs.
 
+**WF0 is the sole owner of `tracking.webhookUrl`.** No other workflow may create, overwrite, or clear this field. WF3 receives POSTs at the URL; WF2 only embeds whatever value is already on `app.json`.
+
+**Production Drive (1.5.0):** `App Validation/{appId}/app.json` **ONLY** — no `copy/`, `media/`, `mockup/`, `docs/`, `logs/`, `reports/`, README, package files, or lockfiles. Warn if the folder contains anything else.
+
 **WF0 does:**
 
 1. Trigger on `status: provisioning` (schedule poll or manual `appId`)
 2. Read `App Validation/{appId}/app.json` from Google Drive
-3. Validate package completeness (`experiment`, `analytics`, `ads`)
+3. Validate package completeness (`experiment`, `analytics`, `ads`) and Drive hygiene (`app.json` only)
 4. Create or resolve n8n webhook URL for landing events
 5. Merge-write `tracking.webhookUrl` to Drive `app.json`
 6. Set `status` to `"ready"`
@@ -26,11 +30,13 @@ WF0 provisions **tracking infrastructure** for App Packages on Google Drive befo
 | Out of scope | Owned by |
 |--------------|----------|
 | Mockup or landing deploy | **WF1**, **WF2** |
+| Receive webhook events / Sheets | **WF3** |
 | Meta ads | **WF-Ads** |
 | Metrics / decision | **WF-Decision** |
 | Modify `deployment.*`, `ads.meta`, `validation` | Other workflows |
+| Store webhook auth secrets in `app.json` | n8n env / Credentials only (see WF3) |
 
-**App Package on Drive remains SSOT.** WF0 never changes author content sections.
+**Drive `app.json` remains control-plane SSOT.** WF0 never changes author content sections.
 
 ---
 
@@ -41,8 +47,9 @@ WF0 provisions **tracking infrastructure** for App Packages on Google Drive befo
 | Google Service Account JSON | ✅ | — | optional | redacted | — |
 | Drive folder ID | — | ✅ | ✅ | ✅ | — |
 | `N8N_BASE_URL` | — | ✅ | ✅ | ✅ | — |
-| `tracking.webhookUrl` | — | — | — | — | ✅ **written by WF0** |
+| `tracking.webhookUrl` | — | — | — | — | ✅ **written by WF0 only** |
 | `status` | — | — | — | — | Human sets `provisioning`; WF0 sets `ready` |
+| Webhook auth secret | n8n env / Credentials | — | — | — | **never** in Drive `app.json` |
 
 ---
 
@@ -102,20 +109,26 @@ flowchart TD
 | Gate | Rule |
 |------|------|
 | `status` | Must be `"provisioning"` |
+| Drive hygiene | Folder contains **only** `app.json` (warn/error on extra files) |
 | `experiment` | Full section: name, hypothesis, successCriteria, testBudget, decisionRules |
 | `analytics` | `projectId`, `experimentId`, `experimentRunId`, `landingVariantId`, `mockupVersionId` |
 | `ads` | `campaignName`, `platforms`, at least one headline and primaryText |
+| Landing copy (production) | Enabled sections use `source: "inline"`; `landingPage.content` for long-form |
+| Media refs | Used assets have `url` or `githubPath` (not Drive `path`) |
 | `appId` | Matches folder name (warn on mismatch) |
 
-**Optional:** `ads.targeting`, `experiment.thresholds` (recommended before WF-Ads/WF-Decision).
+**Optional:** `ads.targeting`, `experiment.thresholds`, `ads.media[]` (recommended before WF-Ads/WF-Decision).
 
 ---
 
 ## 7. Webhook provisioning
 
+**Ownership:** WF0 alone writes `tracking.webhookUrl`. WF1/WF2/WF3/WF-Ads/WF-Decision must not overwrite it.
+
 1. Use n8n Webhook node (production URL) or construct stable path from Config Set + `appId`
 2. URL must be HTTPS and reachable from deployed Vercel landing pages
 3. Store in `tracking.webhookUrl` only — not in `tracking.webhooks.*` legacy keys
+4. Do **not** write auth secrets into `app.json` — future Bearer auth lives in n8n env / Credentials (WF3)
 
 WF3 (separate workflow) receives POSTs at this URL and appends Google Sheets rows.
 
@@ -151,15 +164,17 @@ WF3 (separate workflow) receives POSTs at this URL and appends Google Sheets row
 
 **Prerequisites:**
 
-1. Package on Drive with full `experiment`, `analytics`, `ads`
-2. `status: "provisioning"`
+1. Drive folder is `app.json` only (inline landing copy; media via `url`/`githubPath`)
+2. Package has full `experiment`, `analytics`, `ads`
+3. `status: "provisioning"`
 
 **Test steps:**
 
 1. Trigger WF0 with `appId=human-lab`
-2. Verify `tracking.webhookUrl` on Drive
+2. Verify `tracking.webhookUrl` on Drive (written by WF0 only)
 3. Verify `status: "ready"`
-4. POST test payload to webhook URL; confirm WF3 appends Sheet row (when WF3 is built)
+4. Confirm no secrets written into `app.json`
+5. POST test payload to webhook URL; confirm WF3 appends Sheet row (when WF3 is built)
 
 ---
 
@@ -180,9 +195,10 @@ flowchart LR
 
 - [ ] Schedule poll and/or manual trigger with `appId`
 - [ ] Gates on `status: provisioning` only
-- [ ] Validates experiment, analytics, ads completeness
-- [ ] Provisions non-null `tracking.webhookUrl`
+- [ ] Validates experiment, analytics, ads completeness + Drive `app.json`-only hygiene
+- [ ] Sole owner: provisions non-null `tracking.webhookUrl`
 - [ ] Merge-write `tracking.webhookUrl` and `status: ready` only
+- [ ] Never stores auth secrets in Drive `app.json`
 - [ ] Never modifies `deployment.*`, `ads.meta`, `validation`
 - [ ] Export JSON to `n8n-workflows/WF0-provisioning.json` when built
 

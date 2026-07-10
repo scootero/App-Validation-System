@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-07  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud  
 **Upstream:** [WF-Ads](./WF-ADS-META-PIPELINE-BLUEPRINT.md) sets `status: validating`; [WF3](./WF3-TRACKING-PIPELINE-BLUEPRINT.md) populates Google Sheets
 
@@ -11,7 +11,11 @@
 
 ## 1. Purpose
 
-WF-Decision monitors whether the validation experiment is working. It aggregates Meta ad metrics and landing signup data, compares against thresholds, writes runtime metrics to `app.json`, saves detailed reports to Drive, and may set terminal root `status`.
+WF-Decision monitors whether the validation experiment is working. It aggregates Meta ad metrics and landing signup data, compares against thresholds, writes a **summary** to `validation.*` in Drive `app.json`, and may set terminal root `status`.
+
+**Detailed raw data** stays in Google Sheets or an external report URL — set `validation.latestReportUrl` when a browser-accessible link exists. Do **not** write Drive `reports/` folders or `latestReportFile`.
+
+**Production Drive (1.5.0):** `App Validation/{appId}/app.json` only.
 
 **WF-Decision does:**
 
@@ -21,9 +25,8 @@ WF-Decision monitors whether the validation experiment is working. It aggregates
 4. Pull signup counts from Google Sheets (`email_captured`, `buy_now_clicked`)
 5. Compute spend, CTR, CPC, signup rate, cost per signup
 6. Compare against `experiment.thresholds` and `experiment.decisionRules`
-7. Merge-write `validation.*`
-8. Save `reports/validation-{date}.json` on Drive
-9. Set root `status` to `winner`, `killed`, or `paused` when criteria met
+7. Merge-write `validation.*` (including `latestReportUrl` when available)
+8. Set root `status` to `winner`, `killed`, or `paused` when criteria met
 
 **WF-Decision does NOT:**
 
@@ -32,6 +35,7 @@ WF-Decision monitors whether the validation experiment is working. It aggregates
 | Create or modify ads | **WF-Ads** |
 | Deploy infrastructure | **WF0**–**WF2** |
 | Add `validation.status` | Use root `status` only |
+| Write Drive `reports/` files | Deprecated in 1.5.0 — use Sheets / `latestReportUrl` |
 | Overwrite author sections | Human / other workflows |
 
 ---
@@ -40,11 +44,11 @@ WF-Decision monitors whether the validation experiment is working. It aggregates
 
 | Value | n8n Credentials | Config Set node | Drive |
 |-------|-----------------|-----------------|-------|
-| Google SA | ✅ | — | Read `app.json`; write reports |
+| Google SA | ✅ | — | Read/write `app.json` only |
 | Meta API token | ✅ | — | Read ad metrics |
-| `GOOGLE_SHEET_ID` | — | ✅ | Read signup rows |
-| `validation.*` | — | — | ✅ merge-write |
-| `reports/validation-*.json` | — | — | ✅ append file |
+| `GOOGLE_SHEET_ID` | — | ✅ | Read signup rows (detailed data) |
+| `validation.*` | — | — | ✅ merge-write summary |
+| `validation.latestReportUrl` | — | — | ✅ URI to Sheets / external / n8n execution |
 | Root `status` | — | — | ✅ `winner`/`killed`/`paused` |
 
 ---
@@ -75,9 +79,8 @@ flowchart TD
   META --> SHEETS[Query Sheets signups]
   SHEETS --> CALC[Compute validation.metrics]
   CALC --> CMP[Compare thresholds + decisionRules]
-  CMP --> WB[Merge-write validation.*]
-  WB --> REP[Write reports/validation-date.json]
-  REP --> STAT{Terminal decision?}
+  CMP --> WB[Merge-write validation.* + latestReportUrl]
+  WB --> STAT{Terminal decision?}
   STAT -->|yes| STATUS[Set root status]
   STAT -->|no| DONE[Done]
   STATUS --> DONE
@@ -100,9 +103,10 @@ flowchart TD
 | 9 | Decision logic | Code |
 | 10 | Re-read app.json | Google Drive |
 | 11 | Merge-Write validation | Code + Drive Upload |
-| 12 | Write report file | Google Drive Upload |
-| 13 | Optional: pause Meta ads on kill | HTTP Request |
-| 14 | Notify | HTTP (optional) |
+| 12 | Optional: pause Meta ads on kill | HTTP Request |
+| 13 | Notify | HTTP (optional) |
+
+**No** Drive Upload of `reports/validation-*.json`.
 
 ---
 
@@ -136,25 +140,21 @@ flowchart TD
 
 ---
 
-## 7. Report file format
+## 7. Report location (1.5.0)
 
-Save to `App Validation/{appId}/reports/validation-2026-07-07.json`:
+Detailed snapshots stay in **Google Sheets** (or an external host / n8n execution URL). Do not create `App Validation/{appId}/reports/`.
+
+Set `validation.latestReportUrl` to a browser-accessible link when available, e.g.:
 
 ```json
 {
-  "appId": "human-lab",
-  "checkedAt": "2026-07-07T18:00:00.000Z",
-  "experimentRunId": "run_human-lab_2026q2_001",
-  "metrics": { },
-  "thresholds": { },
-  "decisionRules": { },
-  "recommendation": "continue",
-  "metaApiSnapshot": { },
-  "sheetSignupCount": 9
+  "latestReportUrl": "https://docs.google.com/spreadsheets/d/…/edit#gid=0"
 }
 ```
 
-Set `validation.latestReportFile` to `reports/validation-2026-07-07.json` (Drive-relative).
+`validation.latestReportFile` is **deprecated** — do not write it on new runs.
+
+Optional: keep a full metrics snapshot in n8n execution data or a Code-node log for debugging; the Drive control plane only needs the `validation.*` summary.
 
 ---
 
@@ -175,7 +175,7 @@ Set `validation.latestReportFile` to `reports/validation-2026-07-07.json` (Drive
       "costPerSignup": 4.68
     },
     "recommendation": "continue",
-    "latestReportFile": "reports/validation-2026-07-07.json"
+    "latestReportUrl": "https://docs.google.com/spreadsheets/d/…/edit#gid=0"
   }
 }
 ```
@@ -186,7 +186,8 @@ Set `validation.latestReportFile` to `reports/validation-2026-07-07.json` (Drive
 { "status": "winner" }
 ```
 
-**Never write** `validation.status` — lifecycle uses root `status` enum only.
+**Never write** `validation.status` — lifecycle uses root `status` enum only.  
+**Never write** Drive `reports/` or `latestReportFile`.
 
 ---
 
@@ -197,7 +198,7 @@ Set `validation.latestReportFile` to `reports/validation-2026-07-07.json` (Drive
 | Meta API fail | Retry; log; skip status change |
 | Sheets read fail | Alert; partial metrics if Meta OK |
 | `ads.meta` missing | Skip package; alert |
-| Drive report write fail | Alert; still try `validation.*` write-back |
+| Drive `app.json` write fail | **Critical alert** — metrics computed but SSOT stale |
 | Ambiguous decision | Set `recommendation: needs_review`; optional `status: paused` |
 
 ---
@@ -214,8 +215,8 @@ Set `validation.latestReportFile` to `reports/validation-2026-07-07.json` (Drive
 **Test steps:**
 
 1. Run WF-Decision manually for `appId=human-lab`
-2. Verify `validation.metrics` on Drive
-3. Verify `reports/validation-{date}.json` on Drive
+2. Verify `validation.metrics` on Drive `app.json`
+3. Verify `validation.latestReportUrl` points to Sheets/external (no `reports/` folder on Drive)
 4. Confirm root `status` unchanged when experiment continues
 5. Simulate kill criteria; confirm `status: killed` and Meta pause call
 
@@ -238,8 +239,8 @@ flowchart LR
 
 - [ ] Schedule trigger during `validating`
 - [ ] Pulls Meta + Sheets metrics
-- [ ] Writes `validation.*` only (not author sections)
-- [ ] Saves report to `reports/` folder
+- [ ] Writes `validation.*` summary only (not author sections)
+- [ ] Sets `validation.latestReportUrl` (not Drive `reports/` / `latestReportFile`)
 - [ ] Sets root `status` for terminal outcomes
 - [ ] Never writes `validation.status`
 - [ ] Export JSON to `n8n-workflows/WF-Decision-monitoring.json` when built

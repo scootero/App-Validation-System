@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-02  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud (no local Node/npm)  
 **Upstream:** [WF1 — Mockup Deploy](./WF1-DEPLOY-PIPELINE-BLUEPRINT.md) must have run successfully
 
@@ -12,6 +12,8 @@
 ## 1. Purpose
 
 WF2 deploys the **landing page only** for App Packages on Google Drive. It runs **after WF1** and treats WF1's mockup deploy URL as required upstream input.
+
+**Production Drive (spec 1.5.0):** `App Validation/{appId}/app.json` **ONLY** — no `copy/`, `media/`, `mockup/`, `docs/`, `logs/`, `reports/`, README, package files, or lockfiles. Landing copy and media references live **inside** `app.json`.
 
 **WF2 v1 assumes platform-level setup only (not per-app):**
 
@@ -25,23 +27,24 @@ WF2 deploys the **landing page only** for App Packages on Google Drive. It runs 
 - Push generated `app-data/` to that repo
 - **Create and deploy** Vercel landing project via API (`name` + `gitSource`) — first run creates the project; subsequent runs redeploy
 
-**WF2 does NOT require:** manual Vercel project creation, manual first deploy in vercel.com, or `tracking.webhookUrl` (WF3).
+**WF2 does NOT require:** manual Vercel project creation, manual first deploy in vercel.com, or `tracking.webhookUrl` (WF0 owns webhook URL; WF3 receives events).
 
 **WF2 does:**
 
 1. Manual trigger with input `appId`
-2. Read `App Validation/{appId}/app.json` from Google Drive
+2. Read `App Validation/{appId}/app.json` from Google Drive (**only** Drive file)
 3. Confirm `status === "ready"`
 4. Require `deployment.mockup.url` or `mockup.previewUrl` from WF1 (non-empty HTTPS URL)
-5. Read `app.json`, `copy/`, and `media/` from Drive
-6. Transform the App Package into `app-data/app-config.json` (equivalent of `generate-app-config.js`)
-7. Set `mockup.embedUrl` from WF1's deployed mockup URL
-8. Copy required media into `app-data/images/`
-9. Bootstrap landing GitHub repo if missing; push template + generated `app-data/`
-10. Trigger Vercel landing deployment via Vercel API (`name` + `gitSource` from GitHub)
-11. Poll deployment until `readyState === "READY"`
-12. **Merge-write** only `deployment.landing.*` and related deployment metadata back to Drive `app.json`
-13. Leave `status` as `"ready"`
+5. Read landing copy from **inline** `landingPage.sections[].inline` + `landingPage.content` (never Drive `copy/`)
+6. Resolve media via `url` or `githubPath`; fetch declared assets only from `source.assetsGithubRepo ?? source.mockupGithubRepo` (never mockup source code)
+7. Transform into `app-data/app-config.json` (equivalent of `generate-app-config.js`)
+8. Set `mockup.embedUrl` from WF1's deployed mockup URL
+9. Stage resolved media into `app-data/images/`
+10. Bootstrap landing GitHub repo if missing; push template + generated `app-data/`
+11. Trigger Vercel landing deployment via Vercel API (`name` + `gitSource` from GitHub)
+12. Poll deployment until `readyState === "READY"`
+13. **Merge-write** only `deployment.landing.*` and related deployment metadata back to Drive `app.json`
+14. Leave `status` as `"ready"`
 
 **WF2 does NOT:**
 
@@ -49,15 +52,16 @@ WF2 deploys the **landing page only** for App Packages on Google Drive. It runs 
 |--------------|-----------------|
 | Deploy or modify the mockup | **WF1** |
 | Re-run WF1 | Operator runs WF1 separately |
-| Provision `tracking.webhookUrl` | **WF3** |
+| Provision `tracking.webhookUrl` | **WF0** |
 | Write Google Sheets analytics | **WF3** |
 | Launch Meta ads | WF-Ads |
-| Change App Package content/copy | Human edits package on Drive |
+| Change App Package content/copy | Human edits `app.json` on Drive / GitHub assets |
+| Download Drive `copy/`, `media/`, or mockup code | Spec 1.5.0 — not on production Drive |
 | Use npm/local build inside n8n Cloud | GitHub → Vercel handles builds |
 | Set `status: validating` | WF-Ads or operator sets later |
 | Manual per-app Vercel setup | WF2 triggers deploy API; project auto-created on first run |
 
-**App Package on Drive remains SSOT.** WF2 never changes `appId`, `specVersion`, `source.*`, author `copy/`, `landingPage`, `experiment`, `tracking`, or `deployment.mockup.*`.
+**Drive `app.json` remains control-plane SSOT.** WF2 never changes `appId`, `specVersion`, `source.*`, author `landingPage`, `experiment`, `tracking`, or `deployment.mockup.*`.
 
 ### Upstream contract (WF1 output)
 
@@ -80,7 +84,7 @@ WF2 reads `deployment.mockup.url ?? mockup.previewUrl` only — **never** `deplo
 |-------|-----------------|---------------------|----------------|---------------------------|------------------|-----------------|
 | Google Service Account JSON | ✅ paste JSON | — | optional copy | tracker only (redacted) | — | — |
 | Vercel API token | ✅ Bearer auth | — | optional copy | tracker only | — | — |
-| GitHub PAT | ✅ | — | optional copy | tracker only (redacted) | — | WF2 push only |
+| GitHub PAT | ✅ | — | optional copy | tracker only (redacted) | — | WF2 push + asset fetch |
 | Drive folder ID | — | ✅ | ✅ | ✅ | — | — |
 | Vercel team ID | — | ✅ | ✅ | ✅ | — | query param on API |
 | `githubOrgOrUser` | — | ✅ | ✅ | ✅ | — | repo org/user |
@@ -89,20 +93,21 @@ WF2 reads `deployment.mockup.url ?? mockup.previewUrl` only — **never** `deplo
 | `repoOverrides` | — | ✅ | — | — | — | nonstandard repo/project |
 | Landing repo `{org}/{appId}-landing` | — | **derived** | — | — | — | WF2 bootstraps if missing |
 | Vercel project `{appId}-landing` | — | **derived** | — | — | — | WF2 creates via deploy API on first run |
-| Package content (`copy/`, `media/`, `landingPage`) | — | — | — | — | ✅ **human sets** | — |
+| Landing copy (`landingPage.*`) | — | — | — | — | ✅ **human sets** (inline) | — |
+| Media refs (`media.*` url/githubPath) | — | — | — | — | ✅ **human sets** | binaries in assets/mockup GitHub |
 | `deployment.mockup.*`, `mockup.previewUrl` | — | — | — | — | ✅ **written by WF1** | WF2 reads only |
 | `deployment.landing.*` | — | — | — | — | ✅ **written by WF2** | deploy output |
 | `deployment.githubRepoUrl` | — | — | — | — | ✅ **written by WF2** (if null) | repo link |
 | `mockup.embedUrl` (in app-config) | — | — | — | — | — | generated disposable output |
-| `tracking.webhookUrl` | — | — | — | — | WF3 writes | — |
-| `status` | — | — | — | — | Human sets `ready` | — |
+| `tracking.webhookUrl` | — | — | — | — | **WF0** writes | — |
+| `status` | — | — | — | — | Human → `provisioning`; WF0 → `ready` | — |
 
 **Rules:**
 
 - **Secrets** → n8n Credentials only (not Config node, not committed markdown, not `app.json`).
 - **`.env`** → local reference; n8n Cloud does not read it automatically.
 - **`PLATFORM_SETUP_VALUES.md`** → human tracker; no real secrets.
-- **Drive `app.json`** → SSOT for package content; WF2 reads package files and WF1 output; writes only landing deploy fields.
+- **Drive `app.json`** → control-plane SSOT; WF2 reads inline package + WF1 output; writes only landing deploy fields.
 - **No new `source.*` fields for WF2 v1** — landing repo and Vercel project names are derived from Config Set + `appId`.
 
 ### Repo and project resolution
@@ -179,8 +184,9 @@ flowchart TD
   G1 -->|no| SKIP[Skip with log]
   G1 -->|yes| G2{mockup URL exists?}
   G2 -->|no| ERR1[Fail — run WF1 first]
-  G2 -->|yes| DL[Download app.json copy media]
-  DL --> XFORM[Code transform to app-config.json]
+  G2 -->|yes| COPY[Read inline landingPage copy]
+  COPY --> MEDIA[Fetch media url or githubPath]
+  MEDIA --> XFORM[Code transform to app-config.json]
   XFORM --> GH[Bootstrap repo if needed + push app-data]
   GH --> VC[POST Vercel deployment API]
   VC --> POLL[Poll until READY]
@@ -190,18 +196,19 @@ flowchart TD
 
 **Numbered steps (matches scope):**
 
-1. Discover/load App Package from Drive by `appId`
+1. Discover/load App Package from Drive by `appId` — **`app.json` only**
 2. Gate: `status === "ready"`
 3. Gate: `deployment.mockup.url` or `mockup.previewUrl` exists
-4. Download `app.json`, `copy/*.md`, and referenced `media/*` from Drive
-5. Transform package → `app-data/app-config.json`
-6. Set `mockup.embedUrl` from WF1 mockup URL
-7. Stage images for `app-data/images/`
-8. Bootstrap landing GitHub repo if missing; commit `app-data/` (and template tree on first run)
-9. POST Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run)
-10. Poll until `readyState === "READY"`
-11. Merge-write `deployment.landing.*` (+ `githubRepoUrl` if null) to Drive `app.json`
-12. Leave `status` unchanged (`ready`)
+4. Read landing copy from `landingPage.sections[].inline` + `landingPage.content`
+5. Resolve and fetch media (`url` preferred; else `githubPath` from assets repo)
+6. Transform package → `app-data/app-config.json`
+7. Set `mockup.embedUrl` from WF1 mockup URL
+8. Stage images for `app-data/images/`
+9. Bootstrap landing GitHub repo if missing; commit `app-data/` (and template tree on first run)
+10. POST Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run)
+11. Poll until `readyState === "READY"`
+12. Merge-write `deployment.landing.*` (+ `githubRepoUrl` if null) to Drive `app.json`
+13. Leave `status` unchanged (`ready`)
 
 ---
 
@@ -211,15 +218,15 @@ flowchart TD
 |---|------|------|
 | 1 | Manual Run | Manual Trigger (`appId` string, required) |
 | 2 | Workflow Config | Set |
-| 3 | Read app.json | Google Drive (download `App Validation/{appId}/app.json`) |
+| 3 | Read app.json | Google Drive (download `App Validation/{appId}/app.json` **only**) |
 | 4 | Parse + Gate status | Code |
 | 5 | Gate: status ready | IF |
 | 6 | Validate WF1 mockup URL | Code |
 | 7 | WF1 URL present? | IF |
 | 8 | Resolve landing repo + Vercel project | Code |
-| 9 | Download copy files | Google Drive (parallel: `copy/hero.md`, `benefits.md`, `features.md`, `faq.md`) |
-| 10 | Download media files | Google Drive (paths from `app.json` → `media`) |
-| 11 | Transform to app-config | Code (port `generate-app-config.js`) |
+| 9 | Resolve assets repo | Code (`assetsGithubRepo ?? mockupGithubRepo`) |
+| 10 | Fetch media assets | HTTP / GitHub Contents (declared `url`/`githubPath` only) |
+| 11 | Transform to app-config | Code (port `generate-app-config.js`; inline copy) |
 | 12 | GitHub: bootstrap repo if missing | GitHub API / GitHub node |
 | 13 | GitHub: commit app-data | GitHub API / GitHub node |
 | 14 | Trigger Vercel Deploy | HTTP Request |
@@ -230,7 +237,7 @@ flowchart TD
 | 19 | Upload app.json | Google Drive |
 | 20 | Notify Failure | HTTP (optional) |
 
-**v1 has no:** Schedule trigger, Drive folder listing, mockup deploy, npm/Execute Command nodes, webhook provisioning, Google Sheets nodes.
+**v1 has no:** Schedule trigger, Drive folder listing beyond `app.json`, Drive `copy/`/`media/` downloads, mockup deploy, npm/Execute Command nodes, webhook provisioning, Google Sheets nodes.
 
 ---
 
@@ -246,21 +253,22 @@ flowchart TD
 | WF1 mockup URL | `deployment.mockup.url` OR `mockup.previewUrl` — non-empty `https://` URI |
 | `appId` | Present; warn if folder name mismatch |
 | `app.json` | Valid JSON; `identity`, `landingPage`, `commerce`, `branding` present |
-| Copy files | Download enabled `landingPage.sections` where `source === "file"`; always read `copy/benefits.md` when present |
-| Media | Download paths from `media.screenshots[]`, `media.logo`, `media.ogImage`; warn if missing (transform sets `screenshots[].missing: true`) |
+| Drive hygiene | Folder contains **only** `app.json` (warn/error on extra files) |
+| Landing copy | Enabled sections use `source: "inline"` (or `media` for screenshots); `landingPage.content` for benefits/features/FAQ/testimonials |
+| Media | Each used asset has `url` or `githubPath` (not Drive `path`); fetch declared assets only |
 
 **Optional checks:**
 
-- `specVersion` matches expected range (informational)
+- `specVersion` matches expected range (informational; current **1.5.0**)
 - `deployment.mockup.url === mockup.previewUrl` when both set (warn on mismatch)
 
 **Not required for WF2:**
 
 | Not required | Owned by |
 |--------------|----------|
-| `tracking.webhookUrl` | WF3 |
+| `tracking.webhookUrl` | **WF0** |
 | Full `experiment` / `ads` completeness | WF-Ads / validator |
-| Drive `mockup/` folder | WF1 uses GitHub, not Drive mockup |
+| Drive `copy/`, `media/`, `mockup/` | Not on production Drive (1.5.0) |
 | `source.*` landing fields | Derived from Config Set for WF2 v1 |
 
 ---
@@ -271,18 +279,35 @@ flowchart TD
 
 **Normative reference:** [`landing-template/scripts/generate-app-config.js`](../landing-template/scripts/generate-app-config.js) and [`APP_PACKAGE_TRANSFORM.md`](../landing-template/scripts/APP_PACKAGE_TRANSFORM.md).
 
-### Inputs (from Drive)
+### Inputs (production — from Drive `app.json` + GitHub/HTTP assets)
 
-| App Package path | Used for |
-|------------------|----------|
+| Source | Used for |
+|--------|----------|
 | `app.json` | Identity, audience, commerce, branding, sections, analytics, tracking, deployment |
-| `copy/hero.md` | `heroHeadline`, `heroSubheadline`, `heroBody` |
-| `copy/benefits.md` | `benefits[]` |
-| `copy/features.md` | `features[]` |
-| `copy/faq.md` | `faq.items[]` |
-| `media/screenshots/*` | Copied to `app-data/images/`; paths in `screenshots[].image` |
-| `media/logo.png` | `app-data/images/logo.png` |
-| `media/og-image.png` | `app-data/images/og-image.png` |
+| `landingPage.sections[].inline` | Hero, pricing, CTA, footer headlines/body/placeholder |
+| `landingPage.content.benefits` | `benefits[]` |
+| `landingPage.content.features` | `features[]` |
+| `landingPage.content.faq` | `faq.items[]` |
+| `landingPage.content.testimonials` | `testimonials.items[]` |
+| `media.*` via `url` or `githubPath` | Binaries staged to `app-data/images/` |
+
+**Do not** download Drive `copy/*.md` or Drive `media/*`. Local-dev `source: "file"` / `path` is for local transform only — not production WF2.
+
+### Media resolution
+
+```javascript
+function resolveAssetsRepo(app) {
+  const source = app.source ?? {};
+  return {
+    repo: source.assetsGithubRepo ?? source.mockupGithubRepo,
+    branch: source.assetsBranch ?? source.mockupBranch ?? "main",
+    root: source.assetsRootDirectory ?? "",
+  };
+}
+
+// For each mediaAsset: prefer url; else fetch githubPath from resolveAssetsRepo.
+// Fetch DECLARED asset paths only — never mockup source (src/, package.json, etc.).
+```
 
 ### Critical: mockup.embedUrl
 
@@ -303,23 +328,23 @@ Real human-lab example after WF1:
 
 | Script function | Purpose |
 |-----------------|---------|
-| `parseHeroSection` | Parse `copy/hero.md` |
-| `parseBenefits` | Parse `copy/benefits.md` |
-| `parseFeatures` | Parse `copy/features.md` |
-| `parseFaq` | Parse `copy/faq.md` |
+| Map `sections[hero].inline` | `heroHeadline`, `heroSubheadline`, `heroBody` |
+| Map `landingPage.content.benefits` | `benefits[]` |
+| Map `landingPage.content.features` | `features[]` |
+| Map `landingPage.content.faq` | `faq.items[]` |
 | `mapTracking` | Fold `analytics.*`, `tracking.*`, `ads.campaignName`, `deployment.landing.*` into `tracking` block |
 | `mapAccentColor`, `mapLandingStyle`, `mapBadgeText`, etc. | Theme and commerce helpers |
-| `copyPackageImages` | Binary → `app-data/images/` paths |
+| Stage images | Binary → `app-data/images/` paths from fetched assets |
 
-`tracking.webhookUrl` may be empty until WF3 — pass through as `""` (current script behavior).
+`tracking.webhookUrl` may be empty until WF0 — pass through as `""` (current script behavior).
 
 ### Image output paths
 
-| Source | GitHub path |
-|--------|-------------|
-| `media/screenshots/01-home.png` | `app-data/images/01-home.png` (basename) |
-| `media/logo.png` | `app-data/images/logo.png` |
-| `media/og-image.png` | `app-data/images/og-image.png` |
+| Source asset | GitHub path in landing repo |
+|--------------|----------------------------|
+| Screenshot binary (basename) | `app-data/images/01-home.png` |
+| Logo | `app-data/images/logo.png` |
+| OG image | `app-data/images/og-image.png` |
 
 **Vercel build note:** `landing-template` runs `prebuild: node scripts/copy-app-data-images.js` which mirrors `app-data/images/` → `public/app-data/images/` during Vercel build. WF2 **only pushes `app-data/`** — do not duplicate images to `public/` in GitHub commits.
 
@@ -413,7 +438,7 @@ On success, capture from response:
 }
 ```
 
-**Never modify:** `appId`, `specVersion`, `status`, `source`, `identity`, `copy`, `experiment`, `tracking`, `deployment.mockup.*`, `mockup.previewUrl`, author `landingPage` content.
+**Never modify:** `appId`, `specVersion`, `status`, `source`, `identity`, `landingPage`, `experiment`, `tracking`, `deployment.mockup.*`, `mockup.previewUrl`.
 
 **Status after success:** stays `ready`
 
@@ -425,8 +450,9 @@ On success, capture from response:
 |-------|--------|
 | `status !== "ready"` | Log; stop; no deploy |
 | Missing WF1 mockup URL | Fail with clear message: "Run WF1 first" |
-| Missing required copy files | Fail or alert; no deploy |
-| Missing media binaries | Warn; continue (transform marks `missing: true`) |
+| Missing required inline copy | Fail or alert; no deploy |
+| `source: "file"` on production package | Fail — convert to inline before Drive sync |
+| Missing media (`url`/`githubPath`) | Warn; continue (transform marks `missing: true`) |
 | Transform Code error | Alert; no GitHub push |
 | GitHub push fail | Retry 3× with backoff; alert |
 | Vercel deploy fail | Retry 3× with backoff; alert |
@@ -441,7 +467,7 @@ On success, capture from response:
 - Each run regenerates `app-config.json`, re-commits `app-data/`, triggers a new Vercel deployment, and updates `deployment.landing.lastDeployedAt`.
 - Does **not** re-deploy the mockup or modify `deployment.mockup.*` / `mockup.previewUrl`.
 - `repoOverrides` in Config Set are stable across runs.
-- Re-running after copy/media changes on Drive picks up latest package content (SSOT).
+- Re-running after inline copy or GitHub media changes picks up latest package content.
 
 ---
 
@@ -472,9 +498,9 @@ WF2 transform uses `deployment.mockup.url ?? mockup.previewUrl` for `mockup.embe
 
 1. WF1 completed for `human-lab` — `deployment.mockup.url` populated (e.g. `https://human-lab.vercel.app`); verified incognito + `?embed=1`
 2. `status: "ready"` on Drive `app.json`
-3. Package on Drive includes `copy/` and `media/` for human-lab
+3. Drive folder is **`app.json` only**; landing copy is inline; media uses `url`/`githubPath`
 
-**Not required:** pre-created GitHub landing repo, pre-created Vercel project, manual Vercel deploy, or `tracking.webhookUrl`.
+**Not required:** pre-created GitHub landing repo, pre-created Vercel project, manual Vercel deploy, or Drive `copy/`/`media/` folders.
 
 **Test steps:**
 
@@ -491,10 +517,11 @@ WF2 transform uses `deployment.mockup.url ?? mockup.previewUrl` for `mockup.embe
 ## 15. Definition of done
 
 - [ ] Manual trigger only with `appId` input
-- [ ] Reads single package from Drive by `appId`
+- [ ] Reads single package from Drive by `appId` — **`app.json` only**
 - [ ] Picks up only `status: ready` packages
 - [ ] Gates on WF1 mockup URL (`deployment.mockup.url` or `mockup.previewUrl`)
-- [ ] Downloads `app.json`, `copy/`, and `media/` from Drive
+- [ ] Reads inline `landingPage` copy; does **not** download Drive `copy/` or `media/`
+- [ ] Fetches media via `url`/`githubPath` from assets repo only (never mockup code)
 - [ ] Transform matches `generate-app-config.js` behavior (no app-specific hardcoding)
 - [ ] Sets `mockup.embedUrl` from WF1 output
 - [ ] Bootstrap landing GitHub repo from `landingTemplateRepo` when missing
@@ -535,7 +562,7 @@ flowchart LR
 | **WF2** | Landing transform + deploy (this doc); writes `deployment.landing.*` |
 | **WF3** | Webhook receiver + Google Sheets append |
 | **WF-Ads** | Meta ads using `deployment.landing.url` (paused by default) |
-| **WF-Decision** | Metrics monitoring; writes `validation.*` and root `status` |
+| **WF-Decision** | Metrics monitoring; writes `validation.*` + `latestReportUrl`; root `status` |
 
 ---
 

@@ -2,7 +2,18 @@
 
 **Status:** Blueprints and AI prompts only — **no workflow JSON exported yet**
 
-Canonical workflow order for the App Validation Platform (spec **1.4.0**).
+Canonical workflow order for the App Validation Platform (spec **1.5.0**).
+
+## Spec 1.5.0 notes
+
+- **Production Drive:** `App Validation/{appId}/app.json` **ONLY** — no `copy/`, `media/`, `mockup/`, `docs/`, `logs/`, `reports/`, README, or lockfiles
+- **Landing copy:** inline `landingPage.sections[].inline` + `landingPage.content`
+- **Media:** `url` / `githubPath` from `source.assetsGithubRepo ?? source.mockupGithubRepo`
+- **Mockup GitHub:** full app repo; Vercel root = `source.mockupRootDirectory` (e.g. `/mockup`)
+- **WF0** sole owner of `tracking.webhookUrl`
+- **WF-Decision:** `validation.latestReportUrl` (not Drive `reports/`)
+- **WF-Ads creative:** `ads.media[]` → `media.ogImage` → **fail** (no silent text-only)
+- **WF3 auth:** default `webhookAuthSecret: null`; secrets never in Drive `app.json`
 
 ## Workflow map
 
@@ -22,7 +33,7 @@ flowchart LR
 | [WF2 — Landing Deploy](./WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) | Manual `appId` | `deployment.landing.*`, `deployment.githubRepoUrl` |
 | [WF3 — Tracking](./WF3-TRACKING-PIPELINE-BLUEPRINT.md) | Landing webhook POST | Google Sheets rows (runtime) |
 | [WF-Ads — Meta](./WF-ADS-META-PIPELINE-BLUEPRINT.md) | Manual `appId` | `ads.meta.*`, `status` → `validating` |
-| [WF-Decision — Monitoring](./WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md) | Schedule during `validating` | `validation.*`, root `status` |
+| [WF-Decision — Monitoring](./WF-DECISION-MONITORING-PIPELINE-BLUEPRINT.md) | Schedule during `validating` | `validation.*` (+ `latestReportUrl`), root `status` |
 
 ## Write-back ownership
 
@@ -44,7 +55,7 @@ Each workflow may read the full `app.json` but must **merge-write only its owned
 
 ## Pre-deploy validation
 
-JSON Schema and file-existence checks before WF1 are documented in [validator-gate.md](../app-validation-spec/docs/validator-gate.md) — not a numbered workflow.
+JSON Schema and production-profile checks before WF1 are documented in [validator-gate.md](../app-validation-spec/docs/validator-gate.md) — not a numbered workflow.
 
 ## Exported workflow JSON (future)
 

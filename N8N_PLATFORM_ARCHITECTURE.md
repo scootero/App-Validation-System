@@ -2,7 +2,7 @@
 
 **Status:** Canonical architecture and implementation handoff  
 **Audience:** Future AI agents (Cursor, ChatGPT, Codex, n8n builders)  
-**Spec version:** App Package Specification 1.4.0  
+**Spec version:** App Package Specification 1.5.0  
 **Last verified:** 2026-07-07
 
 This document is the **single entry point** for understanding the automated iOS app validation platform. It explains what the platform is, how every project fits together, where data originates, what may and may not be modified, and how automation is expected to work. It is **not** a user guide.
@@ -80,11 +80,11 @@ Humans and AI **author**. n8n **orchestrates**. Validators **gate**. Landing tem
 
 #### App Package as SSOT (Single Source of Truth)
 
-An App Package is a folder named `{appId}/` whose canonical manifest is `app.json`, plus optional `copy/`, `media/`, `mockup/`, and `docs/`.
+An App Package’s **control-plane SSOT on production Drive** is `App Validation/{appId}/app.json` only (spec **1.5.0**). Local/GitHub authoring may still use `copy/`, `media/`, `mockup/`, and `docs/` scaffolds; those folders are **not** uploaded to production Drive.
 
-**SSOT means:** All app-specific copy, pricing, experiment design, ad copy, analytics IDs, and mockup source live in the App Package. No other project may become the authoritative store for this content.
+**SSOT means:** All app-specific identity, inline landing copy (`landingPage.content` + `sections[].inline`), media refs (`url`/`githubPath`), experiment design, ad copy, analytics IDs, and `source.*` live in `app.json` (plus mockup/media binaries in the full app GitHub repo). No other project may become the authoritative store for this content.
 
-**SSOT does NOT include:** Generated deploy URLs, webhook URLs, or Vercel project IDs — those are automation write-backs into `deployment.*` and `tracking.webhookUrl`.
+**SSOT does NOT include:** Generated deploy URLs, webhook URLs, or Vercel project IDs — those are automation write-backs into `deployment.*` and `tracking.webhookUrl` (**WF0** owns the webhook URL).
 
 #### landing-template as Renderer
 
@@ -110,20 +110,19 @@ No n8n workflow JSON exists in the repository yet. [`n8n-workflows/`](n8n-workfl
 
 #### Google Drive as Package Storage
 
-Production App Packages live under a configured parent folder:
+Production App Packages live under a configured parent folder (**spec 1.5.0 — `app.json` only**):
 
 ```txt
 App Validation/
 └── {appId}/
-    ├── app.json
-    ├── copy/
-    ├── media/
-    └── mockup/
+    └── app.json              # Only file allowed
 ```
 
-Drive is both the **authoring surface** (humans edit packages) and the **automation I/O target** (n8n reads packages and writes back `deployment.*`, `tracking.webhookUrl`, and `status`).
+No `copy/`, `media/`, `mockup/`, `docs/`, `logs/`, `reports/`, README, package files, or lockfiles on Drive.
 
-Local development uses `test-app-packages/{appId}/` as a stand-in for Drive packages.
+Drive is the **control-plane I/O target** (n8n reads `app.json` and writes back `deployment.*`, `tracking.webhookUrl`, `validation.*`, and `status`). Mockup source and media binaries live in GitHub (`source.mockupGithubRepo` / optional `assetsGithubRepo`).
+
+Local development uses `test-app-packages/{appId}/` (or the starter) as a fuller package layout before syncing inline fields to Drive.
 
 #### Google Sheets as Analytics / Event Storage
 
@@ -137,7 +136,7 @@ Each app idea gets **two independent Vercel projects**:
 
 | Project | Source | Written to |
 |---------|--------|------------|
-| Mockup | `{appId}/mockup/` | `deployment.mockup.*` |
+| Mockup | Full app GitHub repo; Vercel root = `source.mockupRootDirectory` (e.g. `mockup/`) | `deployment.mockup.*` |
 | Landing | `landing-template/` + generated `app-data/` in `{org}/{appId}-landing` GitHub repo | `deployment.landing.*` |
 
 Mockup deploys first. Landing embeds the mockup URL in an iframe. Ad destination URLs always point to `deployment.landing.url`.
@@ -301,10 +300,11 @@ This section traces one app idea from creation through experiment decision and n
 
 #### Stage A: Starter → App Package
 
-1. Author copies [`app-package-starter/`](app-package-starter/) to `test-app-packages/{appId}/` or creates `{appId}/` on Google Drive.
+1. Author copies [`app-package-starter/`](app-package-starter/) to a local/GitHub app repo (or `test-app-packages/{appId}/`).
 2. Folder name MUST equal `appId` (kebab-case).
-3. Author fills `app.json`, `copy/`, `media/`, `mockup/`, and internal `docs/`.
-4. `status` remains `draft` during authoring.
+3. Author fills `app.json` (inline `landingPage`), local `copy/`/`media/`/`mockup/` scaffolds as needed, then syncs **production Drive** to `{appId}/app.json` only (convert file copy → inline; media → `url`/`githubPath`).
+4. Push full app repo to GitHub (`source.mockupGithubRepo`) with `/mockup` as Vercel root.
+5. `status` remains `draft` during authoring.
 
 #### Stage B: Package Completion → Provisioning
 
@@ -347,20 +347,21 @@ See [n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PI
 
 **Prerequisite:** WF1 has written `deployment.mockup.url` or `mockup.previewUrl`. Vercel team GitHub integration installed (platform one-time). Landing repo and Vercel project are **created by WF2** on first run — no manual per-app vercel.com steps.
 
-1. **WF2** manual trigger with `appId`; read `App Validation/{appId}/app.json` from Drive.
+1. **WF2** manual trigger with `appId`; read `App Validation/{appId}/app.json` from Drive (**only** file).
 2. Gate on `status === "ready"` and WF1 mockup URL present.
-3. Download `app.json`, `copy/*.md`, and referenced `media/*` from Drive.
-4. Transform package → `app-data/app-config.json` (equivalent of `generate-app-config.js`); set `mockup.embedUrl` from WF1 output.
-5. Bootstrap landing GitHub repo from `landingTemplateRepo` if missing; push `app-data/` (GitHub PAT; n8n does not run npm).
-6. Trigger Vercel deployment API with `name` + `gitSource` (creates Vercel project on first run).
-7. Poll until `readyState === "READY"`.
-8. Merge-write to `app.json`:
+3. Read landing copy from inline `landingPage.sections[].inline` + `landingPage.content` (never Drive `copy/`).
+4. Resolve media via `url` / `githubPath` from `source.assetsGithubRepo ?? source.mockupGithubRepo` (declared assets only — never mockup source).
+5. Transform package → `app-data/app-config.json` (equivalent of `generate-app-config.js`); set `mockup.embedUrl` from WF1 output.
+6. Bootstrap landing GitHub repo from `landingTemplateRepo` if missing; push `app-data/` (GitHub PAT; n8n does not run npm).
+7. Trigger Vercel deployment API with `name` + `gitSource` (creates Vercel project on first run).
+8. Poll until `readyState === "READY"`.
+9. Merge-write to `app.json`:
    - `deployment.landing.vercelProjectId`
    - `deployment.landing.url` (canonical public URL — ad destination)
    - `deployment.landing.deploymentUrl` (latest Vercel deployment URL)
    - `deployment.landing.lastDeployedAt`
    - `deployment.githubRepoUrl` (if still null)
-9. Leave `status` as `"ready"`.
+10. Leave `status` as `"ready"`.
 
 See [n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) for the normative WF2 v1 flow.
 
@@ -393,7 +394,7 @@ See [n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-L
 
 1. Author creates new `analytics.experimentRunId` (e.g. `run_human-lab_2026q3_001`).
 2. Optionally bumps `landingVariantId` or `mockupVersionId` for A/B tests.
-3. Updates copy in `copy/` or `app.json`.
+3. Updates inline landing copy in `app.json` (and GitHub media if needed).
 4. Re-enters pipeline at `provisioning` or `ready` depending on whether webhook reuse is acceptable.
 
 ### 3.2 End-to-End Data Flow Diagram
@@ -402,7 +403,7 @@ See [n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-L
 flowchart TD
   subgraph authoring [Authoring]
     Starter[app-package-starter]
-    Pkg["App Package\napp.json + copy/ + media/ + mockup/"]
+    Pkg["App Package\nDrive: app.json only\nGitHub: mockup + media"]
     Starter -->|copy + customize| Pkg
   end
 
@@ -509,10 +510,10 @@ This section documents **where every important value originates**, who writes it
 
 | Value | Origin | Written by | Consumed by |
 |-------|--------|------------|-------------|
-| Hero copy | `copy/hero.md` or `landingPage.sections[hero].inline` | Human / AI | Transform → `heroHeadline`, `heroSubheadline`, `heroBody` |
-| Benefits | `copy/benefits.md` (NOT in `sections[].file`) | Human / AI | Transform → `benefits[]` |
-| Features | `copy/features.md` | Human / AI | Transform → `features[]` |
-| FAQ | `copy/faq.md` | Human / AI | Transform → `faq.items[]` |
+| Hero copy | `landingPage.sections[hero].inline` (production); local `copy/hero.md` is local-dev only | Human / AI | Transform → `heroHeadline`, `heroSubheadline`, `heroBody` |
+| Benefits | `landingPage.content.benefits` (production) | Human / AI | Transform → `benefits[]` |
+| Features | `landingPage.content.features` | Human / AI | Transform → `features[]` |
+| FAQ | `landingPage.content.faq` | Human / AI | Transform → `faq.items[]` |
 | Screenshots | `media.screenshots[]` in `app.json` + binary files | Human | Transform copies to `app-data/images/` |
 | Logo, OG image | `media.logo`, `media.ogImage` | Human | Transform → images + `seo.ogImageUrl` |
 | Footer text | `landingPage.sections[footer].inline.body` | Human | Transform → `footer.text` |
@@ -618,22 +619,27 @@ Every meaningful folder in the workspace, with data ownership and modification r
 | `examples/full-app/` | Habit Stack full example | — | Spec maintainers | — |
 | `docs/` | Pipeline and integration docs | — | Spec maintainers | — |
 
-### 5.3 App Package Folders (starter, test-app-packages, Drive)
+### 5.3 App Package Folders (starter / local / GitHub vs production Drive)
 
-Applies to `app-package-starter/`, `test-app-packages/{appId}/`, and Google Drive `{appId}/`.
+**Local starter & GitHub full app repo** (`app-package-starter/`, `test-app-packages/{appId}/`, `source.mockupGithubRepo`):
+
+| Folder / File | Owns data | Reads | Writes | Notes |
+|---------------|-----------|-------|--------|-------|
+| `app.json` | Canonical manifest | Validator, transform, n8n | Human/AI; n8n write-backs | Sync to Drive for production |
+| `copy/` | Local-dev markdown scaffolds | Local transform only | Human/AI | Convert to `landingPage.content` / `sections[].inline` before Drive |
+| `docs/` | Internal planning notes | Humans only | Human/AI | **Not** on production Drive |
+| `media/` | Binaries referenced via `githubPath` | WF2 / WF-Ads fetch declared paths | Human/AI | On GitHub; not on production Drive |
+| `mockup/` | Interactive prototype source | Vercel (root dir) | Human/AI | Full app repo; exclude `node_modules`/`dist` |
+| `package.json` | Root script delegation to mockup | npm | Human | — |
+| `README.md` | Human notes | Humans | Human | **Not** on production Drive |
+
+**Production Google Drive** (`App Validation/{appId}/`):
 
 | Folder / File | Owns data | Reads | Writes | Must never modify |
 |---------------|-----------|-------|--------|-------------------|
-| `app.json` | Canonical manifest (SSOT) | Validator, n8n, transform | Human/AI (authoring); n8n (`deployment.*`, `tracking.webhookUrl`, `status`) | `appId` after deploy; `specVersion` by automation |
-| `copy/` | Landing markdown copy (SSOT) | Transform, n8n | Human/AI | — |
-| `copy/benefits.md` | Benefit bullets (SSOT) | Transform (always when present) | Human/AI | — |
-| `docs/` | Internal planning notes | Humans only | Human/AI | **Not read by pipeline** — do not put required copy here |
-| `media/` | Image/video binaries + paths in `app.json` | Transform, n8n, ads | Human/AI | — |
-| `media/screenshots/` | Screenshot PNGs | Transform | Human/AI | — |
-| `mockup/` | Interactive prototype source | n8n deploy | Human/AI | — |
-| `mockup/src/` | Mockup React/UI code | Mockup build | Human/AI | Landing template |
-| `package.json` | Root script delegation to mockup | npm | Human | — |
-| `README.md` | Human notes | Humans | Human | **Not validated** |
+| `app.json` | Control-plane SSOT | Validator, n8n | Human/AI (authoring); n8n (`deployment.*`, `tracking.webhookUrl`, `validation.*`, `status`) | `appId` after deploy; secrets; extra sibling files |
+
+**Forbidden on production Drive:** `copy/`, `media/`, `mockup/`, `docs/`, `logs/`, `reports/`, README, package/lockfiles.
 
 ### 5.4 landing-template/
 
@@ -822,7 +828,7 @@ flowchart LR
 | **WF2 Landing Deploy** (v1) | Manual (`appId`); gate WF1 mockup URL | Drive package + WF1 mockup URL | Transform + GitHub push `app-data/`; Vercel deploy; `deployment.landing.*`; `status` stays `ready` |
 | **WF3 Tracking** | Always-on POST from landing | Tracking payload JSON | Append row to Google Sheets; return 200 fast |
 | **WF-Ads Meta** | Manual (`appId`) after WF2 | `ads.*`, `deployment.landing.url` | Meta campaign **paused**; `ads.meta.*`; `status: validating` |
-| **WF-Decision Monitoring** | Schedule during `validating` | Sheets + Meta API + `experiment.*` | `validation.*`; root `status` (`winner`/`killed`/`paused`); `reports/*.json` |
+| **WF-Decision Monitoring** | Schedule during `validating` | Sheets + Meta API + `experiment.*` | `validation.*` (+ `latestReportUrl`); root `status` (`winner`/`killed`/`paused`); no Drive `reports/` |
 | **Package discovery** (future) | Schedule (poll every N min) | Drive parent folder | List of `{appId}/` folders with `status` |
 | **Dashboard feed** (future) | Schedule or on-demand | Google Sheets | Human-readable metrics view |
 
@@ -911,11 +917,11 @@ flowchart LR
 
 **Flow:**
 
-1. Read `App Validation/{appId}/app.json` from Drive.
+1. Read `App Validation/{appId}/app.json` from Drive (**only** file).
 2. Gate: `status === "ready"`.
 3. Gate: WF1 mockup URL present (`deployment.mockup.url` or `mockup.previewUrl`).
 4. Resolve landing repo and Vercel project name from Config Set + `appId` (or `repoOverrides`).
-5. Download `copy/*.md` and `media/*` from Drive.
+5. Read inline `landingPage` copy; fetch media via `url`/`githubPath` (never Drive `copy/`/`media/`).
 6. Transform → `app-data/app-config.json` + images (port `generate-app-config.js`).
 7. Bootstrap landing GitHub repo if missing; commit `app-data/`.
 8. `POST` Vercel `/v13/deployments` with `name` + `gitSource` (creates project on first run).
@@ -936,7 +942,7 @@ flowchart LR
     ```
 11. Leave `status` as `ready`. Do not modify `deployment.mockup.*` or `mockup.previewUrl`.
 
-**Out of scope for WF2:** Mockup deploy, WF1 re-run, webhook provisioning, Google Sheets, Meta ads, npm in n8n, changing package copy, setting `status: validating`.
+**Out of scope for WF2:** Mockup deploy, WF1 re-run, webhook provisioning (**WF0**), Google Sheets, Meta ads, npm in n8n, changing package copy, Drive `copy/`/`media/` downloads, setting `status: validating`.
 
 **Credentials:** Google Service Account + Vercel Bearer token + GitHub PAT (WF2 only).
 
@@ -956,6 +962,7 @@ flowchart LR
 
 - **Trigger:** Manual with `appId` after WF2; gate `deployment.landing.url`
 - Read `ads.*` (copy), `ads.targeting`, `experiment.testBudget`
+- **Creative priority:** `ads.media[]` → `media.ogImage` → **fail** (no silent text-only unless Meta format supports it)
 - Expand `ads.utmTemplate` → destination URL
 - Create Meta campaign, ad set, creative, ad — all **PAUSED**
 - Merge-write `ads.meta.*` only; set `status: validating`
@@ -966,7 +973,7 @@ flowchart LR
 - **Trigger:** `status: validating`; schedule (e.g. every 6–12 hours)
 - Pull Meta metrics (spend, impressions, clicks) and Sheets signups
 - Compute `validation.metrics`; compare `experiment.thresholds` and `decisionRules`
-- Merge-write `validation.*`; save `reports/validation-{date}.json` on Drive
+- Merge-write `validation.*` summary; set `validation.latestReportUrl` (Sheets / external) — **do not** write Drive `reports/`
 - Set root `status` to `winner`, `killed`, or `paused` when criteria met
 - On `killed`: pause/stop Meta ads via API
 
@@ -1184,7 +1191,7 @@ projectId (proj_human-lab)
 
 ### 9.3 Future Split Testing Workflow (Planned)
 
-1. Author creates variant B copy in `copy/` or alternate inline sections.
+1. Author creates variant B copy in `landingPage` inline fields (or local `copy/` then sync to Drive).
 2. Author bumps `analytics.landingVariantId` to `v2`.
 3. n8n runs transform + landing deploy.
 4. Ads split traffic between URLs or use UTM `content` to distinguish creatives.
@@ -1220,7 +1227,7 @@ The validator gates all deploy and ad spend. Phase 2 CLI is planned; rules are n
 
 | Transition | Required before promotion |
 |------------|-------------------------|
-| `draft` → `provisioning` | Full `experiment`; complete `ads`; analytics IDs; copy/media/mockup per profile |
+| `draft` → `provisioning` | Full `experiment`; complete `ads`; analytics IDs; inline landing + media `url`/`githubPath`; mockup on GitHub |
 | `provisioning` → `ready` | `tracking.webhookUrl` non-null URI |
 | `ready` → pipeline | All checks below pass |
 
@@ -1234,7 +1241,7 @@ The validator gates all deploy and ad spend. Phase 2 CLI is planned; rules are n
 #### Copy Checks
 
 - Every `landingPage.sections[]` with `source: "file"` and `enabled: true` resolves to existing file
-- `copy/benefits.md` exists when landing expects benefits (recommended for full packages)
+- `landingPage.content.benefits` present when landing expects benefits (production); local `copy/benefits.md` for local-dev only
 
 #### Media Checks
 
@@ -1472,7 +1479,7 @@ These are secondary references — consult when needed, not before understanding
 
 | Component | Status | Evidence |
 |-----------|--------|----------|
-| App Package Specification v1.4.0 | ✅ Complete | `app-validation-spec/`, `schemas/app.schema.json` |
+| App Package Specification v1.5.0 | ✅ Complete | `app-validation-spec/`, `schemas/app.schema.json` |
 | JSON Schema with status enum, nested deployment | ✅ Complete | `app.schema.json` |
 | Normative docs (workflow, validator-gate, n8n notes, design philosophy) | ✅ Complete | `app-validation-spec/docs/` |
 | app-package-starter scaffold | ✅ Complete | `app-package-starter/` |
@@ -1529,8 +1536,8 @@ Future agents MUST be aware of these cross-document conflicts:
 | **landingVersion is deploy timestamp** | Name suggests manual version number | Derived from `deployment.landing.lastDeployedAt` |
 | **deploymentId is landing-only** | Name is generic | Mockup has separate `deployment.mockup.vercelProjectId` not in tracking payload |
 | **TrackingProvider in components/, README says lib/** | Minor path inconsistency in README | Actual path: `components/TrackingProvider.tsx` |
-| **WF1 v1 pre-provisioned model** | Older docs assumed WF1 downloads `mockup/` from Drive and pushes to GitHub | [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) v1.4.0: infra pre-provisioned; WF1 reads `source.*` and triggers Vercel API only |
-| **WF2 v1 config-derived landing repo** | Older docs implied per-app `source.landing*` fields or inline Vercel deploy without GitHub push | [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) v1.4.0: repo/project derived from Config Set; WF2 bootstraps repo and creates Vercel project via deploy API |
+| **WF1 v1 pre-provisioned model** | Older docs assumed WF1 downloads `mockup/` from Drive and pushes to GitHub | [WF1-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF1-DEPLOY-PIPELINE-BLUEPRINT.md) v1.5.0: Drive `app.json` only; full app GitHub repo; WF1 triggers Vercel API only |
+| **WF2 v1 config-derived landing repo** | Older docs downloaded Drive `copy/`/`media/` | [WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md](n8n-workflows/WF2-LANDING-DEPLOY-PIPELINE-BLUEPRINT.md) v1.5.0: inline `landingPage` + GitHub/HTTP media; repo/project derived from Config Set |
 | **WF2 no manual Vercel per app** | Older WF2 docs required manual Vercel project + first deploy | WF2 v1: first `POST /v13/deployments` with `name` + `gitSource` creates project when team GitHub integration is installed |
 | **WF2 leaves status at ready** | Stage F previously said "optionally sets validating" | WF2 v1 does not change `status`; WF-Ads or operator promotes to `validating` later |
 
@@ -1555,24 +1562,32 @@ This document was cross-checked against:
 
 ## Appendix A: Quick Reference — App Package Layout
 
+**Production Drive (1.5.0):**
+
 ```txt
-{appId}/
-├── app.json              # Required manifest (SSOT)
-├── copy/                 # Landing markdown (SSOT)
-│   ├── hero.md
-│   ├── benefits.md       # Not in sections[].file — always read by transform
-│   ├── features.md
-│   └── faq.md
-├── docs/                 # Internal only — NOT in pipeline
-├── media/                # Images, video (SSOT)
-│   └── screenshots/
-├── mockup/               # Interactive prototype source
-├── reports/              # WF-Decision validation reports (automation writes)
-├── logs/                 # Optional workflow run logs
-├── package.json          # Delegates to mockup/
-└── README.md             # Human notes — NOT validated
+App Validation/{appId}/
+└── app.json              # Only file allowed
 ```
 
+**Local / GitHub full app repo (authoring + mockup deploy):**
+
+```txt
+{appId}/
+├── app.json              # Required manifest (sync to Drive)
+├── copy/                 # Local-dev scaffolds → convert to landingPage.content / inline
+│   ├── hero.md
+│   ├── benefits.md
+│   ├── features.md
+│   └── faq.md
+├── docs/                 # Internal only — NOT on Drive / NOT in pipeline
+├── media/                # Binaries; reference via githubPath or url
+│   └── screenshots/
+├── mockup/               # Vercel root (source.mockupRootDirectory)
+├── package.json          # Delegates to mockup/
+└── README.md             # Human notes — NOT on Drive
+```
+
+Detailed validation reports live in **Google Sheets** / `validation.latestReportUrl` — not Drive `reports/`.
 ## Appendix B: Quick Reference — Transform Command
 
 ```bash

@@ -2,8 +2,8 @@
 
 **Blueprint for n8n AI / human workflow builders**  
 **Status:** Blueprint only — no workflow JSON yet  
-**Spec version:** 1.4.0  
-**Last updated:** 2026-07-05  
+**Spec version:** 1.5.0  
+**Last updated:** 2026-07-09  
 **n8n target:** n8n Cloud (no local Node/npm)
 
 ---
@@ -12,17 +12,19 @@
 
 WF1 deploys the **interactive mockup only** for App Packages on Google Drive.
 
+**Production Drive (1.5.0):** `App Validation/{appId}/app.json` **ONLY**. Mockup source lives in the **full app GitHub repo** with `/mockup` as the Vercel root (`source.mockupRootDirectory`). The repo includes mockup source, package/Vite config, and media; exclude `node_modules`/`dist` from the repo.
+
 **WF1 v1 assumes mockup infrastructure is already provisioned:**
 
-- GitHub repo already exists for the mockup app
+- Full app GitHub repo already exists (`source.mockupGithubRepo`) with `/mockup` as Vercel root
 - Vercel project already exists for the mockup app
 - Vercel project is already connected to the GitHub repo
-- Vercel project root directory is already configured correctly (e.g. `mockup`)
+- Vercel project root directory matches `source.mockupRootDirectory` (e.g. `mockup`)
 
 **WF1 does:**
 
 1. Manual trigger with input `appId`
-2. Read `App Validation/{appId}/app.json` from Google Drive
+2. Read `App Validation/{appId}/app.json` from Google Drive (**only** Drive file)
 3. Confirm `status === "ready"`
 4. Validate required mockup deploy metadata in `source.*`
 5. Read deploy metadata from `app.json` (`source.mockupGithubRepo`, branch, root directory, Vercel project ID or name)
@@ -39,15 +41,16 @@ WF1 deploys the **interactive mockup only** for App Packages on Google Drive.
 |--------------|-----------------|
 | Create GitHub repos | Human / separate tooling |
 | Create Vercel projects | Human one-time setup in vercel.com |
-| Download `mockup/` from Drive or push to GitHub | GitHub is code SSOT; code lives in repo |
+| Download `mockup/` from Drive or push to GitHub | GitHub is code SSOT; Drive has `app.json` only |
 | Landing transform + deploy | **WF2** |
-| Webhook provisioning, tracking, Google Sheets | **WF3** |
+| Provision `tracking.webhookUrl` | **WF0** |
+| Webhook receiver, Google Sheets | **WF3** |
 | Meta ads | **WF-Ads** |
 | Experiment decisions | **WF-Decision** |
 
-**WF1 does NOT require `tracking.webhookUrl`.** Webhooks belong to WF3.
+**WF1 does NOT require `tracking.webhookUrl`.** Webhooks are owned by **WF0** (URL) and **WF3** (receiver).
 
-**App Package on Drive remains SSOT.** WF1 never changes `appId`, `specVersion`, `source.*`, or author content.
+**Drive `app.json` remains control-plane SSOT.** WF1 never changes `appId`, `specVersion`, `source.*`, or author content.
 
 ---
 
@@ -66,8 +69,8 @@ WF1 deploys the **interactive mockup only** for App Packages on Google Drive.
 | `source.vercelMockupProjectName` | — | — | — | — | ✅ **human sets** (or ID) | project must exist |
 | `deployment.mockup.*` | — | — | — | — | ✅ **written by WF1** | deploy output |
 | `mockup.previewUrl` | — | — | — | — | ✅ **written by WF1** | — |
-| `tracking.webhookUrl` | — | — | — | — | WF3 writes | — |
-| `status` | — | — | — | — | Human sets `ready` to trigger WF1 | — |
+| `tracking.webhookUrl` | — | — | — | — | **WF0** writes | — |
+| `status` | — | — | — | — | Human → `provisioning`; WF0 → `ready` | — |
 
 **Rules:**
 
@@ -82,11 +85,13 @@ WF1 deploys the **interactive mockup only** for App Packages on Google Drive.
 
 In **vercel.com**:
 
-1. Add project → Import GitHub repo from `source.mockupGithubRepo` (e.g. `scootero/Human-Lab`)
+1. Add project → Import GitHub repo from `source.mockupGithubRepo` (full app repo, e.g. `scootero/Human-Lab`)
 2. Set **Root Directory** = `source.mockupRootDirectory` (e.g. `mockup`)
 3. Framework = Vite (or match mockup stack)
 4. Deploy once manually to confirm build works
 5. Record `vercelMockupProjectId` and/or `vercelMockupProjectName` in `app.json` → `source`
+
+The GitHub repo should contain the full app package layout used for mockup deploy: `mockup/` source, root `package.json`/Vite, and `media/` as needed. Do **not** commit `node_modules/` or `dist/`. Production Drive still has **`app.json` only**.
 
 After that, WF1 triggers redeploys via Vercel API using the same connected project.
 
@@ -98,7 +103,7 @@ After that, WF1 triggers redeploys via Vercel API using the same connected proje
 | `draft`, `provisioning` | Skip |
 | `validating`, `paused`, `winner`, `killed`, `built` | Skip |
 
-Human sets `status: "ready"` when the package is complete, `source.*` is filled, and mockup infrastructure is provisioned.
+Human sets `status: "provisioning"` when the package is complete; **WF0** promotes to `ready` after `tracking.webhookUrl`. WF1 then runs on `ready`.
 
 ---
 
@@ -180,7 +185,7 @@ flowchart TD
 - `appId` matches folder name (warn if mismatch)
 - `mockup` section present (informational)
 
-**Not required for WF1:** `copy/`, `media/`, `mockup/` files on Drive, `landingPage`, `tracking.webhookUrl`, full `experiment`/`ads` completeness (those gate WF2/WF3/ads).
+**Not required for WF1:** Drive `copy/`, `media/`, or `mockup/` folders (not on production Drive), `landingPage` completeness for landing deploy, `tracking.webhookUrl` (WF0), full `experiment`/`ads` completeness (those gate WF2/WF-Ads).
 
 ---
 
@@ -290,10 +295,10 @@ Only write to Drive when the public URL verification gate passes.
 
 **Prerequisites (one-time):**
 
-1. GitHub repo exists with mockup code pushed
+1. Full app GitHub repo exists with mockup at `source.mockupRootDirectory` (include media; exclude `node_modules`/`dist`)
 2. Vercel project connected to repo; root directory = `mockup`; manual deploy succeeded
-3. `source.*` filled in Drive `app.json`
-4. `status: "ready"` in `app.json`
+3. Drive folder is `app.json` only; `source.*` filled
+4. `status: "ready"` in `app.json` (after WF0 in production)
 
 **Test steps:**
 

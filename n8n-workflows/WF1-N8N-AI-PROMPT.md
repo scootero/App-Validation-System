@@ -10,11 +10,11 @@ Copy everything in the **prompt box** below into n8n's AI workflow builder.
 |------|-------|------|
 | 1 | n8n → **Credentials** | Add **Google Service Account** (paste JSON from Google Cloud) |
 | 2 | n8n → **Credentials** | Add **Header Auth** — Name: `Authorization`, Value: `Bearer YOUR_VERCEL_TOKEN` |
-| 3 | github.com | Create mockup repo; push `mockup/` code to branch (e.g. `main`) |
-| 4 | vercel.com | Create project → Import GitHub repo → Root Directory = `mockup` → deploy once manually |
-| 5 | drive.google.com | Upload `{appId}/` to **App Validation/** folder; service account has Editor |
+| 3 | github.com | Create **full app repo**; push mockup at `/mockup` (plus package/Vite/media; no `node_modules`/`dist`) |
+| 4 | vercel.com | Create project → Import GitHub repo → Root Directory = `mockup` (`source.mockupRootDirectory`) → deploy once manually |
+| 5 | drive.google.com | Upload `{appId}/app.json` **only** to **App Validation/**; service account has Editor |
 | 6 | Drive `app.json` | Fill `source.*` (repo, branch, root directory, Vercel project ID or name) |
-| 7 | Drive `app.json` | Set **`"status": "ready"`** (run **WF0** first in production to provision `tracking.webhookUrl`; WF1 does not require webhook for v1 testing) |
+| 7 | Drive `app.json` | Set **`"status": "provisioning"`** then run **WF0** to provision `tracking.webhookUrl` → `ready` (WF1 does not require webhook for v1 testing if you set `ready` manually) |
 
 ---
 
@@ -26,14 +26,14 @@ Copy everything in the **prompt box** below into n8n's AI workflow builder.
 | Vercel API token | **n8n Credentials** → Header Auth (`Bearer …`) |
 | Drive folder ID | **Workflow Config Set node** (not Credentials) |
 | Vercel team ID | **Workflow Config Set node** |
-| Mockup GitHub repo, branch, root directory | **Drive `app.json`** → `source.*` |
+| Mockup GitHub repo, branch, root directory | **Drive `app.json`** → `source.*` (full app repo; Vercel root = `/mockup`) |
 | Vercel mockup project ID or name | **Drive `app.json`** → `source.*` |
 | Same non-secret values for your records | **`.env`** (local, gitignored) |
 | Status tracker, no secrets | **`PLATFORM_SETUP_VALUES.md`** |
 | Deploy URLs after run | **Drive `app.json`** (written by workflow) |
 | GitHub repo + root directory | **Vercel project settings** (one-time) |
 
-**Prerequisite:** WF0 should have provisioned `tracking.webhookUrl` in production. WF1 gates on `status: ready` only.
+**Prerequisite:** WF0 should have provisioned `tracking.webhookUrl` in production. WF1 gates on `status: ready` only. Drive has `app.json` only — no `mockup/` on Drive.
 
 **n8n does NOT read `.env`.** Paste credentials in n8n UI. **Secrets never go in `app.json`.**
 
@@ -44,15 +44,16 @@ Copy everything in the **prompt box** below into n8n's AI workflow builder.
 ```
 Build an n8n Cloud workflow named "WF1 Mockup Deploy".
 
-SCOPE — mockup deploy orchestration only (v1):
+SCOPE — mockup deploy orchestration only (v1 / spec 1.5.0):
 WF1 assumes mockup infrastructure is ALREADY provisioned:
-- GitHub repo exists with mockup code
+- Full app GitHub repo exists (mockup at source.mockupRootDirectory, e.g. mockup/)
 - Vercel project exists and is connected to that GitHub repo
 - Vercel root directory is already configured (e.g. mockup)
+- Production Drive has App Validation/{appId}/app.json ONLY — no mockup/ on Drive
 
 WF1 must:
 1. Manual trigger only with input appId (string, required)
-2. Read App Validation/{appId}/app.json from Google Drive
+2. Read App Validation/{appId}/app.json from Google Drive (only file)
 3. Continue ONLY if status === "ready"; else stop with log
 4. Validate source metadata exists:
    - source.mockupGithubRepo (org/repo or GitHub URL)
@@ -90,10 +91,10 @@ WF1 must:
 OUT OF SCOPE — do NOT build any of these:
 - Schedule trigger or Drive folder discovery loop
 - GitHub repo creation or code push nodes
-- Downloading mockup/ from Drive
+- Downloading mockup/ from Drive (Drive has app.json only in 1.5.0)
 - Vercel project creation
 - Landing page deploy or app-config transform
-- Webhook provisioning or tracking fields
+- Webhook provisioning (WF0 owns tracking.webhookUrl) or tracking field writes
 - Google Sheets or analytics
 - Meta ads
 
@@ -210,16 +211,19 @@ Test with manual trigger appId=human-lab after source.* is filled and status is 
 ## FAQ
 
 **Do I need a webhook URL for WF1?**  
-No. Webhooks are **WF3** (tracking + Google Sheets). WF1 only triggers mockup deploy.
+No. **WF0** provisions `tracking.webhookUrl`. **WF3** receives events + Google Sheets. WF1 only triggers mockup deploy.
 
 **Do I need a GitHub PAT for WF1?**  
-No. WF1 does not push code. GitHub repo must already exist; Vercel pulls from it.
+No. WF1 does not push code. The full app GitHub repo must already exist; Vercel pulls from it.
 
 **What status triggers WF1?**  
-`"status": "ready"` on Drive `app.json`. Human sets this when package and mockup infrastructure are ready.
+`"status": "ready"` on Drive `app.json`. In production, human sets `provisioning` and WF0 promotes to `ready`.
 
 **Where do repo and Vercel project details go?**  
-In `app.json` → `source.*` on Google Drive — not in the Config Set node.
+In `app.json` → `source.*` on Google Drive — not in the Config Set node. Repo is the full app repo; Vercel Root Directory = `source.mockupRootDirectory` (e.g. `mockup`).
+
+**Is mockup code on Drive?**  
+No (spec 1.5.0). Drive has `app.json` only. Mockup source lives in GitHub.
 
 **Does `.env` wire n8n?**  
 No. `.env` is your local cheat sheet. Paste secrets into **n8n Credentials**.
