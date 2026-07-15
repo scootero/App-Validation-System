@@ -1,27 +1,18 @@
 # WF4 Execution Log
 
-## 2026-07-15 — Dry-run sandbox proof
+## 2026-07-15 — V1 revision
 
-| Step | Status | Notes |
-|------|--------|-------|
-| Contract frozen | Done | `meta-ads-contract.md` with idempotency, triple approval, VERIFY_* |
-| Local `wf4-rehearse.js` | PASS | Fixture + idempotency refusal tested |
-| External setup package | Done | `EXTERNAL-SETUP-HANDOFF.md` A–E |
-| n8n workflow created | Done | `YIc53GBq4upelYp6`, **inactive** |
-| URLSearchParams fix | Done | n8n Code sandbox lacks URLSearchParams; manual UTM builder |
-| Dry-run execution | PASS | Execution 30, Respond Dry Run |
-| Zero mutations verified | PASS | metaHttpCalls=0, driveWrites=0 |
+| Step | Status |
+|------|--------|
+| Claude Context Package | Done |
+| Prompt A / B + checklist + ownership + classification | Done |
+| Contract / CANONICAL / CONFIG / EXTERNAL-SETUP | Done |
+| Fixtures 14/14 ($1/day) + 500/14 cap exceed | Done |
+| `wf4-rehearse.js` | PASS |
+| n8n sync (`MAX_DAILY_BUDGET_USD=10`) | Done |
+| Dry-run execution 35 | PASS; zero mutations |
+| Backlog / deps / Spec deferral | Done |
 
-## Canonical Node Flow (proven)
+## Stop line
 
-Manual Run → Workflow Config → Process WF4 Dry Run → Triple Approval Gate → Respond Dry Run
-
-Create-paused branch: disabled (Create Paused Blocked, Create Campaign PAUSED).
-
-## Blockers before create-paused
-
-- Meta API VERIFY_* values from operator/Web AI
-- Meta credential attach
-- Approval token in n8n
-- Explicit operator approval
-- Final payload review
+Create-paused not enabled. Production spec/starter/Drive untouched.

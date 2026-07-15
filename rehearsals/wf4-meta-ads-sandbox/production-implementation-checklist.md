@@ -9,11 +9,14 @@
 
 ## WF4 Dry-Run
 
-- [x] Local `wf4-rehearse.js` passed.
-- [x] n8n dry-run execution succeeded (execution 30).
+- [x] Local `wf4-rehearse.js` passed ($1/day + cap-exceed fixture).
+- [x] n8n dry-run execution succeeded (execution 35).
 - [x] Zero Meta HTTP calls observed.
 - [x] Zero Drive writes observed.
 - [x] Create-paused branch disabled.
+- [x] `MAX_DAILY_BUDGET_USD = 10` fail-closed (never clamp).
+- [x] Broad targeting only (locations + age + FB/IG; interests optional).
+- [x] Claude Context Package + Prompt A/B ready.
 
 ## Meta Readiness
 

@@ -4,10 +4,11 @@
 
 - [x] WF3 sandbox proven (Sheet rows + live n8n)
 - [x] WF4 dry-run local proof (`wf4-rehearse.js`)
-- [x] WF4 dry-run n8n proof (execution 30)
-- [ ] Meta API VERIFY_* values confirmed by operator/Web AI
+- [x] WF4 dry-run n8n proof (execution 35)
+- [x] Prompt A VERIFY_* reconciled (`notes/meta-research-prompt-a-results.md`)
+- [ ] Prompt B account IDs + `min_daily_budget` confirmed
 - [ ] Operator explicit approval for create-paused testing
-- [ ] Meta credential + approval token in n8n
+- [ ] Meta system-user credential + approval token in n8n
 
 ## B. Sandbox Export Locations
 
@@ -15,14 +16,16 @@
 - Canonical meta: `rehearsals/wf4-meta-ads-sandbox/n8n/WF4-meta-ads-sandbox.canonical-meta.json`
 - Contract: `rehearsals/wf4-meta-ads-sandbox/meta-ads-contract.md`
 - Dry-run payload: `rehearsals/wf4-meta-ads-sandbox/dry-run-payloads/human-lab-wf4-dry-run.json`
+- Prompt A results: `rehearsals/wf4-meta-ads-sandbox/notes/meta-research-prompt-a-results.md`
 
 ## C. Promote Logic, Not Hardcodes
 
 - Idempotency run key pattern
 - Triple approval gate
 - Creative selection + UTM expansion
-- VERIFY_* → confirmed value mapping table
-- PAUSED-by-default create sequence
+- Reconciled Meta mapping table (`v25.0`, `OUTCOME_TRAFFIC`, `IMPRESSIONS`, `LANDING_PAGE_VIEWS`, `[]`)
+- Create sequence: Campaign → Ad Set → image upload → Creative → Ad
+- PAUSED for Campaign / Ad Set / Ad only (Creative is asset)
 - Four-ID verify-before-write-back
 
 ## D. Do Not Promote

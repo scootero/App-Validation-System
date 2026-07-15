@@ -39,10 +39,10 @@ These fields are part of the **33-column** Google Sheets event log and landing P
 | Copy variants | `ads.headlines`, `ads.primaryTexts`, `ads.descriptions` | No |
 | CTA | `ads.callToAction` | No |
 | UTM params | `ads.utmTemplate` | No |
-| Targeting hints | `ads.targeting.locations`, `ageMin`, `ageMax`, `interests` | No |
+| Broad targeting (V1) | `ads.targeting.locations`, `ageMin`, `ageMax` required; `interests` optional | No schema change; gender/placements deferred |
 | Creative assets | `ads.media[]`, fallback `media.ogImage` | No |
 | Asset repo resolution | `source.assetsGithubRepo`, `source.mockupGithubRepo`, branches/root | No |
-| Budget | `experiment.testBudget` | No |
+| Budget | `experiment.testBudget`; daily must be ≤ n8n `MAX_DAILY_BUDGET_USD` (10) | No app.json field for cap |
 | Meta write-back | `ads.meta.*` | No |
 | Lifecycle promotion | root `status: validating` | No |
 | Meta API token | n8n Credentials | Correctly outside `app.json` |

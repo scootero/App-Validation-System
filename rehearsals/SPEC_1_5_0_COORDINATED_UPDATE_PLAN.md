@@ -66,8 +66,12 @@ Must share: 33-col event contract, validate/map Code, node sequence, credential 
 - [x] Dependency graph reviewed.
 - [x] WF3 external curl evidence attached.
 - [ ] Browser E2E (optional for doc sync; required before paid traffic).
-- [x] WF4 dry-run sandbox proven (local + n8n). VERIFY_* Meta API values still required before create-paused.
-- [ ] Schema additions approved or explicitly deferred.
+- [x] WF4 V1 dry-run revised and proven (local + n8n execution 35). Claude Context Package + Prompt A/B ready.
+- [x] Prompt A VERIFY_* table reconciled (`rehearsals/wf4-meta-ads-sandbox/notes/meta-research-prompt-a-results.md`).
+- [x] Architecture revision decided: Ad Plan → adapter SSOT → ledger; V1 `LINK_CLICKS`+`IMPRESSIONS`; `created_paused`; root preserved until activation.
+- [ ] Defer production `app-validation-spec` / `app-package-starter` / WF-Ads blueprint sync until Prompt B + create-paused design freeze.
+- [ ] After Prompt B: sync blueprint + starter; document WF-Ads does not set root `validating` until human activation.
+- [ ] Schema: keep `ads.meta.status` = `created_paused` (no rename). `ads.specialAdCategories` not required for V1 (adapter `[]`).
 - [x] Shared components / config-driven rules documented.
 - [ ] Production docs updated in one pass.
 - [x] No production secrets introduced.

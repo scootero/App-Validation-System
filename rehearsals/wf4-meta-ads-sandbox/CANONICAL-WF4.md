@@ -1,6 +1,6 @@
 # CANONICAL WF4 — Meta Ads Sandbox
 
-**Status:** Dry-run proven (2026-07-15). Create-paused disabled.
+**Status:** Architecture revision design pass 2026-07-15. Create-paused disabled.
 
 ## Proven Platform Values
 
@@ -9,65 +9,48 @@
 | N8N_BASE_URL | `https://scottyo.app.n8n.cloud` |
 | WF4_WORKFLOW_ID | `YIc53GBq4upelYp6` |
 | WF4_WORKFLOW_NAME | `WF4 - Meta Ads Sandbox` |
-| WF4_WORKFLOW_URL | `https://scottyo.app.n8n.cloud/workflow/YIc53GBq4upelYp6` |
 | WF4_ACTIVE | `false` |
 | SANDBOX_APP_ID | `human-lab-wf1-sandbox` |
-| SANDBOX_EXPERIMENT_RUN_ID | `run_human-lab_2026q2_001` |
+| FIRST_TEST_BUDGET | `14 USD / 14 days = $1.00/day` |
+| MAX_DAILY_BUDGET_USD | `10` |
 | PROVIDER | `meta` |
 | DEFAULT_MODE | `dry_run` |
 | WF3_GATE_STATUS | `proven` |
-| WF3_SHEET_ID | `1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0` |
-| DRY_RUN_EXECUTION_ID | `30` |
+| META_API_VERSION | `v25.0` (configurable) |
+| Adapter SSOT | `lib/meta-adapter.js` |
 
-## Canonical Node Flow (dry-run proven)
+## V1 Meta pairing (adapter)
+
+`OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS`  
+(`LANDING_PAGE_VIEWS` = alternative, not locked)
+
+## Status after paused create (when enabled later)
+
+- `ads.meta.status` = **`created_paused`**
+- Root status = **preserved** (not `validating` until human activation)
+
+## Pipeline
+
+```txt
+app.json → Ad Plan → Meta adapter → ledger → paused create → read-back → ads.meta.*
+```
+
+## Node Flow (dry-run)
 
 ```
 Manual Run → Workflow Config → Process WF4 Dry Run → Triple Approval Gate → Respond Dry Run
 ```
 
-Create-paused branch (disabled): `Create Paused Blocked → Create Campaign PAUSED`
-
-## Field Ownership
-
-| Field | Owner |
-|-------|-------|
-| `ads.*` (copy, targeting, media, utm) | Human author — never overwrite |
-| `ads.meta.*` | WF-Ads — write only after full paused create + verify |
-| `status` | WF-Ads sets `validating` only after four IDs verified |
-| Sheet Meta columns | WF4 create-paused follow-up |
-
-## Safety Gates
-
-1. **Idempotency:** refuse if any `ads.meta.{campaignId,adSetId,creativeId,adId}` exists
-2. **Triple approval:** `mode=create_paused` + `approval=true` + matching `WF4_CREATE_PAUSED_APPROVAL_TOKEN`
-3. **`_createPausedAllowed`:** hardcoded `false` in this pass
-4. **Disabled nodes:** Create Paused Blocked, Create Campaign PAUSED
-
-## VERIFY_* Fields (awaiting Meta API confirmation)
-
-- `metaApiVersion`
-- `objective` → `VERIFY_META_OBJECTIVE_MAPPING`
-- `billing_event`, `optimization_goal` → `VERIFY_FOR_OBJECTIVE`
-- `special_ad_categories` → `VERIFY_BEFORE_LIVE_USE`
-- `daily_budget` → `VERIFY_MINOR_UNITS_BEFORE_LIVE_USE`
-- `page_id` → `CONFIG_META_PAGE_ID`
-- `image_hash` → `VERIFY_AFTER_IMAGE_UPLOAD`
-- `interests[]` → `VERIFY_INTEREST_ID`
+Create-paused nodes disabled.
 
 ## Artifact Index
 
 | File | Role |
 |------|------|
-| `meta-ads-contract.md` | Frozen contract |
-| `dry-run-payloads/human-lab-wf4-dry-run.json` | Canonical bundle shape |
-| `scripts/wf4-rehearse.js` | Local proof |
-| `EXTERNAL-SETUP-HANDOFF.md` | External setup A–E |
-| `n8n/wf4-meta-ads-sandbox.workflow.ts` | SDK source |
-| `n8n/WF4-meta-ads-sandbox.canonical-meta.json` | Live IDs |
-| `notes/live-rehearsal-report.md` | Dry-run execution proof |
-
-## Provider Model
-
-- Author contract: `ads.*` (provider-neutral)
-- Meta automation: `ads.meta.*`
-- Future: `ads.google.*`, `ads.tiktok.*` (document only)
+| `lib/meta-adapter.js` | Adapter SSOT |
+| `architecture/*.md` | Ad Plan / adapter / ledger contracts |
+| `notes/meta-research-prompt-a-results.md` | Prompt A reconciliation |
+| `meta-ads-contract.md` | V1 contract |
+| `scripts/wf4-rehearse.js` | Local proof (consumes adapter) |
+| `scripts/sync-wf4-adapter-into-workflow.js` | Sync SSOT into workflow |
+| `n8n/` | SDK + canonical meta |

@@ -1,0 +1,42 @@
+# WF4 Operation Ledger (n8n Data Table)
+
+**Status:** Design only 2026-07-15 — no live Data Table this pass.  
+**Key:** `appId` + `experimentRunId` + `provider`  
+**operationKey:** `appId|experimentRunId|provider`
+
+## Purpose
+
+Persist each successfully created external Meta ID **immediately** after each API call so partial failure can resume or stop safely.
+
+## Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `operationKey` | string | Unique |
+| `appId` | string | |
+| `experimentRunId` | string | |
+| `provider` | string | `meta` |
+| `phase` | string | see phases |
+| `campaignId` | string \| null | |
+| `adSetId` | string \| null | |
+| `imageHash` | string \| null | |
+| `creativeId` | string \| null | |
+| `adId` | string \| null | |
+| `lastError` | string \| null | |
+| `updatedAt` | string | ISO 8601 |
+
+## Phases
+
+`planned` → `campaign` → `adset` → `image` → `creative` → `ad` → `verified` → `writeback_done`  
+Failure terminals: `manual_review_required` | `failed`
+
+## V1 reconciliation (minimal)
+
+1. **No row** → start fresh (when create-paused enabled).
+2. **Complete + verified** (all IDs + phase `writeback_done` or `ads.meta` IDs present) → refuse duplicate.
+3. **Partial IDs** → read-back prior objects; if still valid, resume next missing step; else `manual_review_required`.
+4. **Never** auto-delete Meta objects in V1.
+
+## Dry-run
+
+Dry-run bundles include a `ledgerPlan` snapshot (`phase: planned`). No Data Table writes until create-paused is approved.

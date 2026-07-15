@@ -1,39 +1,54 @@
 # WF4 Config-Driven vs Hardcoded
 
-## Config-Driven (promote per app / environment)
+## n8n non-secret Config
 
-| Value | Source |
-|-------|--------|
-| `appId` | Manual trigger / Drive `app.json` |
-| `mode`, `approval`, `approvalToken` | Manual trigger |
-| `provider` | Config Set (`meta` for v1) |
-| `metaApiVersion` | Config Set (VERIFY until confirmed) |
-| `defaultDailyBudgetCap` | Config Set |
-| `wf4CreatePausedApprovalToken` | n8n credential / Config Set (secret) |
-| `wf3GateStatus` | Config Set |
-| `useFixtureAppJson` | Config Set (sandbox only) |
-| Meta ad account, Page, IG actor | n8n credentials / Config Set |
+| Key | Notes |
+|-----|-------|
+| `MAX_DAILY_BUDGET_USD` | Global cap; default **10** |
+| `META_BUSINESS_PORTFOLIO_ID` | From Prompt B |
+| `META_AD_ACCOUNT_ID` | From Prompt B |
+| `META_PAGE_ID` | → `object_story_spec.page_id` |
+| `META_INSTAGRAM_USER_ID` | `instagram_user_id` or N/A |
+| `META_API_VERSION` | Default **`v25.0`** (configurable) |
+| `provider` | `meta` |
+| `mode` default | `dry_run` |
+| `useFixtureAppJson` | `true` for sandbox dry-run |
 
-## Shared Logic (promote as reusable components)
+**Not in Config:** objective mapping, billing_event, optimization_goal, payload builders — those live in [`lib/meta-adapter.js`](./lib/meta-adapter.js).
 
-- Idempotency check (`appId` + `experimentRunId` + `provider`)
+## Secrets
+
+| Key |
+|-----|
+| Meta access token (system user preferred) |
+| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` |
+
+## Adapter SSOT (version-controlled)
+
+V1 pairing:
+
+- `OUTCOME_TRAFFIC`
+- `optimization_goal: LINK_CLICKS`
+- `billing_event: IMPRESSIONS`
+
+Alternative (not V1 default): `LANDING_PAGE_VIEWS` — account-validate first.
+
+Sync into n8n workflow via `scripts/sync-wf4-adapter-into-workflow.js`. Do not hand-edit Process Code mappings.
+
+## Shared logic
+
+- Ad Plan normalization
+- Ledger key + phases
 - Triple approval gate
-- Creative selection priority (`ads.media[]` → `media.ogImage`)
-- UTM expansion (manual query builder — no URLSearchParams in n8n Code)
-- Dry-run bundle shape (campaign → ad set → creative → ad)
-- PAUSED-by-default entity status
-- VERIFY_* placeholder enforcement until API confirmed
+- Fail-closed budget cap
+- PAUSED Campaign/AdSet/Ad only; never ACTIVE
+- Write-back: `ads.meta.status = created_paused`; root status preserved
 
-## Sandbox Hardcodes (do not promote blindly)
+## Sandbox hardcodes (do not promote blindly)
 
-| Value | Sandbox value |
-|-------|---------------|
-| `fixtureAppJson` | Embedded human-lab fixture |
-| `useFixtureAppJson` | `true` |
+| Value | Sandbox |
+|-------|---------|
+| Fixture budget | 14/14 = $1/day → `daily_budget: 100` |
+| Fixture objective | `traffic` |
 | `_createPausedAllowed` | `false` |
-| WF4 workflow ID | `YIc53GBq4upelYp6` |
-| WF3 Sheet ID | `1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0` |
-
-## Reuse Model
-
-Future apps: parameterize `appId`, Drive file ID, Meta account/Page IDs via Config Set. Keep node sequence and safety gates identical.
+| Workflow ID | `YIc53GBq4upelYp6` |

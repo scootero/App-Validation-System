@@ -7,10 +7,11 @@
       "creativeId": "<creative-id>",
       "adId": "<ad-id>",
       "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
-      "dailyBudget": 35.71,
+      "dailyBudget": 1,
       "createdAt": "<iso8601>",
       "lastSyncedAt": null
     }
   },
-  "status": "validating"
+  "rootStatusUnchanged": true,
+  "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation."
 }

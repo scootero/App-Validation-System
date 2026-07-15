@@ -1,40 +1,40 @@
-# WF4 Meta Ads Rehearsal — Dry Run Proven
+# WF4 Meta Ads Rehearsal — Architecture Revision (Design Pass)
 
-**Status:** Dry-run sandbox proven (local + n8n). Create-paused disabled. Zero Meta/Drive mutations.
+**Status:** Prompt A reconciled; architecture revision in progress. Create-paused disabled. No Meta mutations.
 
-## Safety Rules
+## Safety
 
-- Do not create campaigns, ad sets, creatives, or ads.
-- Do not activate campaigns or spend money.
-- Create-paused branch is disabled until explicit operator approval.
+- No campaigns/ad sets/creatives/ads created
+- No spend
+- Workflow inactive
+- Cap fail-closed; never clamp
 
-## Proven Values
+## Proven / design
 
 | Item | Value |
 |------|-------|
-| n8n workflow | `WF4 - Meta Ads Sandbox` (`YIc53GBq4upelYp6`) — **inactive** |
-| Dry-run execution | `30` (success) |
-| Local proof | `node scripts/wf4-rehearse.js` → PASS |
-| WF3 gate | proven |
+| Workflow | `YIc53GBq4upelYp6` (inactive) |
+| Dry-run execution | `35` (prior) |
+| First-test budget | $1/day (14/14) |
+| Global cap | `MAX_DAILY_BUDGET_USD = 10` |
+| Adapter SSOT | `lib/meta-adapter.js` |
+| V1 pairing | `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS` |
+| Write-back status | `ads.meta.status = created_paused`; root preserved |
 
-## Goal Flow
+## Operator next
 
-```
-app.json (fixture) → gates → dry-run bundle → Respond Dry Run
-[create-paused path disabled]
-```
+1. Complete Manual Meta Account Setup Checklist
+2. Run Prompt B
+3. Populate n8n Config (IDs + API version + cap)
+4. Attach credentials
+5. Explicit create-paused approval only after the above
 
-## Key Docs
+## Key docs
 
 | File | Purpose |
 |------|---------|
-| [CANONICAL-WF4.md](./CANONICAL-WF4.md) | Proven IDs, node flow, ownership |
-| [meta-ads-contract.md](./meta-ads-contract.md) | Frozen contract |
-| [EXTERNAL-SETUP-HANDOFF.md](./EXTERNAL-SETUP-HANDOFF.md) | External setup A–E |
-| [PRODUCTION-PROMOTION-CHECKLIST.md](./PRODUCTION-PROMOTION-CHECKLIST.md) | Promotion rules |
-| [n8n/README.md](./n8n/README.md) | Workflow export + live IDs |
-| [notes/live-rehearsal-report.md](./notes/live-rehearsal-report.md) | Dry-run execution proof |
-
-## Next Step
-
-Web AI read-only Meta inspection → return Section B YAML → operator reviews verified payloads → approve create-paused testing separately.
+| [architecture/](./architecture/) | Ad Plan, adapter, ledger |
+| [lib/meta-adapter.js](./lib/meta-adapter.js) | Mapping SSOT |
+| [notes/meta-research-prompt-a-results.md](./notes/meta-research-prompt-a-results.md) | Prompt A |
+| [meta-ads-contract.md](./meta-ads-contract.md) | Contract |
+| [CANONICAL-WF4.md](./CANONICAL-WF4.md) | Proven IDs |

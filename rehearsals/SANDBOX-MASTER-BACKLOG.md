@@ -44,7 +44,7 @@ NODE_FLOW: "Webhook → Config → Validate Auth → Validate Payload → Map To
 
 - WF1 and WF2 remain architecturally canonical unless a critical defect is discovered.
 - WF3 uses one unified n8n webhook receiver and one unified Google Sheet event log for v1.
-- WF4 maps to the existing WF-Ads Meta and WF-Decision architecture; **WF4 dry-run sandbox is proven** (local + inactive n8n workflow `YIc53GBq4upelYp6`). Create-paused remains disabled until operator approves and Meta API values are verified.
+- WF4 maps to the existing WF-Ads Meta and WF-Decision architecture; **WF4 V1 dry-run revised and proven** (local + inactive n8n `YIc53GBq4upelYp6`, execution 35). First-test budget $1/day; `MAX_DAILY_BUDGET_USD=10` fail-closed. Create-paused disabled until Prompt A reviewed + operator approval. Production spec/starter/blueprint deferred.
 - Secrets and platform-level IDs stay in n8n Credentials or Config Set nodes, not `app.json`.
 
 ## Master Backlog
@@ -66,8 +66,8 @@ NODE_FLOW: "Webhook → Config → Validate Auth → Validate Payload → Map To
 | BL-013 | P1 | SHARED-LIB | Shared Drive read/merge-write helper | WF0, WF1, WF2, WF-Ads, and WF-Decision need identical safe merge-write behavior. | n8n workflow builds | Yes for production | Reusable component |
 | BL-014 | P1 | SHARED-LIB | Shared logging/error handling convention | All workflows need consistent execution evidence, retries, and alerts. | Error handler decision | Yes for production | Reusable component |
 | BL-015 | P1 | WF4-RESEARCH | `rehearsals/wf4-meta-ads-sandbox/` | ~~WF4 needs dry-run payloads, Meta prerequisites, and safety gates.~~ **Done** — contract, fixtures, external handoff, local proof. | WF3 proof | No (dry-run) | Research/design |
-| BL-016 | P1 | WF4-RESEARCH | `WF4 - Meta Ads Sandbox` n8n workflow | ~~Future WF-Ads n8n workflow.~~ **Sandbox done** — `YIc53GBq4upelYp6` (inactive); dry-run execution 30; create-paused disabled. | BL-015 | No for dry-run; Yes for create-paused | Workflow blueprint/update |
-| BL-017 | P1 | WF4-RESEARCH | Meta API verification docs | Meta objectives, permissions, Page/IG ownership, budget minimums, and special ad categories need current API confirmation. | Read-only Meta research | Yes for WF4 | Open question |
+| BL-016 | P1 | WF4-RESEARCH | `WF4 - Meta Ads Sandbox` n8n workflow | ~~Future WF-Ads n8n workflow.~~ **Sandbox done** — `YIc53GBq4upelYp6` (inactive); dry-run execution **35**; create-paused disabled. | BL-015 | No for dry-run; Yes for create-paused | Workflow blueprint/update |
+| BL-017 | P1 | WF4-RESEARCH | Prompt A/B + Context Package | ~~Meta API verification.~~ **Prompt A reconciled** + architecture revision (Ad Plan / adapter SSOT / ledger; V1 `LINK_CLICKS`+`IMPRESSIONS`; `created_paused`; root preserved). Operator: Manual setup → Prompt B. | Context package | Yes for create-paused | Open question |
 | BL-018 | P1 | SPEC-SYNC | `app.schema.json`, `APP_PACKAGE_SPEC.md`, starter/examples | Consider `ads.specialAdCategories` only if Meta verification shows it is required for safe v1. | BL-017 | Conditional | Schema update |
 | BL-019 | P2 | SPEC-SYNC | `app.schema.json`, `APP_PACKAGE_SPEC.md` | Optional `tracking.lastEventAt` is mentioned as a future debug write-back but not in schema. | WF3 implementation decision | No | Future improvement |
 | BL-020 | P2 | SPEC-SYNC | `ads.targeting`, future WF-Ads docs | Placements, optimization goals, and structured geo targeting may be needed beyond current v1 fields. | WF4 dry-run findings | No | Future improvement |
@@ -170,29 +170,34 @@ Canonical: `rehearsals/wf3-human-lab-sandbox/CANONICAL-WF3.md`. Promotion: `PROD
 
 ### WF4
 
-**Dry-run proven.** Canonical: `rehearsals/wf4-meta-ads-sandbox/CANONICAL-WF4.md`.
+**V1 dry-run revised and proven.** Canonical: `rehearsals/wf4-meta-ads-sandbox/CANONICAL-WF4.md`.
 
 ```yaml
 WF4_WORKFLOW_ID: "YIc53GBq4upelYp6"
 WF4_WORKFLOW_NAME: "WF4 - Meta Ads Sandbox"
 WF4_WORKFLOW_URL: "https://scottyo.app.n8n.cloud/workflow/YIc53GBq4upelYp6"
 WF4_WORKFLOW_ACTIVE: false
-WF4_DRY_RUN_EXECUTION_ID: "30"
+WF4_DRY_RUN_EXECUTION_ID: "35"
+MAX_DAILY_BUDGET_USD: 10
+FIRST_TEST_DAILY_BUDGET_USD: 1
 META_HTTP_CALLS_OBSERVED: 0
 DRIVE_WRITES_OBSERVED: 0
 SANDBOX_APP_ID: "human-lab-wf1-sandbox"
 SANDBOX_EXPERIMENT_RUN_ID: "run_human-lab_2026q2_001"
 ```
 
+Operator next: Manual checklist → Prompt B → Config/credentials → explicit create-paused approval.
+
 Return read-only Meta context only (still required before create-paused):
 
 ```yaml
-META_BUSINESS_MANAGER_ID: "<read-only or sandbox>"
+META_BUSINESS_PORTFOLIO_ID: "<read-only or sandbox>"
 META_AD_ACCOUNT_ID: "<read-only or sandbox>"
 META_PAGE_ID: "<page allowed for ad creation>"
-META_INSTAGRAM_ACTOR_ID: "<optional>"
+META_INSTAGRAM_USER_ID: "<optional / required if platforms include instagram>"
 DEFAULT_DAILY_BUDGET_CAP: "<amount>"
-SPECIAL_AD_CATEGORY_DECISION: "<NONE or required category>"
+SPECIAL_AD_CATEGORY_DECISION: "NONE"
+MIN_DAILY_BUDGET_USD: "<from AdAccount.min_daily_budget>"
 ```
 
 Do not return access tokens or secrets in files.
@@ -228,8 +233,11 @@ Do not return access tokens or secrets in files.
 - [x] WF3 sandbox external curl rehearsal passes for all four events (runs 1–2).
 - [x] Google Sheet append uses canonical **33-column** order (Append success + map Code).
 - [ ] Browser E2E with provisioned `tracking.webhookUrl` (BL-005/006).
-- [x] WF4 dry-run payloads built and locally verified (`wf4-rehearse.js` + n8n execution 30).
-- [ ] WF4 VERIFY_* values confirmed against current Meta API docs (operator/Web AI).
+- [x] WF4 V1 dry-run revised ($1/day fixture, $10 cap, broad targeting) — local + n8n execution 35.
+- [x] WF4 Prompt A VERIFY_* resolution reconciled (`notes/meta-research-prompt-a-results.md`).
+- [x] WF4 architecture revision design pass (adapter SSOT + fixtures + rehearse PASS).
+- [ ] WF4 Prompt B account IDs + `min_daily_budget` (operator).
+- [ ] Production app-validation-spec / starter / WF-Ads blueprint sync (deferred; document root status stays until activation).
 - [x] No production assets modified during rehearsal.
 - [x] No secrets committed or stored in `app.json`.
 - [ ] Final Spec 1.5.0 coordinated update applied (BL-031–BL-038).

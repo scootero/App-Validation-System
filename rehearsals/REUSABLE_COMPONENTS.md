@@ -16,7 +16,7 @@ This registry identifies shared components to avoid workflow-specific implementa
 | Common Google Drive helpers | WF0, WF1, WF2, WF-Ads, WF-Decision | Read file, merge-write, preserve content | Backlog only |
 | Common Google Sheets helpers | WF3, WF-Decision | Canonical **33** columns, append rows, filter event rows; `receivedAt` / `eventId` / consent / Meta defaults — **live-proven** in sandbox WF3 |
 | Common Vercel helpers | WF1, WF2 | Deploy, poll, resolve alias, verify public/iframe-safe URLs | WF1/WF2 rehearsal evidence |
-| Common Meta Ads helpers | WF-Ads, WF-Decision | Dry-run bundle, idempotency, triple approval, create paused entities, insights read, pause-on-kill | **Sandbox-proven** dry-run in WF4 `YIc53GBq4upelYp6`; create-paused not built |
+| Common Meta Ads helpers | WF-Ads, WF-Decision | Dry-run bundle, idempotency, triple approval, fail-closed `MAX_DAILY_BUDGET_USD`, broad targeting, create paused entities, insights read, pause-on-kill | **Sandbox-proven** V1 dry-run in WF4 `YIc53GBq4upelYp6` (exec 35); create-paused not built |
 
 ## Promotion Criteria
 
@@ -34,6 +34,6 @@ A component should be promoted from rehearsal guidance to production docs/workfl
 2. Landing attribution capture (`utm_*` + `fbclid` persistence) and per-event `eventId` generation — proven in sandbox landing; production `landing-template` sync pending (BL-028).
 3. Drive merge-write helper for WF0/WF1/WF2/WF-Ads/WF-Decision.
 4. Vercel deploy/poll/alias verification helper for WF1/WF2.
-5. Meta dry-run bundle builder + idempotency checker + triple approval gate for WF-Ads — **proven in sandbox WF4** `YIc53GBq4upelYp6` (dry-run execution 30); export in `rehearsals/wf4-meta-ads-sandbox/n8n/`.
+5. Meta dry-run bundle builder + idempotency + triple approval + budget-cap validator for WF-Ads — **proven in sandbox WF4** `YIc53GBq4upelYp6` (execution 35; $1/day; cap $10); export in `rehearsals/wf4-meta-ads-sandbox/n8n/`.
 6. Status transition validator for WF0/WF-Ads/WF-Decision.
 7. Config-driven WF3 template: per-app `appId`/webhook path/Sheet ID; shared event contract (see `CONFIG-DRIVEN-VS-HARDCODED.md`).

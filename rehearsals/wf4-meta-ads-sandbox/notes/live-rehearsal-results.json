@@ -1,32 +1,18 @@
 {
-  "executionId": "30",
+  "executionId": "35",
   "workflowId": "YIc53GBq4upelYp6",
   "status": "success",
   "mode": "dry_run",
   "lastNodeExecuted": "Respond Dry Run",
-  "nodesExecuted": [
-    "Manual Run",
-    "Workflow Config",
-    "Process WF4 Dry Run",
-    "Triple Approval Gate",
-    "Respond Dry Run"
-  ],
-  "nodesNotExecuted": [
-    "Create Paused Blocked",
-    "Create Campaign PAUSED"
-  ],
   "verification": {
     "metaHttpCalls": 0,
     "driveWrites": 0,
     "externalWritePerformed": false,
-    "tripleApproved": false,
+    "dailyBudget": 1,
+    "totalBudget": 14,
+    "maxDailyBudgetUsd": 10,
+    "budgetCapPassed": true,
+    "interestsInTargeting": false,
     "createPausedAllowed": false
-  },
-  "runKey": {
-    "appId": "human-lab-wf1-sandbox",
-    "experimentRunId": "run_human-lab_2026q2_001",
-    "provider": "meta"
-  },
-  "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
-  "dailyBudget": 35.71
+  }
 }

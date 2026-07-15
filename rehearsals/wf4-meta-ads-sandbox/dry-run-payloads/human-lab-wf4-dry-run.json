@@ -7,8 +7,8 @@
     "experimentRunId": "run_human-lab_2026q2_001",
     "provider": "meta"
   },
-  "metaApiVersion": "VERIFY_CURRENT_VERSION_BEFORE_LIVE_USE",
-  "adAccountIdRef": "n8n.credentials.META_AD_ACCOUNT_ID",
+  "metaApiVersion": "v25.0",
+  "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
   "pageIdRef": "n8n.config.META_PAGE_ID",
   "wf3Gate": {
     "required": true,
@@ -19,6 +19,30 @@
       "buy_now_clicked",
       "mockup_interacted"
     ]
+  },
+  "adPlan": {
+    "authorObjective": "traffic",
+    "campaignName": "human-lab-validation",
+    "platforms": [
+      "facebook",
+      "instagram"
+    ],
+    "targeting": {
+      "locations": [
+        "United States"
+      ],
+      "ageMin": 25,
+      "ageMax": 55,
+      "interests": null
+    },
+    "budget": {
+      "currency": "USD",
+      "totalAmount": 14,
+      "durationDays": 14,
+      "dailyBudgetUsd": 1
+    },
+    "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+    "rootStatusPreserved": "ready"
   },
   "source": {
     "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
@@ -31,25 +55,42 @@
   },
   "computed": {
     "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
-    "dailyBudget": 35.71,
+    "dailyBudget": 1,
     "currency": "USD",
-    "totalBudget": 500,
+    "totalBudget": 14,
     "durationDays": 14,
-    "statusForAllCreatedEntities": "PAUSED"
+    "pausedStatuses": {
+      "campaign": "PAUSED",
+      "adSet": "PAUSED",
+      "creative": "N/A_ASSET",
+      "ad": "PAUSED"
+    },
+    "statusForDeliveryEntities": "PAUSED"
+  },
+  "budgetCapCheck": {
+    "maxDailyBudgetUsd": 10,
+    "passed": true
+  },
+  "v1Pairing": {
+    "objective": "OUTCOME_TRAFFIC",
+    "optimization_goal": "LINK_CLICKS",
+    "billing_event": "IMPRESSIONS",
+    "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+    "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
   },
   "requests": {
     "campaign": {
       "name": "human-lab-validation",
-      "objective": "VERIFY_META_OBJECTIVE_MAPPING",
+      "objective": "OUTCOME_TRAFFIC",
       "status": "PAUSED",
-      "special_ad_categories": "VERIFY_BEFORE_LIVE_USE"
+      "special_ad_categories": []
     },
     "adSet": {
       "name": "human-lab-validation-adset-v1",
       "status": "PAUSED",
-      "daily_budget": "VERIFY_MINOR_UNITS_BEFORE_LIVE_USE",
-      "billing_event": "VERIFY_FOR_OBJECTIVE",
-      "optimization_goal": "VERIFY_FOR_OBJECTIVE",
+      "daily_budget": 100,
+      "billing_event": "IMPRESSIONS",
+      "optimization_goal": "LINK_CLICKS",
       "targeting": {
         "geo_locations": {
           "countries": [
@@ -58,16 +99,16 @@
         },
         "age_min": 25,
         "age_max": 55,
-        "interests": [
-          "VERIFY_INTEREST_ID",
-          "VERIFY_INTEREST_ID",
-          "VERIFY_INTEREST_ID"
-        ],
         "publisher_platforms": [
           "facebook",
           "instagram"
         ]
       }
+    },
+    "imageUpload": {
+      "endpoint": "POST /act_{META_AD_ACCOUNT_ID}/adimages",
+      "source": "ads.media githubPath or media.ogImage",
+      "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
     },
     "creative": {
       "name": "human-lab-validation-creative-a",
@@ -96,6 +137,20 @@
       }
     }
   },
+  "ledgerPlan": {
+    "operationKey": "human-lab-wf1-sandbox|run_human-lab_2026q2_001|meta",
+    "appId": "human-lab-wf1-sandbox",
+    "experimentRunId": "run_human-lab_2026q2_001",
+    "provider": "meta",
+    "phase": "planned",
+    "campaignId": null,
+    "adSetId": null,
+    "imageHash": null,
+    "creativeId": null,
+    "adId": null,
+    "lastError": null,
+    "reconciliation": "V1: detect existing op → resume if safe → else manual_review_required; no auto-delete"
+  },
   "writeBackAfterCreatePausedOnly": {
     "ads": {
       "meta": {
@@ -105,18 +160,20 @@
         "creativeId": "<creative-id>",
         "adId": "<ad-id>",
         "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
-        "dailyBudget": 35.71,
+        "dailyBudget": 1,
         "createdAt": "<iso8601>",
         "lastSyncedAt": null
       }
     },
-    "status": "validating"
+    "rootStatusUnchanged": true,
+    "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation."
   },
   "safety": {
     "externalWritePerformed": false,
     "liveAdsCreated": false,
     "spendPossible": false,
     "requiresExplicitApprovalBeforeCreatePaused": true,
+    "neverSendActive": true,
     "tripleApprovalRequired": {
       "mode": "create_paused",
       "approval": true,

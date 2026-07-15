@@ -1,53 +1,37 @@
-# WF4 app.json Field Audit
+# WF4 app.json Field Audit (V1 revised)
 
 ## Verdict
 
-No new `app.json` fields are required for WF4 dry-run research or the first paused-campaign contract.
+No production schema changes required for WF4 V1 dry-run. Existing Spec 1.5.0 fields support broad targeting + budget + creative + `ads.meta.*` write-back.
 
-## Existing Support
+## V1 required (existing)
 
-| Requirement | Existing field |
-|-------------|----------------|
-| Landing destination | `deployment.landing.url` |
-| Campaign name | `ads.campaignName` |
-| Objective hint | `ads.objective` |
+| Requirement | Field |
+|-------------|-------|
+| Destination | `deployment.landing.url` |
+| Copy / CTA / UTM | `ads.*` |
 | Platforms | `ads.platforms` |
-| Headlines | `ads.headlines[]` |
-| Primary text | `ads.primaryTexts[]` |
-| Description | `ads.descriptions[]` |
-| CTA | `ads.callToAction` |
-| UTM attribution | `ads.utmTemplate` |
-| Targeting hints | `ads.targeting` |
-| Preferred creatives | `ads.media[]` |
-| Creative fallback | `media.ogImage` |
-| Asset resolution | `source.assetsGithubRepo`, `source.mockupGithubRepo`, branches/root |
+| Broad targeting | `ads.targeting.locations`, `ageMin`, `ageMax` |
+| Creative | `ads.media[]` or `media.ogImage` |
 | Budget | `experiment.testBudget` |
-| Write-back IDs | `ads.meta.*` |
-| Lifecycle promotion | root `status: validating` |
+| Write-back | `ads.meta.*` |
 
-## Correctly Outside app.json
+## Optional (not required V1)
 
-| Value | Storage |
-|-------|---------|
-| Meta API access token | n8n Credentials |
-| Meta ad account ID | n8n Credentials / Config Set |
-| Meta Page ID | n8n Config Set |
-| Instagram actor ID | n8n Config Set |
-| Meta API version | n8n Config Set |
-| Platform daily budget cap | n8n Config Set |
-| Event-log Meta join keys (`metaCampaignId`, `metaAdSetId`, `metaAdId`, `placement`) | WF3 Google Sheet columns (blank until WF4) |
+| Field | Notes |
+|-------|-------|
+| `ads.targeting.interests` | Extension; omit from dry-run when absent |
+| Gender / placements / custom audiences | Deferred — no schema change |
 
-## Optional Future Improvements
+## Outside app.json
 
-| Priority | Field | Reason | Blocks v1? |
-|----------|-------|--------|------------|
-| P1 | `ads.specialAdCategories` | Avoid unsafe assumptions for regulated categories | Conditional |
-| P2 | `ads.placements` | More precise Feed/Stories/Reels control | No |
-| P2 | `ads.optimization` | Objective-specific billing/optimization mapping | No |
-| P2 | `ads.targeting.geo` | Structured geo beyond free-text locations | No |
-| P2 | `ads.meta.errorMessage` | Store last failure summary | No |
-| P3 | `ads.meta.requestHash` | Idempotency/audit support | No |
+| Value | Where |
+|-------|-------|
+| Business Portfolio / Ad Account / Page / IG | n8n Config (non-secret) |
+| API version / objective / billing / optimization | n8n Config (non-secret) |
+| `MAX_DAILY_BUDGET_USD` | n8n Config |
+| Meta token / approval token | n8n Credentials |
 
-## Recommendation
+## Production Drive / Spec
 
-Proceed with dry-run WF4 design using current fields. Add optional schema fields only after current Meta API verification and WF3 proof.
+Do not modify production Drive or `app-validation-spec` / starter until Prompt A reviewed (Spec 1.5.0 coordinated pass).
