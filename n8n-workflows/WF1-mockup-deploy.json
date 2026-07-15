@@ -1,0 +1,874 @@
+{
+  "name": "WF1 Mockup Deploy",
+  "nodes": [
+    {
+      "id": "513f8e24-ef2d-4dfd-ac35-613398e54a1b",
+      "name": "Manual Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "081bc057-0c5a-42d7-8ca0-88d50f808bc6",
+      "name": "Workflow Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "appId",
+              "name": "appId",
+              "value": "human-lab-wf1-sandbox",
+              "type": "string"
+            },
+            {
+              "id": "driveParentFolderId",
+              "name": "driveParentFolderId",
+              "value": "1O3RHwYFhJlPRBygNKxc7HGHmWtfiaB5A",
+              "type": "string"
+            },
+            {
+              "id": "vercelTeamId",
+              "name": "vercelTeamId",
+              "value": "team_CvzW7iL13TaNbaIiaCHfjafe",
+              "type": "string"
+            },
+            {
+              "id": "vercelPollIntervalSeconds",
+              "name": "vercelPollIntervalSeconds",
+              "value": 15,
+              "type": "number"
+            },
+            {
+              "id": "vercelPollMaxMinutes",
+              "name": "vercelPollMaxMinutes",
+              "value": 10,
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "93466a13-bc1f-4ccc-95d7-586ec5343460",
+      "name": "Search App Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "authentication": "serviceAccount",
+        "searchMethod": "name",
+        "queryString": "={{ $json.appId }}",
+        "returnAll": false,
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.driveParentFolderId }}"
+          },
+          "whatToSearch": "folders"
+        }
+      }
+    },
+    {
+      "id": "c10d022e-266c-4ab6-807d-861e42febd7d",
+      "name": "Search app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "authentication": "serviceAccount",
+        "searchMethod": "name",
+        "queryString": "app.json",
+        "returnAll": false,
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.id }}"
+          },
+          "whatToSearch": "files"
+        }
+      }
+    },
+    {
+      "id": "2d4167b3-fb0e-4bbf-800a-1224c0920210",
+      "name": "Download app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      }
+    },
+    {
+      "id": "ef9ff2ab-9dd7-48e2-9265-b49e39293749",
+      "name": "Parse And Gate Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Workflow Config').first().json;\nconst fileMeta = $('Download app.json').first().json;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = buf.toString('utf8');\nlet pkg;\ntry {\n  pkg = JSON.parse(text);\n} catch (e) {\n  throw new Error('PARSE_FAILED: ' + e.message);\n}\nif (!pkg.appId) {\n  throw new Error('MISSING_APP_ID');\n}\nif (pkg.appId !== cfg.appId) {\n  throw new Error('APP_ID_MISMATCH: expected ' + cfg.appId + ', got ' + pkg.appId);\n}\nconst statusReady = pkg.status === 'ready';\nreturn [{\n  json: {\n    appId: pkg.appId,\n    status: pkg.status,\n    statusReady,\n    fileId: fileMeta.id,\n    folderId: $('Search App Folder').first().json.id,\n    driveParentFolderId: cfg.driveParentFolderId,\n    vercelTeamId: cfg.vercelTeamId,\n    vercelPollIntervalSeconds: cfg.vercelPollIntervalSeconds,\n    vercelPollMaxMinutes: cfg.vercelPollMaxMinutes,\n    source: pkg.source || {},\n    pkg,\n  },\n}];"
+      }
+    },
+    {
+      "id": "7115f759-ce17-45bc-b678-742fd11f572c",
+      "name": "Status Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-ready",
+              "leftValue": "={{ $json.statusReady }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "11961d93-8360-4c33-b51c-023aee661cee",
+      "name": "Validate Source Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst source = item.source || {};\nconst missing = [];\nif (!source.mockupGithubRepo) missing.push('source.mockupGithubRepo');\nif (!source.mockupBranch) missing.push('source.mockupBranch');\nif (!source.mockupRootDirectory) missing.push('source.mockupRootDirectory');\nif (!source.vercelMockupProjectId && !source.vercelMockupProjectName) {\n  missing.push('source.vercelMockupProjectId|vercelMockupProjectName');\n}\nif (missing.length) {\n  throw new Error('SOURCE_INVALID: ' + missing.join(', '));\n}\nlet repo = String(source.mockupGithubRepo).trim();\nrepo = repo.replace(/^https?:\\/\\/github\\.com\\//i, '').replace(/\\.git$/i, '');\nconst parts = repo.split('/').filter(Boolean);\nif (parts.length < 2) {\n  throw new Error('SOURCE_INVALID: mockupGithubRepo must be org/repo');\n}\nconst org = parts[0];\nconst repoName = parts[1];\nconst body = {\n  target: 'production',\n  gitSource: {\n    type: 'github',\n    org,\n    repo: repoName,\n    ref: source.mockupBranch,\n  },\n};\nif (source.vercelMockupProjectId) {\n  body.project = source.vercelMockupProjectId;\n  body.name = source.vercelMockupProjectName || source.vercelMockupProjectId;\n} else {\n  body.name = source.vercelMockupProjectName;\n}\nreturn [{\n  json: {\n    ...item,\n    org,\n    repo: repoName,\n    deployBody: body,\n    projectIdHint: source.vercelMockupProjectId || null,\n    projectNameHint: source.vercelMockupProjectName || null,\n  },\n}];"
+      }
+    },
+    {
+      "id": "ec29c7b3-3dc1-4a08-9120-6c48dab3ce6b",
+      "name": "Trigger Vercel Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"https://api.vercel.com/v13/deployments?teamId=\" + $json.vercelTeamId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.deployBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "id": "48ba1a2a-ab33-4883-9a2b-ca1d6c4cbf6e",
+      "name": "Prepare Poll Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const prev = $('Validate Source Metadata').first().json;\nconst dep = $input.first().json;\nconst deploymentId = dep.id || dep.uid;\nif (!deploymentId) {\n  throw new Error('DEPLOY_FAILED: missing deployment id');\n}\nreturn [{\n  json: {\n    appId: prev.appId,\n    fileId: prev.fileId,\n    folderId: prev.folderId,\n    vercelTeamId: prev.vercelTeamId,\n    vercelPollIntervalSeconds: prev.vercelPollIntervalSeconds,\n    vercelPollMaxMinutes: prev.vercelPollMaxMinutes,\n    projectIdHint: prev.projectIdHint,\n    projectNameHint: prev.projectNameHint,\n    deploymentId,\n    pollStartedAt: new Date().toISOString(),\n    initialReadyState: dep.readyState || null,\n  },\n}];"
+      }
+    },
+    {
+      "id": "fd54b106-cc5e-4639-b316-02895ac78ca6",
+      "name": "Wait Before Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        96
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "webhookId": "0417d104-10a5-4757-9b1c-431655a48db1"
+    },
+    {
+      "id": "0bcd273c-fed5-4b01-9a55-5b35571f9927",
+      "name": "Poll Vercel Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2464,
+        32
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://api.vercel.com/v13/deployments/\" + $json.deploymentId + \"?teamId=\" + $json.vercelTeamId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      }
+    },
+    {
+      "id": "953abba4-659d-4dbd-bf80-a063602c153e",
+      "name": "Merge Poll Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        32
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ctx = $('Prepare Poll Context').first().json;\nconst dep = $input.first().json;\nconst maxMs = (Number(ctx.vercelPollMaxMinutes) || 10) * 60 * 1000;\nconst started = new Date(ctx.pollStartedAt).getTime();\nconst readyState = dep.readyState;\nif (readyState === 'ERROR' || readyState === 'CANCELED') {\n  throw new Error('DEPLOY_FAILED: readyState=' + readyState + ' id=' + ctx.deploymentId);\n}\nif (readyState !== 'READY' && Date.now() - started > maxMs) {\n  throw new Error('POLL_TIMEOUT: deployment ' + ctx.deploymentId + ' not READY within ' + ctx.vercelPollMaxMinutes + 'm');\n}\nreturn [{\n  json: {\n    ...ctx,\n    readyState,\n    isReady: readyState === 'READY',\n    alias: dep.alias || [],\n    url: dep.url || null,\n    projectId: dep.projectId || ctx.projectIdHint,\n    createdAt: dep.createdAt || null,\n    deployment: dep,\n  },\n}];"
+      }
+    },
+    {
+      "id": "b9697c52-628d-4e85-8ac9-12f12226aa42",
+      "name": "Deploy Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2912,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "deploy-ready",
+              "leftValue": "={{ $json.isReady }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "88a331d0-3bb1-409d-a456-e8720fad6aab",
+      "name": "Extract Public Alias",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst teamSlug = 'scooteros-projects';\nfunction isProtectedHost(host) {\n  return /-[a-z0-9]{5,}-/.test(host) || host.endsWith('-' + teamSlug + '.vercel.app');\n}\nfunction pickPublicAlias(aliases) {\n  const hosts = (aliases || [])\n    .map((a) => (typeof a === 'string' ? a : a.domain || a))\n    .filter(Boolean)\n    .map((h) => String(h).replace(/^https?:\\/\\//, ''));\n  return hosts.find((h) => h.endsWith('.vercel.app') && !isProtectedHost(h)) || null;\n}\nlet publicHost = pickPublicAlias(item.alias);\nconst deploymentUrl = item.url\n  ? (String(item.url).startsWith('http') ? String(item.url) : 'https://' + item.url)\n  : null;\nconst publicUrl = publicHost\n  ? (publicHost.startsWith('http') ? publicHost : 'https://' + publicHost)\n  : null;\nreturn [{\n  json: {\n    appId: item.appId,\n    fileId: item.fileId,\n    folderId: item.folderId,\n    vercelTeamId: item.vercelTeamId,\n    deploymentId: item.deploymentId,\n    projectId: item.projectId,\n    publicUrl,\n    deploymentUrl,\n    needsDomainsFallback: !publicUrl,\n    createdAt: item.createdAt,\n  },\n}];"
+      }
+    },
+    {
+      "id": "5adc0025-23dd-4e7c-8367-5674b028732d",
+      "name": "Needs Domains Fallback?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3360,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "needs-domains",
+              "leftValue": "={{ $json.needsDomainsFallback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "35040afd-e2da-47a6-8c9d-e7718c63a3e2",
+      "name": "Get Project Domains",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3584,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://api.vercel.com/v9/projects/\" + $json.projectId + \"/domains?production=true&target=production&teamId=\" + $json.vercelTeamId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      }
+    },
+    {
+      "id": "c852c825-e7ea-4076-903c-cb4df413d04e",
+      "name": "Resolve From Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3808,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const urls = $('Extract Public Alias').first().json;\nconst domainsResp = $input.first().json;\nconst list = Array.isArray(domainsResp) ? domainsResp : (domainsResp.domains || domainsResp.data || []);\nconst verified = list.find((d) => {\n  const name = d.name || d.domain || d;\n  const ok = d.verified !== false;\n  return ok && name && String(name).endsWith('.vercel.app');\n}) || list[0];\nconst host = verified ? (verified.name || verified.domain || verified) : null;\nif (!host) {\n  throw new Error('ALIAS_RESOLVE_FAILED: no public domain for project ' + urls.projectId);\n}\nconst publicUrl = String(host).startsWith('http') ? String(host) : 'https://' + host;\nreturn [{\n  json: {\n    ...urls,\n    publicUrl,\n    needsDomainsFallback: false,\n  },\n}];"
+      }
+    },
+    {
+      "id": "46823c42-b056-4ee1-8c26-cb32c2469eaf",
+      "name": "Resolve Final Public Url",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4032,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nif (!item.publicUrl) {\n  throw new Error('ALIAS_RESOLVE_FAILED: publicUrl missing after alias/domains resolution');\n}\nreturn [{ json: item }];"
+      }
+    },
+    {
+      "id": "afdea258-d11b-4049-bd68-0d5cc4a99f0a",
+      "name": "Verify Public URL HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4256,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.publicUrl }}",
+        "authentication": "none",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "3696a0e0-12de-4f07-a7a0-beec6affb293",
+      "name": "Verify Public URL Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const urls = $('Resolve Final Public Url').first().json;\nconst resp = $input.first().json;\nconst statusCode = resp.statusCode || resp.status || 0;\nconst headers = resp.headers || {};\nconst location = headers.location || headers.Location || '';\nconst xfo = headers['x-frame-options'] || headers['X-Frame-Options'] || '';\nconst sso = String(location).includes('vercel.com/sso-api');\nconst deny = String(xfo).toUpperCase() === 'DENY';\nconst ok = Number(statusCode) === 200 && !sso && !deny;\nif (!ok) {\n  throw new Error(\n    'PUBLIC_URL_VERIFY_FAILED: status=' + statusCode +\n    ' sso=' + sso +\n    ' xfo=' + xfo +\n    ' publicUrl=' + urls.publicUrl +\n    ' deploymentUrl=' + urls.deploymentUrl +\n    ' deploymentId=' + urls.deploymentId\n  );\n}\nreturn [{\n  json: {\n    ...urls,\n    verifyOk: true,\n    verifyStatusCode: statusCode,\n  },\n}];"
+      }
+    },
+    {
+      "id": "0d2c9e1b-8562-4adc-a0b8-c81a2f0cbda5",
+      "name": "Re-download app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4704,
+        96
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      }
+    },
+    {
+      "id": "36fec8f7-d8b9-4d96-83d7-358eee0f097c",
+      "name": "Merge Write app.json",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4928,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const urls = $('Verify Public URL Gate').first().json;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = buf.toString('utf8');\nlet pkg;\ntry {\n  pkg = JSON.parse(text);\n} catch (e) {\n  throw new Error('PARSE_FAILED_ON_WRITEBACK: ' + e.message);\n}\nif (pkg.appId !== urls.appId) {\n  throw new Error('WRITEBACK_APP_ID_MISMATCH');\n}\nconst fileMeta = $('Re-download app.json').first().json;\nconst resolvedFileId = fileMeta.id || fileMeta.fileId;\nif (resolvedFileId !== urls.fileId) {\n  throw new Error('WRITEBACK_FILE_MISMATCH: got ' + resolvedFileId + ' expected ' + urls.fileId);\n}\nconst deployedAt = new Date().toISOString();\npkg.mockup = pkg.mockup || {};\npkg.mockup.previewUrl = urls.publicUrl;\npkg.deployment = pkg.deployment || {};\npkg.deployment.mockup = pkg.deployment.mockup || {};\npkg.deployment.mockup.vercelProjectId = urls.projectId;\npkg.deployment.mockup.url = urls.publicUrl;\npkg.deployment.mockup.deploymentUrl = urls.deploymentUrl;\npkg.deployment.mockup.lastDeployedAt = deployedAt;\nconst outText = JSON.stringify(pkg, null, 2);\nconst binary = await this.helpers.prepareBinaryData(Buffer.from(outText, 'utf8'), 'app.json', 'application/json');\nreturn [{\n  json: {\n    appId: pkg.appId,\n    fileId: urls.fileId,\n    publicUrl: urls.publicUrl,\n    deploymentUrl: urls.deploymentUrl,\n    vercelProjectId: urls.projectId,\n    lastDeployedAt: deployedAt,\n    status: pkg.status,\n  },\n  binary: { data: binary },\n}];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "6787b604-56e1-490c-bcd3-4727460779a4",
+      "name": "Update Drive app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        5152,
+        96
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "update",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "changeFileContent": true,
+        "inputDataFieldName": "data"
+      }
+    },
+    {
+      "id": "a34a79ef-0c87-45be-8060-1c7a46767663",
+      "name": "Pass Through Public Url",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3808,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const urls = $input.first().json;\nif (!urls.publicUrl) {\n  throw new Error('ALIAS_RESOLVE_FAILED: publicUrl missing');\n}\nreturn [{ json: urls }];"
+      }
+    },
+    {
+      "id": "8ba2fc2b-e944-416d-9921-e8c22f4027ba",
+      "name": "Skip Not Ready",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        288
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "skipped",
+              "name": "skipped",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "reason",
+              "name": "reason",
+              "value": "status_not_ready",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Run": {
+      "main": [
+        [
+          {
+            "node": "Workflow Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Config": {
+      "main": [
+        [
+          {
+            "node": "Search App Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search App Folder": {
+      "main": [
+        [
+          {
+            "node": "Search app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search app.json": {
+      "main": [
+        [
+          {
+            "node": "Download app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download app.json": {
+      "main": [
+        [
+          {
+            "node": "Parse And Gate Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse And Gate Status": {
+      "main": [
+        [
+          {
+            "node": "Status Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Ready?": {
+      "main": [
+        [
+          {
+            "node": "Validate Source Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Source Metadata": {
+      "main": [
+        [
+          {
+            "node": "Trigger Vercel Deploy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Vercel Deploy": {
+      "main": [
+        [
+          {
+            "node": "Prepare Poll Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Poll Context": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Poll": {
+      "main": [
+        [
+          {
+            "node": "Poll Vercel Deploy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Vercel Deploy": {
+      "main": [
+        [
+          {
+            "node": "Merge Poll Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Poll Result": {
+      "main": [
+        [
+          {
+            "node": "Deploy Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deploy Ready?": {
+      "main": [
+        [
+          {
+            "node": "Extract Public Alias",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Public Alias": {
+      "main": [
+        [
+          {
+            "node": "Needs Domains Fallback?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Domains Fallback?": {
+      "main": [
+        [
+          {
+            "node": "Get Project Domains",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pass Through Public Url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Project Domains": {
+      "main": [
+        [
+          {
+            "node": "Resolve From Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve From Domains": {
+      "main": [
+        [
+          {
+            "node": "Resolve Final Public Url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Final Public Url": {
+      "main": [
+        [
+          {
+            "node": "Verify Public URL HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Public URL HTTP": {
+      "main": [
+        [
+          {
+            "node": "Verify Public URL Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Public URL Gate": {
+      "main": [
+        [
+          {
+            "node": "Re-download app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-download app.json": {
+      "main": [
+        [
+          {
+            "node": "Merge Write app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Write app.json": {
+      "main": [
+        [
+          {
+            "node": "Update Drive app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass Through Public Url": {
+      "main": [
+        [
+          {
+            "node": "Resolve Final Public Url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "pinData": {},
+  "active": false,
+  "versionId": "08140fad-537d-4184-b2e0-34aa61338b14",
+  "id": "aErcPyCDrFCvvQks",
+  "description": "Deploys mockup via Vercel for a Drive app.json package, verifies the public alias, and merge-writes deployment.mockup.* + mockup.previewUrl."
+}

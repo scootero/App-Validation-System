@@ -1,47 +1,74 @@
 # Spec 1.5.0 Coordinated Update Plan
 
-**Status:** Backlog-only plan. Do not apply these updates until WF3 proof and WF4 dry-run review are complete.
+**Status:** WF3 sandbox proven. Backlog-only plan until coordinated production pass. Do not apply production edits yet.
 
 ## Update Principles
 
 - Apply one coordinated update instead of piecemeal edits.
 - Keep WF1/WF2 canonical unless a critical defect is found.
-- Treat WF3 proof artifacts as evidence for tracking docs and workflow exports.
-- Treat WF4 as dry-run/design until WF3 is proven.
+- Treat proven WF3 sandbox logic as canonical (`rehearsals/wf3-human-lab-sandbox/CANONICAL-WF3.md`).
+- Treat WF4 as dry-run/design until user approves paused Meta creation.
 - Validate existing `app.json` fields before adding schema fields.
+- **No new `app.json` fields required for WF3** (confirmed).
 
 ## Implementation Order
 
-1. Finish WF3 local and external sandbox proof.
+1. ~~Finish WF3 local and external sandbox proof.~~ **Done** (curl runs 1–2).
 2. Review WF4 dry-run payload against current Meta API docs.
 3. Decide whether optional fields such as `ads.specialAdCategories` are required.
-4. Build/export n8n workflow JSONs after shared components are agreed.
-5. Update production docs and examples in one pass.
-6. Update starter guidance after the canonical docs are synchronized.
+4. Promote WF3 export to `n8n-workflows/WF3-tracking.json` (parameterize Sheet/path).
+5. Update production docs and examples in one pass (see file-level deltas below).
+6. Update starter + landing-template after canonical docs are synchronized.
 7. Run final consistency review against WF1-WF4 contracts.
+8. Optional: browser E2E (BL-005/006) before or after doc sync.
+
+## Proven deltas that must land in production docs
+
+| Delta | Wrong / stale | Proven |
+|-------|---------------|--------|
+| n8n host | `scooter.app.n8n.cloud` | `scottyo.app.n8n.cloud` |
+| Google SA credential label | `Google Service Account` | `Google Service Account account` |
+| Sheet columns | 25 | **33** |
+| WF3 nodes | 7 (no IF) | 8 (+ Route Valid Events) |
+| WF3 export | “blueprint only” | Sandbox export + live ID `7G2fJmqKsr8CGVID` |
+| Landing tracking | Missing `eventId` / `fbclid` persist / `consentStatus` | Sandbox landing libs proven |
+
+Full drift list: `rehearsals/wf3-human-lab-sandbox/DOC-DRIFT-AND-REQUIRED-UPDATES.md`.
 
 ## Production Files To Update Later
 
 | Area | Candidate files | Reason |
 |------|-----------------|--------|
-| Architecture | `N8N_PLATFORM_ARCHITECTURE.md` | Reflect WF3 proof, WF4 dry-run status, shared components |
-| Spec docs | `app-validation-spec/APP_PACKAGE_SPEC.md` | Add any approved field clarifications |
-| Schema | `app-validation-spec/schemas/app.schema.json` | Only if optional fields are approved |
-| Examples/templates | `app-validation-spec/templates/app.json`, examples | Align event names and WF4 recommendations |
-| Starter | `app-package-starter/README.md`, `START_HERE.md`, `app.json` | Add WF3/WF4 setup guidance after proof |
-| Landing template | `landing-template/README.md` | Fix minor tracking path/readme drift |
-| n8n workflows | `n8n-workflows/*` | Add WF3 prompt/export and later WF-Ads prompt/export |
-| Setup tracker | `PLATFORM_SETUP_VALUES.md` | Mark real sandbox/prod setup state |
-| Implementation guide | `AI_IMPLEMENTATION_GUIDE.md` | Update stale current-state language |
+| Setup tracker | `PLATFORM_SETUP_VALUES.md` | `scottyo` URL, credential label, Sheet ID, webhook, proof status |
+| Architecture | `N8N_PLATFORM_ARCHITECTURE.md` §6 | 33-col Sheet + TrackingPayload; WF3 proven |
+| WF3 blueprint | `n8n-workflows/WF3-TRACKING-PIPELINE-BLUEPRINT.md` | 33 cols, Route Valid Events, proven IDs |
+| WF3 export | `n8n-workflows/WF3-tracking.json` (new) | Promote from sandbox export (parameterized) |
+| WF3 prompt | `n8n-workflows/WF3-N8N-AI-PROMPT.md` (new) | Mirror WF1/WF2 prompt pattern |
+| Spec integration | `app-validation-spec/docs/n8n-integration-notes.md` | Sheet contract + ownership |
+| Spec docs | `app-validation-spec/APP_PACKAGE_SPEC.md` | Clarifications only if needed; no new fields for WF3 |
+| Schema | `app-validation-spec/schemas/app.schema.json` | Only if optional fields approved (not for WF3) |
+| Examples | templates/examples `app.json` | Align event names |
+| Starter | `app-package-starter/README.md`, `START_HERE.md` | WF3 webhook + Sheet expectations |
+| Landing template | `landing-template/lib/tracking.ts`, `session.ts`, TrackingProvider, README | Port sandbox attribution/`eventId`/`consentStatus` |
+| Implementation guide | `AI_IMPLEMENTATION_GUIDE.md` | WF3 proven; drop stale “no JSON” language |
+| Global search | any `scooter.app.n8n.cloud` | Replace with `scottyo` |
+
+## Config-driven promotion rules
+
+See `rehearsals/wf3-human-lab-sandbox/CONFIG-DRIVEN-VS-HARDCODED.md`.
+
+Must parameterize per app: `appId`, webhook path, Sheet ID/tab, experiment IDs, landing URL.  
+Must share: 33-col event contract, validate/map Code, node sequence, credential type.
 
 ## Release Checklist
 
-- [ ] Master backlog reviewed.
-- [ ] Dependency graph reviewed.
-- [ ] WF3 external evidence attached.
-- [ ] WF4 dry-run reviewed.
+- [x] Master backlog updated with proven values (BL-031–BL-039).
+- [x] Dependency graph reviewed.
+- [x] WF3 external curl evidence attached.
+- [ ] Browser E2E (optional for doc sync; required before paid traffic).
+- [x] WF4 dry-run sandbox proven (local + n8n). VERIFY_* Meta API values still required before create-paused.
 - [ ] Schema additions approved or explicitly deferred.
-- [ ] Shared components documented.
+- [x] Shared components / config-driven rules documented.
 - [ ] Production docs updated in one pass.
-- [ ] No production secrets introduced.
-- [ ] All references use canonical WF names and Spec 1.5.0 field paths.
+- [x] No production secrets introduced.
+- [ ] All references use `scottyo`, 33 columns, Route Valid Events, correct credential label.

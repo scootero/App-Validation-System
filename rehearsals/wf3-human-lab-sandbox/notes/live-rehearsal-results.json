@@ -1,0 +1,49 @@
+{
+  "postedAt": "2026-07-10T19:14:33.359Z",
+  "results": [
+    {
+      "eventType": "page_view",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 4208,
+      "bodyText": "{\"ok\":true}",
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "email_captured",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 1560,
+      "bodyText": "{\"ok\":true}",
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "buy_now_clicked",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 1643,
+      "bodyText": "{\"ok\":true}",
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "mockup_interacted",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 2025,
+      "bodyText": "{\"ok\":true}",
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    }
+  ]
+}

@@ -2,10 +2,18 @@
 
 ## WF3 Gate
 
-- [ ] WF3 local rehearsal passed.
-- [ ] WF3 external sandbox rehearsal passed.
-- [ ] Google Sheets contains one row for each required event.
-- [ ] WF-Decision can filter signup-intent events.
+- [x] WF3 local rehearsal passed.
+- [x] WF3 external sandbox rehearsal passed.
+- [x] Google Sheets contains one row for each required event.
+- [x] WF-Decision can filter signup-intent events.
+
+## WF4 Dry-Run
+
+- [x] Local `wf4-rehearse.js` passed.
+- [x] n8n dry-run execution succeeded (execution 30).
+- [x] Zero Meta HTTP calls observed.
+- [x] Zero Drive writes observed.
+- [x] Create-paused branch disabled.
 
 ## Meta Readiness
 
@@ -22,7 +30,7 @@
 
 ## Workflow Safety
 
-- [ ] Default mode is `dry_run`.
+- [x] Default mode is `dry_run`.
 - [ ] Create-paused mode requires explicit human approval.
 - [ ] Campaign status is `PAUSED`.
 - [ ] Ad set status is `PAUSED`.
@@ -42,7 +50,7 @@
 
 ## External Evidence
 
-- [ ] Dry-run bundle reviewed.
+- [x] Dry-run bundle reviewed.
 - [ ] Paused campaign visible in Meta Ads Manager, if create-paused mode is approved later.
 - [ ] Destination URL includes UTM params.
 - [ ] Landing URL points to `deployment.landing.url`.

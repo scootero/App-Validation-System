@@ -40,7 +40,7 @@ Do not rename, reorder, insert, or delete columns. Total: **33**.
 | Google credential type | Google Service Account |
 | Google credential label | `Google Service Account` (reuse existing if present) |
 | Webhook method | `POST` |
-| Webhook path | `app-validation/human-lab-wf1-sandbox-events` |
+| Webhook path | `app-validation/events` |
 | Webhook response mode | Using **Respond to Webhook** node |
 | Auth (v1 sandbox) | `webhookAuthSecret: null` — no Bearer required |
 
@@ -48,14 +48,14 @@ Do not rename, reorder, insert, or delete columns. Total: **33**.
 
 | # | Node name | Type | Settings |
 |---|-----------|------|----------|
-| 1 | Landing Event Webhook | Webhook | Method `POST`. Path `app-validation/human-lab-wf1-sandbox-events`. Response mode: Using 'Respond to Webhook' node. JSON body. |
+| 1 | Landing Event Webhook | Webhook | Method `POST`. Path `app-validation/events`. Response mode: Using 'Respond to Webhook' node. JSON body. |
 | 2 | Workflow Config | Set | `googleSheetId` = sandbox spreadsheet ID; `googleSheetTabName` = `Sheet1`; `webhookAuthSecret` = `null`. |
 | 3 | Validate Auth | Code | If secret null/empty → pass. Else require `Authorization: Bearer <secret>`; on fail → Respond 401 and stop. |
 | 4 | Validate Payload | Code | Require `eventType`, `appId`, `appName`, `experimentId`, `experimentRunId`, `timestamp`. Allow only `page_view`, `email_captured`, `buy_now_clicked`, `mockup_interacted`. On fail: set `_validationFailed: true` (do **not** HTTP 400). |
-| 5 | Map To Sheet Row | Code | Map to 33 columns. Always set `receivedAt` = now ISO (ignore client). If `eventId` missing/empty → UUID. If `consentStatus` missing/empty → `unknown`. Meta fields default `""`. Optional strings → `""`; `timeOnPageSeconds` → `0`; `mockupInteracted` → `false`. If `_validationFailed` → set `_skipAppend: true`. |
+| 5 | Map To Sheet Row | Code | Map to 33 columns. Always set `receivedAt` = now ISO (ignore client). If `eventId` missing/empty → UUID. If `consentStatus` missing/empty → `unknown`. Meta fields default `""`. Optional strings → `""`; `timeOnPageSeconds` → `0`; `mockupInteracted` → `false`. If `_validationFailed` → set `_skipAppend: true` and preserve `_validationErrors`. |
 | 6 | Route Valid Events | IF | True when `_skipAppend` is not true → Append Row. False → Respond 200 (skip Sheets). |
-| 7 | Append Row | Google Sheets | Credential: `Google Service Account`. Operation: Append. Document by ID from Config. Sheet: `Sheet1`. Map all **33** columns. Retry on fail: **3×**. |
-| 8 | Respond 200 | Respond to Webhook | Status `200`. Body `{ "ok": true }`. |
+| 7 | Append Row | Google Sheets | Credential: `Google Service Account`. Operation: Append. Document by ID from Config. Sheet: `Sheet1`. **Explicit/`defineBelow` 1:1 mapping** for all **33** columns (not auto-map). Retry on fail: **3×**. |
+| 8 | Respond 200 | Respond to Webhook | Status `200`. Valid: `{ "ok": true }`. Invalid/skipped: `{ "ok": false, "skipped": true, "errors": [...] }`. |
 | 9 | Notify Failure | HTTP Request (optional) | Only if Append fails after retries. Skip for first sandbox proof. |
 
 **Wiring:** `1 → 2 → 3 → 4 → 5 → 6`. IF true → `7 → 8`. IF false → `8`. Optional: Append error → `9 → 8`.
@@ -161,10 +161,10 @@ for (const c of columns) {
 }
 
 if (p._validationFailed) {
-  return [{ json: { ...row, _skipAppend: true } }];
+  return [{ json: { ...row, _skipAppend: true, _validationErrors: p._validationErrors || [] } }];
 }
 
-return [{ json: row }];
+return [{ json: { ...row, _skipAppend: false } }];
 ```
 
 ### A7. Field Ownership (Do Not Change)
@@ -192,7 +192,7 @@ GOOGLE_SHEET_COLUMN_COUNT: 33
 GOOGLE_SERVICE_ACCOUNT_EMAIL: "app-validation-sa@app-validation-501106.iam.gserviceaccount.com"
 N8N_CREDENTIAL_GOOGLE_SA_LABEL: "Google Service Account"
 N8N_BASE_URL: "https://scooter.app.n8n.cloud"
-WF3_WEBHOOK_URL_SANDBOX: "https://scooter.app.n8n.cloud/webhook/app-validation/human-lab-wf1-sandbox-events"
+WF3_WEBHOOK_URL_SANDBOX: "https://scottyo.app.n8n.cloud/webhook/app-validation/events"
 WF3_WEBHOOK_AUTH_SECRET: null
 SANDBOX_APP_ID: "human-lab-wf1-sandbox"
 SANDBOX_EXPERIMENT_RUN_ID: "run_human-lab_2026q2_001"
@@ -283,7 +283,7 @@ Full fixtures: `fixtures/wf3-payloads.json`. Full expected row arrays: `fixtures
 ### C4. Example curl (only after approval)
 
 ```bash
-curl -X POST "https://scooter.app.n8n.cloud/webhook/app-validation/human-lab-wf1-sandbox-events" \
+curl -X POST "https://scottyo.app.n8n.cloud/webhook/app-validation/events" \
   -H "Content-Type: application/json" \
   -d '{"eventType":"page_view", ... }'
 ```
@@ -333,7 +333,7 @@ timestamp	eventType	appId	appName	experimentId	experimentRunId	projectId	deploym
 - Name: WF3 - Tracking Sandbox
 - Activate: Yes
 - Google credential label: Google Service Account (reuse if exists)
-- Webhook: POST path app-validation/human-lab-wf1-sandbox-events
+- Webhook: POST path app-validation/events
 - Response mode: Using Respond to Webhook node
 - Auth: webhookAuthSecret = null (no Bearer required for v1 sandbox)
 
@@ -342,10 +342,10 @@ Node sequence (exact):
 2. Workflow Config (Set: googleSheetId, googleSheetTabName=Sheet1, webhookAuthSecret=null)
 3. Validate Auth (Code: skip if secret null; else Bearer check → 401)
 4. Validate Payload (Code: require eventType, appId, appName, experimentId, experimentRunId, timestamp; allow only page_view, email_captured, buy_now_clicked, mockup_interacted; on fail set _validationFailed, still aim for HTTP 200)
-5. Map To Sheet Row (Code: 33 columns; always set receivedAt=now ISO; eventId fallback UUID; consentStatus default unknown; meta*+placement default ""; if _validationFailed set _skipAppend)
+5. Map To Sheet Row (Code: 33 columns; always set receivedAt=now ISO; eventId fallback UUID; consentStatus default unknown; meta*+placement default ""; if _validationFailed set _skipAppend and preserve _validationErrors)
 6. Route Valid Events (IF: not _skipAppend → Append; else → Respond 200)
-7. Append Row (Google Sheets Append, all 33 columns, retry 3×)
-8. Respond 200 ({ "ok": true })
+7. Append Row (Google Sheets Append, defineBelow 1:1 for all 33 columns, retry 3×)
+8. Respond 200 (valid `{ "ok": true }`; skipped `{ "ok": false, "skipped": true, "errors": [...] }`)
 9. Notify Failure (optional; skip for first proof)
 
 Field ownership:
@@ -365,7 +365,7 @@ GOOGLE_SHEET_COLUMN_COUNT: 33
 GOOGLE_SERVICE_ACCOUNT_EMAIL: "app-validation-sa@app-validation-501106.iam.gserviceaccount.com"
 N8N_CREDENTIAL_GOOGLE_SA_LABEL: "Google Service Account"
 N8N_BASE_URL: "https://scooter.app.n8n.cloud"
-WF3_WEBHOOK_URL_SANDBOX: "https://scooter.app.n8n.cloud/webhook/app-validation/human-lab-wf1-sandbox-events"
+WF3_WEBHOOK_URL_SANDBOX: "https://scottyo.app.n8n.cloud/webhook/app-validation/events"
 WF3_WEBHOOK_AUTH_SECRET: null
 SANDBOX_APP_ID: "human-lab-wf1-sandbox"
 SANDBOX_EXPERIMENT_RUN_ID: "run_human-lab_2026q2_001"

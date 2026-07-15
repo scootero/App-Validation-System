@@ -1,0 +1,47 @@
+{
+  "postedAt": "2026-07-10T21:47:44.607Z",
+  "runTag": "mrfgv3h5",
+  "results": [
+    {
+      "eventType": "page_view",
+      "eventId": "evt_page_view_live2_mrfgv3h5",
+      "status": 200,
+      "elapsedMs": 5260,
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "email_captured",
+      "eventId": "evt_email_captured_live2_mrfgv3h5",
+      "status": 200,
+      "elapsedMs": 2993,
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "buy_now_clicked",
+      "eventId": "evt_buy_now_clicked_live2_mrfgv3h5",
+      "status": 200,
+      "elapsedMs": 2827,
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    },
+    {
+      "eventType": "mockup_interacted",
+      "eventId": "evt_mockup_interacted_live2_mrfgv3h5",
+      "status": 200,
+      "elapsedMs": 3006,
+      "bodyJson": {
+        "ok": true
+      },
+      "httpPass": true
+    }
+  ],
+  "allHttpPass": true
+}

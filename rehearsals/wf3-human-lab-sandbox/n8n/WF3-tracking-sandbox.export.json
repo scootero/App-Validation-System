@@ -1,0 +1,636 @@
+{
+  "name": "WF3 - Tracking Sandbox",
+  "id": "7G2fJmqKsr8CGVID",
+  "active": true,
+  "versionId": "948926c0-b321-42c6-9c39-d0f0cb554dc1",
+  "description": "Sandbox WF3 tracking webhook: validate events, normalize 33-column rows, append to Google Sheets, respond 200.",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "provenAt": "2026-07-10",
+    "n8nBaseUrl": "https://scottyo.app.n8n.cloud",
+    "productionWebhookUrl": "https://scottyo.app.n8n.cloud/webhook/app-validation/events",
+    "credentialLabel": "Google Service Account account",
+    "credentialId": "AW9ZTTTBz7JeSKKN",
+    "canonical": true,
+    "note": "Sandbox WF3 with explicit Append Row mapping and skip-response errors. Live webhook path app-validation/events.",
+    "hardenedAt": "2026-07-15"
+  },
+  "nodes": [
+    {
+      "id": "b8b53bc1-fc75-4f56-92c5-bd167eea1107",
+      "name": "Landing Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        80
+      ],
+      "webhookId": "7a63e742-3a70-47dd-9dff-93d71859b7bd",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "app-validation/events",
+        "authentication": "none",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "7f2bc972-4da4-46db-80e9-e24b2626c3e2",
+      "name": "Workflow Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "googleSheetId",
+              "name": "googleSheetId",
+              "value": "1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0",
+              "type": "string"
+            },
+            {
+              "id": "googleSheetTabName",
+              "name": "googleSheetTabName",
+              "value": "Sheet1",
+              "type": "string"
+            },
+            {
+              "id": "webhookAuthSecret",
+              "name": "webhookAuthSecret",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d8956c68-c218-48fd-be98-18a5bcb1af47",
+      "name": "Validate Auth",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst secret = item.webhookAuthSecret;\nconst headers = $('Landing Event Webhook').first().json.headers || {};\nconst auth = headers.authorization || headers.Authorization || '';\nif (!secret) {\n  return [{ json: item }];\n}\nif (auth !== ('Bearer ' + secret)) {\n  throw new Error('UNAUTHORIZED');\n}\nreturn [{ json: item }];"
+      }
+    },
+    {
+      "id": "02528acf-98a7-48ec-8a20-f05b2fe67327",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nconst body = item.body && typeof item.body === 'object' ? item.body : item;\nconst allowed = new Set(['page_view','email_captured','buy_now_clicked','mockup_interacted']);\nconst required = ['eventType','appId','appName','experimentId','experimentRunId','timestamp'];\nconst missing = required.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');\nconst invalidType = !allowed.has(body.eventType);\nreturn [{\n  json: {\n    ...body,\n    googleSheetId: item.googleSheetId,\n    googleSheetTabName: item.googleSheetTabName,\n    webhookAuthSecret: item.webhookAuthSecret,\n    _validationFailed: Boolean(missing.length || invalidType),\n    _validationErrors: [\n      ...(missing.length ? ['missing: ' + missing.join(',')] : []),\n      ...(invalidType ? ['invalid eventType: ' + body.eventType] : []),\n    ],\n  },\n}];"
+      }
+    },
+    {
+      "id": "27bfa6f1-7c2e-4aac-8e27-8ad1082535cf",
+      "name": "Map To Sheet Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p = $input.first().json;\nconst columns = ['timestamp','eventType','appId','appName','experimentId','experimentRunId','projectId','deploymentId','landingVersion','landingVariantId','mockupVersionId','campaignName','visitorId','sessionId','email','price','pageUrl','referrer','utmSource','utmMedium','utmCampaign','utmContent','utmTerm','timeOnPageSeconds','mockupInteracted','eventId','receivedAt','fbclid','consentStatus','metaCampaignId','metaAdSetId','metaAdId','placement'];\nfunction uuid() {\n  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();\n  return Date.now() + '-' + Math.random().toString(36).slice(2, 11);\n}\nconst receivedAt = new Date().toISOString();\nconst row = {};\nfor (const c of columns) {\n  if (c === 'receivedAt') { row[c] = receivedAt; continue; }\n  if (c === 'eventId') { row[c] = p.eventId ? p.eventId : uuid(); continue; }\n  if (c === 'consentStatus') { row[c] = p.consentStatus ? p.consentStatus : 'unknown'; continue; }\n  if (c === 'metaCampaignId' || c === 'metaAdSetId' || c === 'metaAdId' || c === 'placement') { row[c] = p[c] == null ? '' : p[c]; continue; }\n  if (p[c] === undefined || p[c] === null) {\n    row[c] = c === 'timeOnPageSeconds' ? 0 : c === 'mockupInteracted' ? false : '';\n  } else {\n    row[c] = p[c];\n  }\n}\nif (p._validationFailed) {\n  return [{ json: Object.assign({}, row, {\n    _skipAppend: true,\n    _validationErrors: p._validationErrors || [],\n  }) }];\n}\nreturn [{ json: Object.assign({}, row, { _skipAppend: false }) }];"
+      }
+    },
+    {
+      "id": "14c4ff16-8876-4763-9f0f-9ad9b406c05e",
+      "name": "Route Valid Events",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ !$json._skipAppend }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "c7d3e192-67f4-433a-bfc0-1b89a267e148",
+      "name": "Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0",
+          "cachedResultName": "App Validation - WF3 Sandbox"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "eventType": "={{ $json.eventType }}",
+            "appId": "={{ $json.appId }}",
+            "appName": "={{ $json.appName }}",
+            "experimentId": "={{ $json.experimentId }}",
+            "experimentRunId": "={{ $json.experimentRunId }}",
+            "projectId": "={{ $json.projectId }}",
+            "deploymentId": "={{ $json.deploymentId }}",
+            "landingVersion": "={{ $json.landingVersion }}",
+            "landingVariantId": "={{ $json.landingVariantId }}",
+            "mockupVersionId": "={{ $json.mockupVersionId }}",
+            "campaignName": "={{ $json.campaignName }}",
+            "visitorId": "={{ $json.visitorId }}",
+            "sessionId": "={{ $json.sessionId }}",
+            "email": "={{ $json.email }}",
+            "price": "={{ $json.price }}",
+            "pageUrl": "={{ $json.pageUrl }}",
+            "referrer": "={{ $json.referrer }}",
+            "utmSource": "={{ $json.utmSource }}",
+            "utmMedium": "={{ $json.utmMedium }}",
+            "utmCampaign": "={{ $json.utmCampaign }}",
+            "utmContent": "={{ $json.utmContent }}",
+            "utmTerm": "={{ $json.utmTerm }}",
+            "timeOnPageSeconds": "={{ $json.timeOnPageSeconds }}",
+            "mockupInteracted": "={{ $json.mockupInteracted }}",
+            "eventId": "={{ $json.eventId }}",
+            "receivedAt": "={{ $json.receivedAt }}",
+            "fbclid": "={{ $json.fbclid }}",
+            "consentStatus": "={{ $json.consentStatus }}",
+            "metaCampaignId": "={{ $json.metaCampaignId }}",
+            "metaAdSetId": "={{ $json.metaAdSetId }}",
+            "metaAdId": "={{ $json.metaAdId }}",
+            "placement": "={{ $json.placement }}"
+          },
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "eventType",
+              "displayName": "eventType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "appId",
+              "displayName": "appId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "appName",
+              "displayName": "appName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "experimentId",
+              "displayName": "experimentId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "experimentRunId",
+              "displayName": "experimentRunId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "projectId",
+              "displayName": "projectId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "deploymentId",
+              "displayName": "deploymentId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "landingVersion",
+              "displayName": "landingVersion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "landingVariantId",
+              "displayName": "landingVariantId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "mockupVersionId",
+              "displayName": "mockupVersionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "campaignName",
+              "displayName": "campaignName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "visitorId",
+              "displayName": "visitorId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "pageUrl",
+              "displayName": "pageUrl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "referrer",
+              "displayName": "referrer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "utmSource",
+              "displayName": "utmSource",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "utmMedium",
+              "displayName": "utmMedium",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "utmCampaign",
+              "displayName": "utmCampaign",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "utmContent",
+              "displayName": "utmContent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "utmTerm",
+              "displayName": "utmTerm",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "timeOnPageSeconds",
+              "displayName": "timeOnPageSeconds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "mockupInteracted",
+              "displayName": "mockupInteracted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "eventId",
+              "displayName": "eventId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "receivedAt",
+              "displayName": "receivedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "fbclid",
+              "displayName": "fbclid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "consentStatus",
+              "displayName": "consentStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "metaCampaignId",
+              "displayName": "metaCampaignId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "metaAdSetId",
+              "displayName": "metaAdSetId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "metaAdId",
+              "displayName": "metaAdId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "placement",
+              "displayName": "placement",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED",
+          "handlingExtraData": "ignoreIt",
+          "useAppend": true
+        }
+      }
+    },
+    {
+      "id": "f62d71e3-4388-4956-af0c-dd08da7778e1",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        80
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json._skipAppend ? { ok: false, skipped: true, errors: $json._validationErrors || [] } : { ok: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Landing Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Workflow Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Config": {
+      "main": [
+        [
+          {
+            "node": "Validate Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Auth": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Map To Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map To Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Route Valid Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Valid Events": {
+      "main": [
+        [
+          {
+            "node": "Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Row": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

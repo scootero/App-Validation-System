@@ -1,12 +1,18 @@
 {
   "mode": "dry_run",
   "appId": "human-lab-wf1-sandbox",
+  "provider": "meta",
+  "runKey": {
+    "appId": "human-lab-wf1-sandbox",
+    "experimentRunId": "run_human-lab_2026q2_001",
+    "provider": "meta"
+  },
   "metaApiVersion": "VERIFY_CURRENT_VERSION_BEFORE_LIVE_USE",
   "adAccountIdRef": "n8n.credentials.META_AD_ACCOUNT_ID",
   "pageIdRef": "n8n.config.META_PAGE_ID",
   "wf3Gate": {
     "required": true,
-    "status": "blocked_until_wf3_sheet_rows_exist",
+    "status": "proven",
     "requiredEvents": [
       "page_view",
       "email_captured",
@@ -20,7 +26,7 @@
       "kind": "githubPath",
       "value": "media/og-image.png",
       "role": "primary",
-      "fallbackSource": "ads.media[0]"
+      "resolvedFrom": "ads.media"
     }
   },
   "computed": {
@@ -53,9 +59,9 @@
         "age_min": 25,
         "age_max": 55,
         "interests": [
-          "fitness",
-          "productivity",
-          "self-improvement"
+          "VERIFY_INTEREST_ID",
+          "VERIFY_INTEREST_ID",
+          "VERIFY_INTEREST_ID"
         ],
         "publisher_platforms": [
           "facebook",
@@ -110,6 +116,11 @@
     "externalWritePerformed": false,
     "liveAdsCreated": false,
     "spendPossible": false,
-    "requiresExplicitApprovalBeforeCreatePaused": true
+    "requiresExplicitApprovalBeforeCreatePaused": true,
+    "tripleApprovalRequired": {
+      "mode": "create_paused",
+      "approval": true,
+      "approvalToken": "WF4_CREATE_PAUSED_APPROVAL_TOKEN"
+    }
   }
 }

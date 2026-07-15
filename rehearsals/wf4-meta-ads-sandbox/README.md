@@ -1,34 +1,40 @@
-# WF4 Meta Ads Rehearsal — Dry Run Only
+# WF4 Meta Ads Rehearsal — Dry Run Proven
 
-**Status:** Research/design complete; no live Meta actions performed.  
-**Scope:** Sandbox payloads, requirements, safety gates, and write-back contract only.
+**Status:** Dry-run sandbox proven (local + n8n). Create-paused disabled. Zero Meta/Drive mutations.
 
 ## Safety Rules
 
 - Do not create campaigns, ad sets, creatives, or ads.
-- Do not activate campaigns.
-- Do not spend money.
-- Do not modify production Meta accounts, Pages, ad accounts, n8n workflows, or Drive files.
-- WF4 remains blocked until WF3 has proven event rows in Google Sheets.
+- Do not activate campaigns or spend money.
+- Create-paused branch is disabled until explicit operator approval.
 
-## Purpose
+## Proven Values
 
-WF4 maps to the platform's WF-Ads Meta flow plus downstream WF-Decision dependencies. It prepares a paused-by-default Meta campaign contract using existing Spec 1.5.0 `app.json` fields.
+| Item | Value |
+|------|-------|
+| n8n workflow | `WF4 - Meta Ads Sandbox` (`YIc53GBq4upelYp6`) — **inactive** |
+| Dry-run execution | `30` (success) |
+| Local proof | `node scripts/wf4-rehearse.js` → PASS |
+| WF3 gate | proven |
 
-## Files
+## Goal Flow
+
+```
+app.json (fixture) → gates → dry-run bundle → Respond Dry Run
+[create-paused path disabled]
+```
+
+## Key Docs
 
 | File | Purpose |
 |------|---------|
-| `meta-ads-contract.md` | Requirements, credentials, flow, safeguards, n8n node list |
-| `dry-run-payloads/human-lab-wf4-dry-run.json` | Example Meta request bundle with no live side effects |
-| `notes/app-json-field-audit.md` | Existing schema support and optional future fields |
-| `production-implementation-checklist.md` | Go-live readiness checklist |
+| [CANONICAL-WF4.md](./CANONICAL-WF4.md) | Proven IDs, node flow, ownership |
+| [meta-ads-contract.md](./meta-ads-contract.md) | Frozen contract |
+| [EXTERNAL-SETUP-HANDOFF.md](./EXTERNAL-SETUP-HANDOFF.md) | External setup A–E |
+| [PRODUCTION-PROMOTION-CHECKLIST.md](./PRODUCTION-PROMOTION-CHECKLIST.md) | Promotion rules |
+| [n8n/README.md](./n8n/README.md) | Workflow export + live IDs |
+| [notes/live-rehearsal-report.md](./notes/live-rehearsal-report.md) | Dry-run execution proof |
 
-## Definition Of Done
+## Next Step
 
-- Dry-run payload contract documented.
-- Existing `app.json` support audited.
-- Required future n8n nodes identified.
-- Manual and external setup tasks documented.
-- WF3 dependency is explicit.
-- No production or external Meta assets modified.
+Web AI read-only Meta inspection → return Section B YAML → operator reviews verified payloads → approve create-paused testing separately.

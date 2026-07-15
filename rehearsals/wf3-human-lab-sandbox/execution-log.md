@@ -51,23 +51,27 @@ Local re-proof output (33-column schema):
 
 | Check | Status | Evidence |
 |-------|--------|----------|
-| Sandbox Google Sheet created | Blocked | Needs `GOOGLE_SHEET_ID_SANDBOX` |
-| Google SA has Sheet Editor access | Blocked | Needs user/web AI setup |
-| WF3 n8n workflow built | Blocked | Needs n8n setup |
-| Sandbox webhook URL returned | Blocked | Needs WF3/WF0 setup |
-| Direct `page_view` POST appends row | Blocked | Needs webhook + Sheet |
-| Direct `email_captured` POST appends row | Blocked | Needs webhook + Sheet |
-| Direct `buy_now_clicked` POST appends row | Blocked | Needs webhook + Sheet |
-| Direct `mockup_interacted` POST appends row | Blocked | Needs webhook + Sheet |
+| Sandbox Google Sheet created | Passed | `1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0` |
+| Google SA has Sheet Editor access | Passed | Shared with `app-validation-sa@...` |
+| WF3 n8n workflow built | Passed | ID `7G2fJmqKsr8CGVID`, name `WF3 - Tracking Sandbox` |
+| Sandbox webhook URL returned | Passed | `https://scottyo.app.n8n.cloud/webhook/app-validation/human-lab-wf1-sandbox-events` |
+| Workflow active/published | Passed | `active=true` |
+| Direct `page_view` POST appends row | **Passed** | HTTP 200; n8n exec 2 Append success |
+| Direct `email_captured` POST appends row | **Passed** | HTTP 200; n8n exec 3 Append success |
+| Direct `buy_now_clicked` POST appends row | **Passed** | HTTP 200; n8n exec 4 Append success |
+| Direct `mockup_interacted` POST appends row | **Passed** | HTTP 200; n8n exec 5 Append success |
 | Browser E2E from sandbox landing | Blocked | Needs webhook embedded by WF2 re-transform/redeploy |
+
+Live report: `notes/live-rehearsal-report.md`
 
 ## Approval Status
 
-- No production assets modified.
-- No external webhook POST sent.
+- No production assets modified (sandbox Sheet + sandbox n8n workflow only).
+- Four approved sandbox webhook POSTs sent and verified.
 - No production Sheet touched.
-- No n8n workflow modified by Cursor.
+- Sandbox n8n workflow created and published by Cursor via MCP.
 - WF4 remains dry-run only.
+- Host note: live n8n base is `scottyo.app.n8n.cloud` (not `scooter`).
 
 ## Exact n8n Node List
 
@@ -77,6 +81,8 @@ Local re-proof output (33-column schema):
 4. Validate Payload — Code.
 5. Map To Sheet Row — Code (`receivedAt`, `eventId` fallback, consent/meta defaults).
 6. Route Valid Events — IF (`_skipAppend` → skip Append).
-7. Append Row — Google Sheets (33 columns).
+7. Append Row — Google Sheets (33 columns, retry 3×).
 8. Respond 200 — Respond to Webhook.
-9. Notify Failure — optional HTTP Request.
+9. Notify Failure — omitted for first sandbox proof.
+
+SDK source: `n8n/wf3-tracking-sandbox.workflow.ts`

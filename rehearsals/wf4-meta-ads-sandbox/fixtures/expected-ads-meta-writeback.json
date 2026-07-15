@@ -1,0 +1,16 @@
+{
+  "ads": {
+    "meta": {
+      "status": "created_paused",
+      "campaignId": "<campaign-id>",
+      "adSetId": "<ad-set-id>",
+      "creativeId": "<creative-id>",
+      "adId": "<ad-id>",
+      "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+      "dailyBudget": 35.71,
+      "createdAt": "<iso8601>",
+      "lastSyncedAt": null
+    }
+  },
+  "status": "validating"
+}

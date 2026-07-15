@@ -104,10 +104,10 @@ Canonical external handoff: `EXTERNAL-SETUP-HANDOFF.md`.
 | 2 | Workflow Config | Set | `googleSheetId`, `googleSheetTabName`, `webhookAuthSecret` |
 | 3 | Validate Auth | Code | Skip when secret is null; otherwise validate Bearer header |
 | 4 | Validate Payload | Code | Check event type and minimum required fields; flag `_validationFailed` (still HTTP 200) |
-| 5 | Map To Sheet Row | Code | Build object/array in canonical Sheet order; set `receivedAt`; fallback `eventId`; default consent/meta; `_skipAppend` when invalid |
+| 5 | Map To Sheet Row | Code | Build object/array in canonical Sheet order; set `receivedAt`; fallback `eventId`; default consent/meta; `_skipAppend` when invalid; preserve `_validationErrors` on skip |
 | 6 | Route Valid Events | IF | Skip Append when `_skipAppend`; else Append |
-| 7 | Append Row | Google Sheets | Append normalized row to sandbox Sheet |
-| 8 | Respond 200 | Respond to Webhook | Respond quickly to landing client |
+| 7 | Append Row | Google Sheets | Append normalized row with **explicit/`defineBelow`** 1:1 mapping for all 33 columns |
+| 8 | Respond 200 | Respond to Webhook | HTTP 200 always for payload outcomes. Valid: `{ "ok": true }`. Invalid/skipped: `{ "ok": false, "skipped": true, "errors": [...] }` |
 | 9 | Notify Failure | HTTP Request, optional | Alert if Sheets append fails after retries |
 
 ## Cursor Tasks
@@ -141,7 +141,7 @@ Canonical external handoff: `EXTERNAL-SETUP-HANDOFF.md`.
 - [ ] Shared validation and row mapping are extracted or duplicated with tests.
 - [ ] Google Sheets append retries are configured.
 - [ ] Alert path is configured or explicitly deferred.
-- [ ] All malformed payloads return 200 except invalid auth.
+- [ ] All malformed payloads return HTTP 200 with `{ "ok": false, "skipped": true, "errors": [...] }` except invalid auth.
 - [ ] Auth secret, if enabled, lives only in n8n Credentials/env.
 - [ ] WF3 does not write `app.json`.
 - [ ] WF3 does not change author `ads` fields.

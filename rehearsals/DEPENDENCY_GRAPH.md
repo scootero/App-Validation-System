@@ -63,12 +63,13 @@ flowchart TD
 ## Critical Path
 
 ```txt
-WF0 webhook -> WF1 mockup URL -> WF2 landing URL + app-config -> WF3 Sheet rows (33 cols) -> WF4 dry-run/create-paused -> WF-Decision
+WF0 webhook -> WF1 mockup URL -> WF2 landing URL + app-config -> WF3 Sheet rows (33 cols) -> WF4 dry-run (proven) -> WF4 create-paused (blocked) -> WF-Decision
 ```
 
 ## Current Blockers
 
-- WF3 **local contract is frozen** (`EXTERNAL-SETUP-HANDOFF.md`); external proof is blocked on sandbox Sheet (33 headers) and n8n webhook values.
-- WF4 live work is blocked on WF3 proof and current Meta API verification.
-- Production `landing-template` attribution/`eventId` sync is deferred to Spec 1.5.0 (sandbox landing already updated).
-- Final production update is blocked until WF3 proof and WF4 dry-run contract are reviewed.
+- ~~WF3 external proof~~ **Cleared** — live workflow `7G2fJmqKsr8CGVID`, curl runs passed. Canonical: `wf3-human-lab-sandbox/CANONICAL-WF3.md`.
+- Browser E2E still needs WF0 `tracking.webhookUrl` + WF2 re-embed (BL-005/006).
+- WF4 dry-run sandbox is **proven** (local + n8n execution 30). Create-paused blocked on Meta API verification + operator approval.
+- Production `landing-template` attribution/`eventId` sync is deferred to Spec 1.5.0 (BL-028).
+- Final production update is blocked until Spec 1.5.0 coordinated pass (BL-031–BL-038) and WF4 dry-run review.

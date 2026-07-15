@@ -1,0 +1,479 @@
+{
+  "name": "WF0 Provisioning",
+  "nodes": [
+    {
+      "id": "c7fb3932-9642-4c58-a9bd-2bb4b89c323b",
+      "name": "Manual Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "6e31081e-3773-43c7-8c3f-f47db1feacb6",
+      "name": "Workflow Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "appId",
+              "name": "appId",
+              "value": "human-lab-wf1-sandbox",
+              "type": "string"
+            },
+            {
+              "id": "driveParentFolderId",
+              "name": "driveParentFolderId",
+              "value": "1O3RHwYFhJlPRBygNKxc7HGHmWtfiaB5A",
+              "type": "string"
+            },
+            {
+              "id": "sharedWebhookUrl",
+              "name": "sharedWebhookUrl",
+              "value": "https://scottyo.app.n8n.cloud/webhook/app-validation/events",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "98aa8c90-c9a8-4bc7-b4f4-0850adfebc09",
+      "name": "Search App Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        448,
+        192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "authentication": "serviceAccount",
+        "searchMethod": "name",
+        "queryString": "={{ $json.appId }}",
+        "returnAll": false,
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.driveParentFolderId }}"
+          },
+          "whatToSearch": "folders"
+        }
+      }
+    },
+    {
+      "id": "150297ee-b4a6-4c61-b5a8-b88d2fbd42dd",
+      "name": "List Folder Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        672,
+        192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "authentication": "serviceAccount",
+        "searchMethod": "query",
+        "queryString": "trashed = false",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.id }}"
+          },
+          "whatToSearch": "files"
+        }
+      }
+    },
+    {
+      "id": "d1667f46-1594-4a28-9b0b-9bf340fab761",
+      "name": "Resolve app.json",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const files = $input.all();\nconst appJsonFiles = [];\nfor (let i = 0; i < files.length; i++) {\n  const f = files[i].json;\n  if (f.name === 'app.json') {\n    appJsonFiles.push(f);\n  }\n}\nif (appJsonFiles.length !== 1) {\n  throw new Error('APP_JSON_RESOLVE_FAILED: expected exactly 1 app.json, found ' + appJsonFiles.length);\n}\nconst cfg = $('Workflow Config').first().json;\nconst folder = $('Search App Folder').first().json;\nreturn [{\n  json: {\n    appId: cfg.appId,\n    driveParentFolderId: cfg.driveParentFolderId,\n    sharedWebhookUrl: cfg.sharedWebhookUrl,\n    fileId: appJsonFiles[0].id,\n    folderId: folder.id,\n    fileName: appJsonFiles[0].name,\n  },\n}];"
+      }
+    },
+    {
+      "id": "384d77f0-1ce0-44fc-b1f7-23de4a70fa05",
+      "name": "Download app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      }
+    },
+    {
+      "id": "15582c2a-7d05-4a6a-b5e1-0dacbe8d56e4",
+      "name": "Parse + Validate Provisioning",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Workflow Config').first().json;\nconst fileMeta = $('Download app.json').first().json;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = buf.toString('utf8');\nlet pkg;\ntry {\n  pkg = JSON.parse(text);\n} catch (e) {\n  throw new Error('PARSE_FAILED: ' + e.message);\n}\nconst errors = [];\nif (!pkg.appId) {\n  errors.push('missing appId');\n} else if (pkg.appId !== cfg.appId) {\n  errors.push('appId mismatch: expected ' + cfg.appId + ', got ' + pkg.appId);\n}\nconst statusProvisioning = pkg.status === 'provisioning';\nif (!pkg.identity || !pkg.identity.appName || !String(pkg.identity.appName).trim()) {\n  errors.push('missing identity.appName');\n}\nconst analytics = pkg.analytics || {};\nif (!analytics.projectId) errors.push('missing analytics.projectId');\nif (!analytics.experimentId) errors.push('missing analytics.experimentId');\nif (!analytics.experimentRunId) errors.push('missing analytics.experimentRunId');\nif (pkg.tracking !== undefined) {\n  const t = pkg.tracking;\n  if (t === null || typeof t !== 'object' || Array.isArray(t)) {\n    errors.push('tracking must be an object when present');\n  }\n}\nconst url = cfg.sharedWebhookUrl;\nif (url !== 'https://scottyo.app.n8n.cloud/webhook/app-validation/events') {\n  errors.push('invalid sharedWebhookUrl config');\n}\nreturn [{\n  json: {\n    appId: cfg.appId,\n    fileId: fileMeta.id || fileMeta.fileId,\n    folderId: $('Search App Folder').first().json.id,\n    driveParentFolderId: cfg.driveParentFolderId,\n    sharedWebhookUrl: cfg.sharedWebhookUrl,\n    statusProvisioning,\n    validationPassed: errors.length === 0,\n    validationErrors: errors,\n    beforeStatus: pkg.status,\n    beforeWebhookUrl: pkg.tracking && pkg.tracking.webhookUrl !== undefined ? pkg.tracking.webhookUrl : null,\n  },\n}];"
+      }
+    },
+    {
+      "id": "0926cad3-ca0d-45c6-97e4-12ffba7937c8",
+      "name": "Status Provisioning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "status-provisioning",
+              "leftValue": "={{ $json.statusProvisioning }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "01036df5-8511-47c0-9f72-076719bc7353",
+      "name": "Validation Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1792,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "validation-passed",
+              "leftValue": "={{ $json.validationPassed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "75ddda17-9829-40e8-98a2-080d6bde4584",
+      "name": "Re-download app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2016,
+        192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      }
+    },
+    {
+      "id": "21cfe419-4534-4616-9a01-dc2d478c0cb9",
+      "name": "Merge Write + Diff Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ctx = $('Parse + Validate Provisioning').first().json;\nconst fileMeta = $('Re-download app.json').first().json;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = buf.toString('utf8');\nlet originalPkg;\ntry {\n  originalPkg = JSON.parse(text);\n} catch (e) {\n  throw new Error('PARSE_FAILED_ON_WRITEBACK: ' + e.message);\n}\nif (originalPkg.status !== 'provisioning') {\n  throw new Error('STATUS_CHANGED: expected provisioning, got ' + originalPkg.status);\n}\nif (originalPkg.appId !== ctx.appId) {\n  throw new Error('WRITEBACK_APP_ID_MISMATCH');\n}\nconst resolvedFileId = fileMeta.id || fileMeta.fileId;\nif (resolvedFileId !== ctx.fileId) {\n  throw new Error('WRITEBACK_FILE_MISMATCH: got ' + resolvedFileId + ' expected ' + ctx.fileId);\n}\nconst beforeStatus = originalPkg.status;\nconst beforeWebhookUrl = originalPkg.tracking && originalPkg.tracking.webhookUrl !== undefined ? originalPkg.tracking.webhookUrl : null;\nconst mergedPkg = JSON.parse(text);\nmergedPkg.tracking = mergedPkg.tracking || {};\nmergedPkg.tracking.webhookUrl = ctx.sharedWebhookUrl;\nmergedPkg.status = 'ready';\nfunction flatten(obj, prefix) {\n  const result = {};\n  if (obj === null || typeof obj !== 'object') {\n    result[prefix || 'root'] = obj;\n    return result;\n  }\n  if (Array.isArray(obj)) {\n    result[prefix || 'root'] = JSON.stringify(obj);\n    return result;\n  }\n  const keys = Object.keys(obj);\n  for (let i = 0; i < keys.length; i++) {\n    const k = keys[i];\n    const path = prefix ? prefix + '.' + k : k;\n    const v = obj[k];\n    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {\n      const nested = flatten(v, path);\n      const nestedKeys = Object.keys(nested);\n      for (let j = 0; j < nestedKeys.length; j++) {\n        result[nestedKeys[j]] = nested[nestedKeys[j]];\n      }\n    } else {\n      result[path] = Array.isArray(v) ? JSON.stringify(v) : v;\n    }\n  }\n  return result;\n}\nconst flatOrig = flatten(originalPkg, '');\nconst flatMerged = flatten(mergedPkg, '');\nconst allowedPaths = { status: true, 'tracking.webhookUrl': true };\nconst allKeys = {};\nconst origKeys = Object.keys(flatOrig);\nfor (let i = 0; i < origKeys.length; i++) allKeys[origKeys[i]] = true;\nconst mergedKeys = Object.keys(flatMerged);\nfor (let i = 0; i < mergedKeys.length; i++) allKeys[mergedKeys[i]] = true;\nconst keyList = Object.keys(allKeys);\nfor (let i = 0; i < keyList.length; i++) {\n  const k = keyList[i];\n  if (allowedPaths[k]) continue;\n  if (flatOrig[k] !== flatMerged[k]) {\n    throw new Error('DIFF_GUARD_FAILED: disallowed change at ' + k);\n  }\n}\nconst outText = JSON.stringify(mergedPkg, null, 2);\nconst binary = await this.helpers.prepareBinaryData(Buffer.from(outText, 'utf8'), 'app.json', 'application/json');\nreturn [{\n  json: {\n    appId: ctx.appId,\n    fileId: ctx.fileId,\n    beforeStatus,\n    beforeWebhookUrl,\n    afterStatus: 'ready',\n    afterWebhookUrl: ctx.sharedWebhookUrl,\n  },\n  binary: { data: binary },\n}];"
+      }
+    },
+    {
+      "id": "5ff1b665-6322-456b-a160-a165c42de0a2",
+      "name": "Update Drive app.json",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2464,
+        192
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "AW9ZTTTBz7JeSKKN",
+          "name": "Google Service Account account"
+        }
+      },
+      "parameters": {
+        "resource": "file",
+        "operation": "update",
+        "authentication": "serviceAccount",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "changeFileContent": true,
+        "inputDataFieldName": "data"
+      }
+    },
+    {
+      "id": "5c3f7656-e5fe-4555-8ab5-f633793012d0",
+      "name": "Summarize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const mergeItem = $('Merge Write + Diff Guard').first().json;\nreturn [{\n  json: {\n    ok: true,\n    appId: mergeItem.appId,\n    fileId: mergeItem.fileId,\n    diff: {\n      status: { before: mergeItem.beforeStatus, after: mergeItem.afterStatus },\n      'tracking.webhookUrl': { before: mergeItem.beforeWebhookUrl, after: mergeItem.afterWebhookUrl },\n    },\n    summary: 'WF0 provisioning complete — only status and tracking.webhookUrl changed',\n  },\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Run": {
+      "main": [
+        [
+          {
+            "node": "Workflow Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Config": {
+      "main": [
+        [
+          {
+            "node": "Search App Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search App Folder": {
+      "main": [
+        [
+          {
+            "node": "List Folder Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Folder Files": {
+      "main": [
+        [
+          {
+            "node": "Resolve app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve app.json": {
+      "main": [
+        [
+          {
+            "node": "Download app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download app.json": {
+      "main": [
+        [
+          {
+            "node": "Parse + Validate Provisioning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse + Validate Provisioning": {
+      "main": [
+        [
+          {
+            "node": "Status Provisioning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Provisioning?": {
+      "main": [
+        [
+          {
+            "node": "Validation Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Passed?": {
+      "main": [
+        [
+          {
+            "node": "Re-download app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-download app.json": {
+      "main": [
+        [
+          {
+            "node": "Merge Write + Diff Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Write + Diff Guard": {
+      "main": [
+        [
+          {
+            "node": "Update Drive app.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Drive app.json": {
+      "main": [
+        [
+          {
+            "node": "Summarize Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "id": "kM6JiXaJMVje5sxR",
+  "active": false,
+  "versionId": "9639f40f-a06c-4c34-af67-1f6525f53352",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "sharedWebhookUrl": "https://scottyo.app.n8n.cloud/webhook/app-validation/events",
+    "credentialLabel": "Google Service Account account",
+    "credentialId": "AW9ZTTTBz7JeSKKN",
+    "note": "Validated 13-node canonical workflow; sandbox proof execution 27 passed on 2026-07-15."
+  }
+}
