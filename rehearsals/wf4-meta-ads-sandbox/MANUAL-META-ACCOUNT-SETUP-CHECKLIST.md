@@ -5,6 +5,17 @@
 **Scope:** Create/configure Meta resources only as needed for future paused ads. **Do not create campaigns or spend.**
 
 ---
+USE THESE VALUES ...ANY FOR ANY other importatn ones its needs. pause and ask me ... or get alist of them on the same page... and pase and let me look if your unsure ... 
+---
+Company: Orro
+Tagline: Build what matters.
+Mission: Help more good ideas become reality.
+Description: AI-powered tools for discovering, validating, and building ideas.
+Facebook: Orro
+Instagram: Orro
+Meta Business Portfolio: Orro
+Ad Account: Orro Ads
+_----
 
 ## Before you start
 
