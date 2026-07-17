@@ -1,6 +1,7 @@
 # WF4 Operation Ledger (n8n Data Table)
 
-**Status:** Design only 2026-07-15 — no live Data Table this pass.  
+**Status:** Table created 2026-07-16 — dry-run does **not** write rows. Create-path ledger nodes exist but stay **disabled** until create-paused is approved.  
+**Live table:** `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) in personal project `3H7cB0ckKR59RwsE`  
 **Key:** `appId` + `experimentRunId` + `provider`  
 **operationKey:** `appId|experimentRunId|provider`
 
@@ -12,7 +13,7 @@ Persist each successfully created external Meta ID **immediately** after each AP
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `operationKey` | string | Unique |
+| `operationKey` | string | Unique match key |
 | `appId` | string | |
 | `experimentRunId` | string | |
 | `provider` | string | `meta` |
@@ -23,7 +24,7 @@ Persist each successfully created external Meta ID **immediately** after each AP
 | `creativeId` | string \| null | |
 | `adId` | string \| null | |
 | `lastError` | string \| null | |
-| `updatedAt` | string | ISO 8601 |
+| `updatedAt` | string (built-in) | Data Table system column — do not redefine |
 
 ## Phases
 
@@ -39,4 +40,4 @@ Failure terminals: `manual_review_required` | `failed`
 
 ## Dry-run
 
-Dry-run bundles include a `ledgerPlan` snapshot (`phase: planned`). No Data Table writes until create-paused is approved.
+Dry-run bundles include a `ledgerPlan` snapshot (`phase: planned`). No Data Table writes until create-paused is approved and ledger nodes are enabled.

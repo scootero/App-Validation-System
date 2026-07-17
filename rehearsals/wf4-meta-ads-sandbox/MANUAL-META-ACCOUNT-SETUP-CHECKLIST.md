@@ -1,91 +1,81 @@
 # Manual Meta Account Setup Checklist
 
 **Audience:** Operator (you)  
-**When:** After Prompt A research review; before Prompt B  
-**Scope:** Create/configure Meta resources only as needed for future paused ads. **Do not create campaigns or spend.**
+**When:** After Prompt A; before create-paused  
+**Scope:** Meta resources for future paused ads. **Do not create campaigns or spend.**
 
 ---
-USE THESE VALUES ...ANY FOR ANY other importatn ones its needs. pause and ask me ... or get alist of them on the same page... and pase and let me look if your unsure ... 
+
+## Confirmed account (2026-07-16)
+
+| Key | Value |
+|-----|-------|
+| Business Portfolio | Orro — `1074341285117707` |
+| Ad Account | App Validation Platform — `act_979257825150251` |
+| Currency | USD |
+| Payment method | present |
+| `min_daily_budget` | $1 |
+| Page | Orro — `1237104852815793` |
+| Instagram | @useorro — `17841440875992246` |
+| System User | Orro n8n — `61591805738163` |
+| n8n credential | `Meta Marketing API - Orro` (token in n8n only) |
+| API version | `v25.0` |
+| Safety ceiling | `MAX_DAILY_BUDGET_USD = 2` (not default ad budget) |
+| V1 pairing (adapter) | `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS` |
+
 ---
-Company: Orro
-Tagline: Build what matters.
-Mission: Help more good ideas become reality.
-Description: AI-powered tools for discovering, validating, and building ideas.
-Facebook: Orro
-Instagram: Orro
-Meta Business Portfolio: Orro
-Ad Account: Orro Ads
-_----
 
 ## Before you start
 
-- [x] Prompt A results reviewed (`notes/meta-research-prompt-a-results.md`)
-- [ ] You understand WF4 will keep Campaign / Ad Set / Ad **PAUSED** until you activate in Ads Manager (Creative is an asset, not PAUSED)
-- [ ] Global n8n cap: `MAX_DAILY_BUDGET_USD = 10`
-- [ ] First-test app budget target: **$1/day** (14 USD / 14 days) — **conditional** on account `min_daily_budget`
-- [ ] Reconciled V1 Meta pairing: `OUTCOME_TRAFFIC` + `LANDING_PAGE_VIEWS` + `IMPRESSIONS`
+- [x] Prompt A results reviewed
+- [x] Campaign / Ad Set / Ad created **PAUSED** later; Creative is an asset
+- [x] Global n8n cap: `MAX_DAILY_BUDGET_USD = 2`
+- [x] First-test fixture budget: **$1/day** (14/14) — within account min and ceiling
+- [x] V1 pairing: `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS`
 
----
+## A–E. Meta setup
 
-## A. Business Portfolio
+- [x] Business Portfolio ID recorded
+- [x] Ad Account ID recorded (`act_…`); USD; payment present
+- [x] Page ID recorded
+- [x] Instagram user ID recorded (connected to Page)
+- [x] Developer App + system user; credential in n8n (`Meta Marketing API - Orro`)
+- [x] Scopes include `ads_management`, `ads_read` (+ page/business scopes as configured)
 
-- [ ] Create or select a Meta Business Portfolio (Business Manager)
-- [ ] Record **Business Portfolio ID** (`META_BUSINESS_PORTFOLIO_ID`)
-- [ ] Confirm you have admin access
+## F. n8n Workflow Config (non-secret) — sync live after repo update
 
-## B. Ad Account
+Add/set on workflow **WF4 - Meta Ads Sandbox** → node **Workflow Config**:
 
-- [ ] Create or select an ad account under the Portfolio
-- [ ] Record **Ad Account ID** (`act_…`)
-- [ ] Add a payment method (billing ready) — campaigns will still be created PAUSED later
-- [ ] Confirm timezone/currency (prefer USD for V1)
-- [ ] Note account `min_daily_budget` during Prompt B
+| Key | Value |
+|-----|-------|
+| `META_BUSINESS_PORTFOLIO_ID` | `1074341285117707` |
+| `META_AD_ACCOUNT_ID` | `act_979257825150251` |
+| `META_PAGE_ID` | `1237104852815793` |
+| `META_INSTAGRAM_USER_ID` | `17841440875992246` |
+| `META_API_VERSION` / `metaApiVersion` | `v25.0` |
+| `MAX_DAILY_BUDGET_USD` | `2` |
 
-## C. Facebook Page
-
-- [ ] Create or select a Facebook Page usable as ad actor
-- [ ] Record **Page ID** (injected as `object_story_spec.page_id`)
-- [ ] Confirm Page is connected to the Business Portfolio / ad account
-
-## D. Instagram (if ads.platforms includes instagram)
-
-- [ ] Connect Instagram professional account to the Page / Portfolio
-- [ ] Record **Instagram user ID** (`instagram_user_id`), or mark **N/A** if Facebook-only for first test
-- [ ] Confirm linkage visible in Business Settings
-
-## E. Developer / token prep (do not paste token into chat or git)
-
-- [ ] Meta Developer App exists (or create one)
-- [ ] Plan **system-user** token (preferred for unattended n8n)
-- [ ] Confirm scopes: `ads_management`, `ads_read`
-- [ ] Own ad account: Standard Access is sufficient (no App Review); Advanced Access only for other businesses' accounts
-- [ ] Store token later in **n8n Credentials only** — never in app.json or repo
-
-## F. n8n Config Set (non-secret) — after Prompt B returns IDs
-
-- [ ] `META_BUSINESS_PORTFOLIO_ID`
-- [ ] `META_AD_ACCOUNT_ID`
-- [ ] `META_PAGE_ID`
-- [ ] `META_INSTAGRAM_USER_ID` (or N/A)
-- [ ] `META_API_VERSION` = `v25.0`
-- [ ] Objective / billing / optimization: V1 funnel `OUTCOME_TRAFFIC` / `IMPRESSIONS` / `LANDING_PAGE_VIEWS`
-- [ ] `SPECIAL_AD_CATEGORIES` = `[]` (decision NONE)
-- [ ] `MAX_DAILY_BUDGET_USD` = `10`
+Do **not** put objective/billing/optimization in Config — adapter SSOT owns those.  
+Do **not** put Meta token in Config.
 
 ## G. n8n Credentials (secrets)
 
-- [ ] Meta system-user access token
-- [ ] `WF4_CREATE_PAUSED_APPROVAL_TOKEN` (operator-generated secret)
+- [x] Meta token in credential `Meta Marketing API - Orro` (never in git)
+- [ ] `WF4_CREATE_PAUSED_APPROVAL_TOKEN` — **later**, before create-paused only
 
 ## H. Explicitly do NOT do yet
 
 - [ ] Do not create Campaign / Ad Set / Creative / Ad
-- [ ] Do not activate anything
+- [ ] Do not activate ads or enable spend
 - [ ] Do not enable WF4 create-paused branch
+- [ ] Do not activate the WF4 workflow
 - [ ] Do not modify production Drive app.json
+- [ ] Do not attach Meta credential to create HTTP nodes until create-paused is approved
 
 ---
 
-## Next step
+## Next
 
-Run [`CLAUDE-PROMPT-B-META-ACCOUNT-INSPECTION.md`](./CLAUDE-PROMPT-B-META-ACCOUNT-INSPECTION.md) with attachments listed in the Context Package.
+1. After Cursor finishes repo/source updates: paste non-secret Config values into live **Workflow Config**.
+2. Keep workflow inactive; keep create-paused disabled.
+3. Create-paused only after explicit operator approval.

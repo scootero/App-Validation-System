@@ -55,7 +55,7 @@ dailyBudgetUsd = amount / durationDays
 daily_budget (Meta) = dailyBudgetUsd × 100  # USD cents
 ```
 
-Fail if daily > `MAX_DAILY_BUDGET_USD` (10). Never clamp. `$1/day` conditional on account `min_daily_budget`.
+Fail if daily > `MAX_DAILY_BUDGET_USD` (**2** sandbox ceiling). Never clamp. Ceiling is not the default ad budget. Fixture first-test remains `$1/day`; account `min_daily_budget` = `$1`.
 
 ## Idempotency + ledger
 

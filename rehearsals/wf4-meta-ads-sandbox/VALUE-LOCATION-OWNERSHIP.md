@@ -17,15 +17,15 @@
 | Landing URL | `deployment.landing.url` | WF2 | HTTPS |
 | Experiment run ID | `analytics.experimentRunId` | Author | Ledger + idempotency key |
 | Objective → Meta enum, billing, optimization, payloads | [`lib/meta-adapter.js`](./lib/meta-adapter.js) | Code SSOT | V1: `OUTCOME_TRAFFIC` / `LINK_CLICKS` / `IMPRESSIONS` |
-| Meta Business Portfolio ID | n8n Config | Operator | |
-| Ad Account ID | n8n Config | Operator | `act_…` |
-| Facebook Page ID | n8n Config | Operator | → `object_story_spec.page_id` |
-| Instagram user ID | n8n Config | Operator | `instagram_user_id` |
-| Meta API version | n8n Config | Operator | Default `v25.0` |
-| `MAX_DAILY_BUDGET_USD` | n8n Config | Operator | Default **10** |
-| Meta access token | n8n Credentials | Operator | System user preferred |
-| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` | n8n Credentials | Operator | |
-| Operation ledger row | n8n Data Table | WF4 | Key: appId + experimentRunId + provider |
+| Meta Business Portfolio ID | n8n Config | Operator | Confirmed: `1074341285117707` |
+| Ad Account ID | n8n Config | Operator | Confirmed: `act_979257825150251` |
+| Facebook Page ID | n8n Config | Operator | Confirmed: `1237104852815793` → `object_story_spec.page_id` |
+| Instagram user ID | n8n Config | Operator | Confirmed: `17841440875992246` |
+| Meta API version | n8n Config | Operator | `v25.0` |
+| `MAX_DAILY_BUDGET_USD` | n8n Config | Operator | **`2`** safety ceiling (not default ad budget) |
+| Meta access token | n8n Credentials | Operator | Credential name: `Meta Marketing API - Orro` (`facebookGraphApi`) |
+| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` | n8n Credentials (Header Auth vault) | Operator | Credential name: `WF4 Create-Paused Approval Token`. Copy into Config `wf4CreatePausedApprovalToken` only at create-paused enablement; keep Config empty otherwise |
+| Operation ledger row | n8n Data Table `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) | WF4 | Key: `appId|experimentRunId|provider`. No dry-run writes |
 
 ---
 
@@ -34,7 +34,7 @@
 | Item | Where | Example |
 |------|-------|---------|
 | Per-app total + duration | `experiment.testBudget` | 14 / 14 = **$1/day** |
-| Global safety cap | n8n `MAX_DAILY_BUDGET_USD` | **10** |
+| Global safety cap | n8n `MAX_DAILY_BUDGET_USD` | **2** (ceiling only) |
 | Cap exceeded | Validation error | 500/14 → fail |
 
 Never auto-clamp. Never store cap in app.json.

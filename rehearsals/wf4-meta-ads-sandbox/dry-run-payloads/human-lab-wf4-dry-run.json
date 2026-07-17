@@ -10,6 +10,12 @@
   "metaApiVersion": "v25.0",
   "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
   "pageIdRef": "n8n.config.META_PAGE_ID",
+  "metaAccountConfig": {
+    "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+    "META_AD_ACCOUNT_ID": "act_979257825150251",
+    "META_PAGE_ID": "1237104852815793",
+    "META_INSTAGRAM_USER_ID": "17841440875992246"
+  },
   "wf3Gate": {
     "required": true,
     "status": "proven",
@@ -68,7 +74,7 @@
     "statusForDeliveryEntities": "PAUSED"
   },
   "budgetCapCheck": {
-    "maxDailyBudgetUsd": 10,
+    "maxDailyBudgetUsd": 2,
     "passed": true
   },
   "v1Pairing": {
@@ -106,14 +112,14 @@
       }
     },
     "imageUpload": {
-      "endpoint": "POST /act_{META_AD_ACCOUNT_ID}/adimages",
+      "endpoint": "POST /act_979257825150251/adimages",
       "source": "ads.media githubPath or media.ogImage",
       "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
     },
     "creative": {
       "name": "human-lab-validation-creative-a",
       "object_story_spec": {
-        "page_id": "CONFIG_META_PAGE_ID",
+        "page_id": "1237104852815793",
         "link_data": {
           "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
           "message": "Discover what actually works for your stress, sleep, and habits.",
@@ -126,7 +132,8 @@
             }
           },
           "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
-        }
+        },
+        "instagram_user_id": "17841440875992246"
       }
     },
     "ad": {

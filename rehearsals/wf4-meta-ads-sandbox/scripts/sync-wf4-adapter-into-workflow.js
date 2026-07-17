@@ -31,10 +31,13 @@ const processBody =
   "const result = WF4MetaAdapter.buildDryRunBundle(app, {\n" +
   "  mode: mode,\n" +
   "  provider: input.provider || 'meta',\n" +
-  "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 10,\n" +
-  "  metaApiVersion: input.metaApiVersion || 'v25.0',\n" +
+  "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n" +
+  "  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n" +
   "  wf3GateStatus: input.wf3GateStatus || 'proven',\n" +
-  "  pageId: 'CONFIG_META_PAGE_ID',\n" +
+  "  pageId: input.META_PAGE_ID || 'CONFIG_META_PAGE_ID',\n" +
+  "  adAccountId: input.META_AD_ACCOUNT_ID || null,\n" +
+  "  instagramUserId: input.META_INSTAGRAM_USER_ID || null,\n" +
+  "  businessPortfolioId: input.META_BUSINESS_PORTFOLIO_ID || null,\n" +
   "});\n" +
   "if (!result.ok) {\n" +
   "  throw new Error(result.error || 'WF4 dry-run bundle failed');\n" +

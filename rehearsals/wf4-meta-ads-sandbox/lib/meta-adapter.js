@@ -20,7 +20,7 @@ if (typeof globalThis !== "undefined") {
 
   var PROVIDER = "meta";
   var DEFAULT_META_API_VERSION = "v25.0";
-  var DEFAULT_MAX_DAILY_BUDGET_USD = 10;
+  var DEFAULT_MAX_DAILY_BUDGET_USD = 2;
 
   var OBJECTIVE_MAPPING = {
     traffic: "OUTCOME_TRAFFIC",
@@ -245,6 +245,8 @@ if (typeof globalThis !== "undefined") {
     config = config || {};
     var metaApiVersion = config.metaApiVersion || DEFAULT_META_API_VERSION;
     var pageId = config.pageId || "CONFIG_META_PAGE_ID";
+    var adAccountId = config.adAccountId || "act_{META_AD_ACCOUNT_ID}";
+    var instagramUserId = config.instagramUserId || null;
     var dailyBudgetMinor = Math.round(adPlan.budget.dailyBudgetUsd * 100);
     var metaObjective = mapAuthorObjective(adPlan.authorObjective);
 
@@ -263,6 +265,28 @@ if (typeof globalThis !== "undefined") {
     var headline = adPlan.headlines[0];
     var primaryText = adPlan.primaryTexts[0];
     var description = (adPlan.descriptions && adPlan.descriptions[0]) || "";
+
+    var objectStorySpec = {
+      page_id: pageId,
+      link_data: {
+        link: adPlan.destinationUrl,
+        message: primaryText,
+        name: headline,
+        description: description,
+        call_to_action: {
+          type: adPlan.callToAction,
+          value: { link: adPlan.destinationUrl },
+        },
+        image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+      },
+    };
+    if (
+      instagramUserId &&
+      adPlan.platforms &&
+      adPlan.platforms.indexOf("instagram") !== -1
+    ) {
+      objectStorySpec.instagram_user_id = instagramUserId;
+    }
 
     return {
       metaApiVersion: metaApiVersion,
@@ -298,26 +322,13 @@ if (typeof globalThis !== "undefined") {
           targeting: adSetTargeting,
         },
         imageUpload: {
-          endpoint: "POST /act_{META_AD_ACCOUNT_ID}/adimages",
+          endpoint: "POST /" + adAccountId + "/adimages",
           source: "ads.media githubPath or media.ogImage",
           image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
         },
         creative: {
           name: adPlan.campaignName + "-creative-a",
-          object_story_spec: {
-            page_id: pageId,
-            link_data: {
-              link: adPlan.destinationUrl,
-              message: primaryText,
-              name: headline,
-              description: description,
-              call_to_action: {
-                type: adPlan.callToAction,
-                value: { link: adPlan.destinationUrl },
-              },
-              image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
-            },
-          },
+          object_story_spec: objectStorySpec,
         },
         ad: {
           name: adPlan.campaignName + "-ad-a",
@@ -390,6 +401,12 @@ if (typeof globalThis !== "undefined") {
         metaApiVersion: meta.metaApiVersion,
         adAccountIdRef: "n8n.config.META_AD_ACCOUNT_ID",
         pageIdRef: "n8n.config.META_PAGE_ID",
+        metaAccountConfig: {
+          META_BUSINESS_PORTFOLIO_ID: config.businessPortfolioId || null,
+          META_AD_ACCOUNT_ID: config.adAccountId || null,
+          META_PAGE_ID: config.pageId || null,
+          META_INSTAGRAM_USER_ID: config.instagramUserId || null,
+        },
         wf3Gate: adPlan.wf3Gate,
         adPlan: {
           authorObjective: adPlan.authorObjective,

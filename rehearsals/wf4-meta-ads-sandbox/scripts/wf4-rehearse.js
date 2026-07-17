@@ -13,7 +13,15 @@ const capExceededPath = path.join(root, "fixtures", "app-json-budget-cap-exceede
 const expectedDryRunPath = path.join(root, "dry-run-payloads", "human-lab-wf4-dry-run.json");
 const expectedWritebackPath = path.join(root, "fixtures", "expected-ads-meta-writeback.json");
 
-const RUNTIME_PLACEHOLDERS = ["VERIFY_AFTER_IMAGE_UPLOAD", "CONFIG_META_PAGE_ID"];
+const RUNTIME_PLACEHOLDERS = ["VERIFY_AFTER_IMAGE_UPLOAD"];
+const SANDBOX_META = {
+  maxDailyBudgetUsd: 2,
+  metaApiVersion: "v25.0",
+  pageId: "1237104852815793",
+  adAccountId: "act_979257825150251",
+  instagramUserId: "17841440875992246",
+  businessPortfolioId: "1074341285117707",
+};
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -45,12 +53,25 @@ function assertReconciledMetaFields(bundle) {
     "special_ad_categories must be []"
   );
   assert(bundle.requests.adSet.daily_budget === 100, "daily_budget must be 100 cents");
+  assert(bundle.budgetCapCheck.maxDailyBudgetUsd === 2, "MAX_DAILY_BUDGET_USD must be 2");
   assert(bundle.requests.adSet.billing_event === "IMPRESSIONS", "billing_event must be IMPRESSIONS");
   assert(
     bundle.requests.adSet.optimization_goal === "LINK_CLICKS",
     "optimization_goal must be LINK_CLICKS"
   );
   assert(bundle.v1Pairing.optimization_goal === "LINK_CLICKS", "v1Pairing opt must be LINK_CLICKS");
+  assert(
+    bundle.requests.creative.object_story_spec.page_id === SANDBOX_META.pageId,
+    "page_id must be META_PAGE_ID"
+  );
+  assert(
+    bundle.requests.creative.object_story_spec.instagram_user_id === SANDBOX_META.instagramUserId,
+    "instagram_user_id must be META_INSTAGRAM_USER_ID"
+  );
+  assert(
+    bundle.requests.imageUpload.endpoint.indexOf(SANDBOX_META.adAccountId) !== -1,
+    "imageUpload endpoint must include META_AD_ACCOUNT_ID"
+  );
   assert(bundle.requests.imageUpload, "imageUpload step required");
   assert(bundle.ledgerPlan && bundle.ledgerPlan.phase === "planned", "ledgerPlan planned");
   assert(
@@ -70,6 +91,7 @@ function assertReconciledMetaFields(bundle) {
   for (const token of RUNTIME_PLACEHOLDERS) {
     assert(serialized.includes(token), "Missing runtime placeholder: " + token);
   }
+  assert(!serialized.includes("CONFIG_META_PAGE_ID"), "CONFIG_META_PAGE_ID placeholder must be gone");
   assert(!bundle.requests.adSet.targeting.interests, "omit interests when fixture has none");
 }
 
@@ -94,7 +116,7 @@ function assertMatchesExpectedDryRun(actual, expected) {
   assert(actual.computed.dailyBudget === expected.computed.dailyBudget, "dailyBudget mismatch");
   assert(actual.computed.totalBudget === expected.computed.totalBudget, "totalBudget mismatch");
   assert(actual.source.creative.value === expected.source.creative.value, "creative mismatch");
-  assert(actual.budgetCapCheck.maxDailyBudgetUsd === 10, "maxDailyBudgetUsd must be 10");
+  assert(actual.budgetCapCheck.maxDailyBudgetUsd === 2, "maxDailyBudgetUsd must be 2");
   assert(actual.requests.adSet.optimization_goal === expected.requests.adSet.optimization_goal);
   assert(actual.requests.adSet.billing_event === expected.requests.adSet.billing_event);
   assert(
@@ -106,14 +128,14 @@ function assertMatchesExpectedDryRun(actual, expected) {
 function testIdempotencyRefusal() {
   const app = readJson(appJsonPath);
   app.ads.meta.campaignId = "123";
-  const result = adapter.buildDryRunBundle(app, { maxDailyBudgetUsd: 10 });
+  const result = adapter.buildDryRunBundle(app, SANDBOX_META);
   assert(!result.ok, "must refuse when campaignId exists");
   assert(result.error.includes("Idempotency refusal"), "must include refusal message");
 }
 
 function testBudgetCapExceeded() {
   const app = readJson(capExceededPath);
-  const result = adapter.buildDryRunBundle(app, { maxDailyBudgetUsd: 10 });
+  const result = adapter.buildDryRunBundle(app, SANDBOX_META);
   assert(!result.ok, "must fail when daily budget exceeds cap");
   assert(result.error.includes("MAX_DAILY_BUDGET_USD"), "must mention MAX_DAILY_BUDGET_USD");
   assert(result.error.includes("35.71"), "must report calculated daily budget");
@@ -134,12 +156,10 @@ function main() {
   assert(app.ads.objective === "traffic", "sandbox fixture objective must be traffic");
 
   const expectedDryRun = readJson(expectedDryRunPath);
-  const result = adapter.buildDryRunBundle(app, {
-    mode: "dry_run",
-    maxDailyBudgetUsd: 10,
-    metaApiVersion: "v25.0",
-    wf3GateStatus: "proven",
-  });
+  const result = adapter.buildDryRunBundle(
+    app,
+    Object.assign({ mode: "dry_run", wf3GateStatus: "proven" }, SANDBOX_META)
+  );
 
   assert(result.ok, result.error || "bundle build failed");
   const bundle = result.bundle;

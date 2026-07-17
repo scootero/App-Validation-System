@@ -16,7 +16,8 @@
 | Workflow | `YIc53GBq4upelYp6` (inactive) |
 | Dry-run execution | `35` (prior) |
 | First-test budget | $1/day (14/14) |
-| Global cap | `MAX_DAILY_BUDGET_USD = 10` |
+| Safety ceiling | `MAX_DAILY_BUDGET_USD = 2` (not default ad budget) |
+| Meta account IDs | Confirmed in `external-proof-status.md` / CANONICAL |
 | Adapter SSOT | `lib/meta-adapter.js` |
 | V1 pairing | `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS` |
 | Write-back status | `ads.meta.status = created_paused`; root preserved |
