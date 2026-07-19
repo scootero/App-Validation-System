@@ -1,6 +1,6 @@
 # Prompt 2 Progress — Image Create-Paused V1
 
-**Status:** Phase 4 local implementation PASS — awaiting Scott approval for Phase 5 (live n8n sync + dry_run still operator-gated)
+**Status:** Phase 4 complete — live Process verified + Respond/Ledger patched + dry_run `49` PASS. Waiting for Scott to approve Phase 5.
 
 **On resume:** Read this file first, then [`PROMPT-2.md`](PROMPT-2.md). Continue only the next unchecked phase after Scott approves.
 
@@ -11,6 +11,7 @@
 - Canonical: [`../CANONICAL-WF4.md`](../CANONICAL-WF4.md)
 - Creative specs (living): [`../CREATIVE-ASSET-SPECS.md`](../CREATIVE-ASSET-SPECS.md)
 - Create-paused contract: [`../architecture/CREATE-PAUSED-V1-CONTRACT.md`](../architecture/CREATE-PAUSED-V1-CONTRACT.md)
+- Phase 4 sync artifacts: [`../n8n/.phase4-sync/`](../n8n/.phase4-sync/)
 
 ---
 
@@ -64,7 +65,10 @@ Prompt 1 handoff summary: PASS — live WF4 `YIc53GBq4upelYp6` inactive; dry_run
 - [x] Concurrency protection implemented
 - [x] Ledger phases / resume-from-partial implemented *(decision + seeding; mid-phase Data Table upsert nodes still deferred to create enablement)*
 - [x] Local rehearsal PASS
-- [ ] Live dry_run PASS *(blocked: n8n MCP unavailable; live workflow not yet re-synced from workflow.ts)*
+- [x] Live Process jsCode manually pasted from `.phase4-sync/process-jsCode.js`
+- [x] Live Process paste verified (bytes **39269**, SHA-256 `9f10544340c80f3e2c240f640bb200efb65bd9801ae482a1e809d152c1604a96`)
+- [x] Respond Dry Run + Ledger Idempotency Check aligned to Phase 4 (MCP patches from `.phase4-sync/`; Ledger remains **disabled**)
+- [x] Live dry_run PASS — execution **`49`**
 - [x] Missing-token → zero writes
 - [x] Wrong-token → zero writes
 - [x] approval=false → zero writes
@@ -136,31 +140,27 @@ Meta IDs:
 
 ## Open blockers / wait for Scott
 
-1. **Approve Phase 4 → Phase 5** after reviewing local proofs.
-2. **Live n8n sync:** Re-import/update live WF4 `YIc53GBq4upelYp6` from [`wf4-meta-ads-sandbox.workflow.ts`](../n8n/wf4-meta-ads-sandbox.workflow.ts) (or export→import-ready), then Manual `dry_run` — expect `metaHttpCalls: 0`, new `operationKey`, Feed positions, `approvalGate` redacted. n8n MCP was unavailable this session.
-3. Before create-paused: add ledger Data Table columns (`environment`, `creativeRevision`, `contentFingerprint`, `creativeSha256`, `lockOwner`, `lockExpiresAt`, `resumeFrom`, `outcome`) + mid-phase upsert nodes on create enablement.
-4. Create Header Auth vault when ready (still empty Config token until enablement).
-5. Do **not** create Meta objects until exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
+1. **Approve Phase 5** (create-paused preflight only — no Meta writes yet).
+2. Before create-paused: add ledger Data Table columns (`environment`, `creativeRevision`, `contentFingerprint`, `creativeSha256`, `lockOwner`, `lockExpiresAt`, `resumeFrom`, `outcome`) + mid-phase upsert nodes on create enablement.
+3. Create Header Auth vault when ready (keep Config token empty until enablement).
+4. Do **not** create Meta objects until exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
 
 ---
 
 ## Latest compact handoff
 
 ```text
-Status: Phase 4 local PASS — live dry_run pending n8n sync; create-path still disabled
-Last completed phase: Phase 4 (local gates/idempotency/resume simulation)
-Next phase: Phase 5 preflight — after Scott approves + live dry_run recorded
-Live WF4 ID: YIc53GBq4upelYp6 (repo SDK updated; live may lag until re-sync)
-Dry-run execution ID: 48 (Prompt 1); Phase 4 live dry_run: pending
+Status: Phase 4 COMPLETE — waiting Scott approve Phase 5
+Last completed: Live Process verified (39269 / 9f105443…); Respond+Ledger patched from .phase4-sync; dry_run execution 49 PASS
+Proof: metaHttpCalls=0, driveWrites=0, externalWritePerformed=false
+Phase4 signals: operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1; creativeSha256=ae73b936…; contentFingerprint=2c5c0a2b…; approvalGate.createPathOpen=false; Feed facebook_positions=[feed] instagram_positions=[stream]
+Live WF4 ID: YIc53GBq4upelYp6 (inactive; create-path disabled; Ledger Idempotency still disabled)
+Process node: 5392da6c-0590-432b-b497-414bbc77bfcd (evaluateCreatePausedGates + WF4_CREATIVE_SHA256 present)
+Config: WF4_CREATIVE_SHA256 + environment=sandbox + workflowVersion=wf4-image-v1; approval token empty
+Dry-run: Prompt 1 = 48; Phase 4 live = 49 PASS
 Create-paused: NOT enabled (_createPausedAllowed=false)
 Meta objects: none
-operationKey: human-lab-wf1-sandbox|sandbox|meta|image-v1
-contentFingerprint: 114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d
-creativeSha256: ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d
-Placements: facebook_positions=[feed], instagram_positions=[stream]
-Local proofs: wf4-rehearse.js PASS; wf4-resolve-creative.js PASS; concurrent-lock simulation-proven
-Git: adapter + workflow.ts + fixtures + dry-run payload + progress (uncommitted unless Scott asks)
-Exact next action: Scott reviews Phase 4; sync live n8n; approve Phase 5 — still no Meta creates without exact phrase
+Exact next action: Scott approve Phase 5 preflight only — do NOT combine Phase 5+6; no Meta creates without exact phrase
 ```
 
 ---
@@ -176,7 +176,9 @@ Exact next action: Scott reviews Phase 4; sync live n8n; approve Phase 5 — sti
 | Lock held / expired | PASS (simulation-proven) |
 | already_complete | PASS |
 | revision_conflict | PASS |
-| Live n8n dry_run | Pending sync (MCP down) |
+| Live Process paste | VERIFIED 39269 / `9f105443…` (markers present) |
+| Respond + Ledger MCP patch | Applied from `.phase4-sync/`; Ledger remains disabled |
+| Live n8n dry_run | **PASS** execution `49` (zero writes + Phase 4 signals) |
 
 ---
 
@@ -195,4 +197,18 @@ Exact next action: Scott reviews Phase 4; sync live n8n; approve Phase 5 — sti
 - Adapter: operationKey, contentFingerprint, evaluateLedgerDecision, evaluateCreatePausedGates, redact, Feed positions
 - Process: WF4_CREATIVE_SHA256 config, approvalGate redacted, `_createPausedAllowed=false`
 - Ledger Idempotency Check: resume / already_complete / lock / revision_conflict
-- Local rehearse + resolve PASS; live dry_run pending n8n re-sync
+- Local rehearse + resolve PASS
+
+### 2026-07-19 — Live Process manually pasted
+
+- Scott pasted `.phase4-sync/process-jsCode.js` into live **Process WF4 Dry Run**
+- Path forward: verify hash/size + one dry_run; **no full-import**
+- Respond/Ledger may still need small `.phase4-sync` patches
+
+### 2026-07-19 — Phase 4 closeout complete
+
+- Live Process verified: 39269 bytes / SHA-256 `9f10544340c80f3e2c240f640bb200efb65bd9801ae482a1e809d152c1604a96`
+- MCP patched **Respond Dry Run** + **Ledger Idempotency Check** only (no full-import; create-path stayed disabled)
+- Live dry_run execution **49** PASS: `metaHttpCalls=0`, `driveWrites=0`, `externalWritePerformed=false`
+- `operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1`; Feed positions `feed` / `stream`; `createPathOpen=false`
+- STOP — wait for Scott to approve Phase 5
