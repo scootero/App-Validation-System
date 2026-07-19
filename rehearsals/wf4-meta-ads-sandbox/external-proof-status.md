@@ -1,7 +1,19 @@
 # WF4 External Proof Status
 
-**Last updated:** 2026-07-16  
-**Phase:** Pre-create prep done (ledger table + disabled create chain + Meta cred attached); dry-run still proven; create-paused still disabled; WF4 inactive
+**Last updated:** 2026-07-17  
+**Phase:** Creative binary-resolution path implemented in repo + local proofs PASS; create-paused still disabled; WF4 inactive; live n8n import of updated SDK pending operator
+
+## Continuity / left off
+
+| Item | Value |
+|------|-------|
+| V1 creative (sandbox fixture) | `media/og-image.png` |
+| Asset repo (fixture only) | `scootero/Human-Lab-WF1-Sandbox` @ `main` |
+| Local file | `rehearsals/github/Human-Lab-WF1-Sandbox/media/og-image.png` (~2,077,914 bytes, PNG) |
+| Resolution | Generic: `ads.media[].githubPath` → `source.assetsGithubRepo ?? source.mockupGithubRepo` → raw download → (later) Meta `adimages` → `image_hash` |
+| Template hardcodes | None in adapter / download nodes (fixture holds Human Lab values) |
+| Create-paused | **Disabled**; `_createPausedAllowed: false` |
+| Next operator action | Import/sync updated `n8n/wf4-meta-ads-sandbox.workflow.ts` into live WF4 → Manual dry_run → confirm `metaHttpCalls: 0` → then await explicit approval before create-paused |
 
 ## Returned values
 
@@ -43,8 +55,42 @@ SANDBOX_APP_ID: "human-lab-wf1-sandbox"
 WF3_GATE_STATUS: proven
 WF4_POST_SYNC_DRY_RUN_EXECUTION_ID: "38"
 WF4_PRECREATE_DRY_RUN_EXECUTION_ID: "39"
+WF4_CREATIVE_BINARY_LOCAL_PROOF: "2026-07-17 PASS (wf4-resolve-creative.js; metaHttpCalls=0)"
+WF4_CREATIVE_BINARY_N8N_DRY_RUN: "pending operator sync/import of updated workflow SDK"
 _createPausedAllowed: false
 ```
+
+## Creative binary resolution (2026-07-17)
+
+**Generic template behavior** (any future app package):
+
+1. Adapter `resolveCreativeSource` reads selected creative + `source.*`
+2. Dry-run bundle exposes `source.creative.downloadUrl` / `filename` / `repo` / `branch`
+3. Disabled create-chain nodes: **Resolve Creative Download Plan** → **Download Creative Binary** → **Validate Creative Binary** → **Upload Ad Image** (multipart binary) → **Merge Image Hash** (fails without `image_hash`)
+
+**Sandbox proof data (fixture only, not template hardcode):**
+
+| Field | Value |
+|-------|-------|
+| `ads.media[0].githubPath` | `media/og-image.png` |
+| `source.mockupGithubRepo` | `scootero/Human-Lab-WF1-Sandbox` |
+| `source.mockupBranch` | `main` |
+| Resolved `downloadUrl` | `https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png` |
+| Downloaded proof | `content-type: image/png`, `byteSize: 2077914` |
+
+**Local proofs:**
+
+| Test | Result | Meta writes |
+|------|--------|-------------|
+| `node scripts/wf4-rehearse.js` | PASS | 0 |
+| `node scripts/wf4-resolve-creative.js` | PASS | 0 |
+
+**Live n8n dry-run (operator):**
+
+1. Keep workflow **inactive**; keep `mode=dry_run`; do **not** enable create-paused nodes
+2. Sync/import updated Process Code + new disabled creative nodes from `n8n/wf4-meta-ads-sandbox.workflow.ts`
+3. Manual Run → expect **Respond Dry Run** with `metaHttpCalls: 0`, `driveWrites: 0`
+4. Confirm create-path nodes remain disabled (including Download/Upload image)
 
 ## Done
 
@@ -54,22 +100,23 @@ _createPausedAllowed: false
 | Architecture + adapter SSOT | Done |
 | Manual Meta account setup | Done (IDs above) |
 | Live Workflow Config (clean, no duplicates) | Done |
-| Live Process node = adapter SSOT | Done |
 | Operation ledger Data Table | Done (`Yys4vVmQGk8fTxag`) |
 | Disabled create chain + ledger nodes | Done (wired, disabled) |
 | Meta credential on create HTTP nodes | Done (`Meta Marketing API - Orro`) |
+| Generic creative binary resolution (adapter + disabled nodes) | Done (repo) |
 | Local dry-run via adapter | PASS (`wf4-rehearse.js`) |
-| Prior n8n dry-run | execution `35` |
-| Post-sync n8n dry-run (IDs + adapter) | execution `38` success |
+| Local creative download proof (no Meta) | PASS (`wf4-resolve-creative.js`) |
+| Prior n8n dry-run | execution `35` / `38` / `39` |
+| Live n8n sync of creative-binary SDK | **Pending operator** (no n8n API from this agent session) |
 | Meta token in repo | Never (credential only) |
 
 ## Blocking (create-paused)
 
 | Item | Owner |
 |------|-------|
+| Sync/import updated WF4 workflow SDK into live n8n + dry_run confirm | Operator |
 | Create approval-token Credential vault | Operator — **manual now** (see CONFIG-DRIVEN doc) |
 | Paste token into Config + run `approvalToken` | Operator — **only at create enablement** |
-| Resolve creative binary for image upload | Operator/next Agent — before create |
 | Flip `_createPausedAllowed` + enable create nodes | Explicit operator approval — **not yet** |
 | Explicit create-paused approval | Operator — **not yet** |
 | Spec 1.5.0 root-status ownership note | Spec pass |

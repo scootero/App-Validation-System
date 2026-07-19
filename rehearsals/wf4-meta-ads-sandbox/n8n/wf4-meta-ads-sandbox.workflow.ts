@@ -66,8 +66,159 @@ const processWf4Code =
   "    us: \"US\",\n" +
   "  };\n" +
   "\n" +
+  "  /** V1 image creative extensions only (no video). */\n" +
+  "  var IMAGE_EXTENSIONS = {\n" +
+  "    png: \"image/png\",\n" +
+  "    jpg: \"image/jpeg\",\n" +
+  "    jpeg: \"image/jpeg\",\n" +
+  "    gif: \"image/gif\",\n" +
+  "    webp: \"image/webp\",\n" +
+  "  };\n" +
+  "\n" +
   "  function roundBudget(value) {\n" +
   "    return Math.round(value * 100) / 100;\n" +
+  "  }\n" +
+  "\n" +
+  "  function normalizeGithubRepo(raw) {\n" +
+  "    if (!raw || typeof raw !== \"string\") return null;\n" +
+  "    var s = raw.trim();\n" +
+  "    s = s.replace(/^https?:\\/\\/github\\.com\\//i, \"\");\n" +
+  "    s = s.replace(/\\.git$/i, \"\");\n" +
+  "    s = s.replace(/\\/+$/, \"\");\n" +
+  "    var parts = s.split(\"/\");\n" +
+  "    if (parts.length < 2 || !parts[0] || !parts[1]) return null;\n" +
+  "    return parts[0] + \"/\" + parts[1];\n" +
+  "  }\n" +
+  "\n" +
+  "  function filenameFromPath(p) {\n" +
+  "    var parts = String(p || \"\").split(\"/\");\n" +
+  "    return parts[parts.length - 1] || \"\";\n" +
+  "  }\n" +
+  "\n" +
+  "  function extensionOf(filename) {\n" +
+  "    var m = String(filename || \"\")\n" +
+  "      .toLowerCase()\n" +
+  "      .match(/\\.([a-z0-9]+)$/);\n" +
+  "    return m ? m[1] : \"\";\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Generic creative binary resolution for any app package.\n" +
+  "   * Reads ads.media[] / media.ogImage + source.assetsGithubRepo ?? source.mockupGithubRepo.\n" +
+  "   * Does not hardcode app ids, repos, or filenames.\n" +
+  "   */\n" +
+  "  function resolveCreativeSource(app, creative) {\n" +
+  "    if (!creative || !creative.kind || !creative.value) {\n" +
+  "      return { ok: false, error: \"CREATIVE_PATH_MISSING: no usable creative value\" };\n" +
+  "    }\n" +
+  "\n" +
+  "    if (creative.kind === \"url\") {\n" +
+  "      var urlValue = String(creative.value).trim();\n" +
+  "      if (!/^https:\\/\\//i.test(urlValue)) {\n" +
+  "        return { ok: false, error: \"CREATIVE_DOWNLOAD_FAILED: creative url must be HTTPS\" };\n" +
+  "      }\n" +
+  "      var urlFilename = filenameFromPath(urlValue.split(\"?\")[0]);\n" +
+  "      var urlExt = extensionOf(urlFilename);\n" +
+  "      if (!IMAGE_EXTENSIONS[urlExt]) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error:\n" +
+  "            \"CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got \" +\n" +
+  "            (urlExt || \"none\"),\n" +
+  "        };\n" +
+  "      }\n" +
+  "      return {\n" +
+  "        ok: true,\n" +
+  "        resolved: {\n" +
+  "          kind: \"url\",\n" +
+  "          value: urlValue,\n" +
+  "          role: creative.role || \"primary\",\n" +
+  "          resolvedFrom: creative.source,\n" +
+  "          repo: null,\n" +
+  "          branch: null,\n" +
+  "          githubPath: null,\n" +
+  "          url: urlValue,\n" +
+  "          downloadUrl: urlValue,\n" +
+  "          filename: urlFilename,\n" +
+  "          expectedMime: IMAGE_EXTENSIONS[urlExt],\n" +
+  "          expectedMimeFamily: \"image\",\n" +
+  "          resolutionMethod: \"direct_url\",\n" +
+  "        },\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    if (creative.kind !== \"githubPath\") {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error: \"CREATIVE_UNSUPPORTED_TYPE: unsupported creative kind \" + creative.kind,\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var githubPath = String(creative.value).trim().replace(/^\\/+/, \"\");\n" +
+  "    if (!githubPath) {\n" +
+  "      return { ok: false, error: \"CREATIVE_PATH_MISSING: githubPath is empty\" };\n" +
+  "    }\n" +
+  "\n" +
+  "    var filename = filenameFromPath(githubPath);\n" +
+  "    var ext = extensionOf(filename);\n" +
+  "    if (!IMAGE_EXTENSIONS[ext]) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error:\n" +
+  "          \"CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got \" +\n" +
+  "          (ext || \"none\"),\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var source = (app && app.source) || {};\n" +
+  "    var repoRaw = source.assetsGithubRepo || source.mockupGithubRepo;\n" +
+  "    if (!repoRaw) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error:\n" +
+  "          \"CREATIVE_REPO_UNRESOLVED: set source.assetsGithubRepo or source.mockupGithubRepo for githubPath creatives\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var repo = normalizeGithubRepo(repoRaw);\n" +
+  "    if (!repo) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error: \"CREATIVE_REPO_INVALID: expected owner/repo, got \" + String(repoRaw),\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var branch = String(source.assetsBranch || source.mockupBranch || \"main\").trim() || \"main\";\n" +
+  "    var downloadUrl =\n" +
+  "      \"https://raw.githubusercontent.com/\" +\n" +
+  "      repo +\n" +
+  "      \"/\" +\n" +
+  "      encodeURIComponent(branch).replace(/%2F/gi, \"/\") +\n" +
+  "      \"/\" +\n" +
+  "      githubPath\n" +
+  "        .split(\"/\")\n" +
+  "        .map(function (seg) {\n" +
+  "          return encodeURIComponent(seg);\n" +
+  "        })\n" +
+  "        .join(\"/\");\n" +
+  "\n" +
+  "    return {\n" +
+  "      ok: true,\n" +
+  "      resolved: {\n" +
+  "        kind: \"githubPath\",\n" +
+  "        value: githubPath,\n" +
+  "        role: creative.role || \"primary\",\n" +
+  "        resolvedFrom: creative.source,\n" +
+  "        repo: repo,\n" +
+  "        branch: branch,\n" +
+  "        githubPath: githubPath,\n" +
+  "        url: null,\n" +
+  "        downloadUrl: downloadUrl,\n" +
+  "        filename: filename,\n" +
+  "        expectedMime: IMAGE_EXTENSIONS[ext],\n" +
+  "        expectedMimeFamily: \"image\",\n" +
+  "        resolutionMethod: \"github_raw\",\n" +
+  "      },\n" +
+  "    };\n" +
   "  }\n" +
   "\n" +
   "  function buildUtmQuery(utmTemplate) {\n" +
@@ -179,6 +330,11 @@ const processWf4Code =
   "      return { ok: false, error: \"No usable creative (ads.media[] or media.ogImage)\" };\n" +
   "    }\n" +
   "\n" +
+  "    var creativeResolved = resolveCreativeSource(app, creative);\n" +
+  "    if (!creativeResolved.ok) {\n" +
+  "      return { ok: false, error: creativeResolved.error };\n" +
+  "    }\n" +
+  "\n" +
   "    var budget = app.experiment.testBudget;\n" +
   "    if (!budget.durationDays || budget.durationDays <= 0) {\n" +
   "      return { ok: false, error: \"experiment.testBudget.durationDays must be > 0\" };\n" +
@@ -237,6 +393,7 @@ const processWf4Code =
   "          interests: targeting.interests || null,\n" +
   "        },\n" +
   "        creative: creative,\n" +
+  "        creativeResolved: creativeResolved.resolved,\n" +
   "        landingUrl: landingUrl,\n" +
   "        destinationUrl: destinationUrl,\n" +
   "        budget: {\n" +
@@ -348,6 +505,22 @@ const processWf4Code =
   "          endpoint: \"POST /\" + adAccountId + \"/adimages\",\n" +
   "          source: \"ads.media githubPath or media.ogImage\",\n" +
   "          image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n" +
+  "          resolutionMethod: adPlan.creativeResolved\n" +
+  "            ? adPlan.creativeResolved.resolutionMethod\n" +
+  "            : null,\n" +
+  "          downloadUrl: adPlan.creativeResolved\n" +
+  "            ? adPlan.creativeResolved.downloadUrl\n" +
+  "            : null,\n" +
+  "          filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,\n" +
+  "          repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,\n" +
+  "          branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,\n" +
+  "          githubPath: adPlan.creativeResolved\n" +
+  "            ? adPlan.creativeResolved.githubPath\n" +
+  "            : null,\n" +
+  "          expectedMime: adPlan.creativeResolved\n" +
+  "            ? adPlan.creativeResolved.expectedMime\n" +
+  "            : null,\n" +
+  "          expectedMimeFamily: \"image\",\n" +
   "        },\n" +
   "        creative: {\n" +
   "          name: adPlan.campaignName + \"-creative-a\",\n" +
@@ -443,10 +616,19 @@ const processWf4Code =
   "        source: {\n" +
   "          landingUrl: adPlan.landingUrl,\n" +
   "          creative: {\n" +
-  "            kind: adPlan.creative.kind,\n" +
-  "            value: adPlan.creative.value,\n" +
-  "            role: adPlan.creative.role,\n" +
-  "            resolvedFrom: adPlan.creative.source,\n" +
+  "            kind: adPlan.creativeResolved.kind,\n" +
+  "            value: adPlan.creativeResolved.value,\n" +
+  "            role: adPlan.creativeResolved.role,\n" +
+  "            resolvedFrom: adPlan.creativeResolved.resolvedFrom,\n" +
+  "            repo: adPlan.creativeResolved.repo,\n" +
+  "            branch: adPlan.creativeResolved.branch,\n" +
+  "            githubPath: adPlan.creativeResolved.githubPath,\n" +
+  "            url: adPlan.creativeResolved.url,\n" +
+  "            downloadUrl: adPlan.creativeResolved.downloadUrl,\n" +
+  "            filename: adPlan.creativeResolved.filename,\n" +
+  "            expectedMime: adPlan.creativeResolved.expectedMime,\n" +
+  "            expectedMimeFamily: adPlan.creativeResolved.expectedMimeFamily,\n" +
+  "            resolutionMethod: adPlan.creativeResolved.resolutionMethod,\n" +
   "          },\n" +
   "        },\n" +
   "        computed: {\n" +
@@ -494,7 +676,9 @@ const processWf4Code =
   "  exports.buildDryRunBundle = buildDryRunBundle;\n" +
   "  exports.mapAuthorObjective = mapAuthorObjective;\n" +
   "  exports.selectCreative = selectCreative;\n" +
+  "  exports.resolveCreativeSource = resolveCreativeSource;\n" +
   "  exports.checkIdempotency = checkIdempotency;\n" +
+  "  exports.IMAGE_EXTENSIONS = IMAGE_EXTENSIONS;\n" +
   "})(__wf4Exports);\n" +
   "\n" +
   "const input = $input.first().json;\n" +
@@ -574,8 +758,80 @@ const mergeAfterAdSetCode =
   "if (!adSetId) throw new Error('Create Ad Set PAUSED returned no id');\n" +
   "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { adSetId: String(adSetId) }) }) }];";
 
-const mergeAfterImageCode =
+const resolveCreativeDownloadPlanCode =
   "const prev = $('Merge AdSet Id').first().json;\n" +
+  "const creative = prev.bundle && prev.bundle.source && prev.bundle.source.creative;\n" +
+  "const imageUpload = prev.bundle && prev.bundle.requests && prev.bundle.requests.imageUpload;\n" +
+  "if (!creative || !creative.downloadUrl) {\n" +
+  "  throw new Error('CREATIVE_REPO_UNRESOLVED: bundle.source.creative.downloadUrl missing');\n" +
+  "}\n" +
+  "if (!creative.filename) {\n" +
+  "  throw new Error('CREATIVE_PATH_MISSING: bundle.source.creative.filename missing');\n" +
+  "}\n" +
+  "if (creative.expectedMimeFamily !== 'image') {\n" +
+  "  throw new Error('CREATIVE_UNSUPPORTED_TYPE: expectedMimeFamily must be image');\n" +
+  "}\n" +
+  "if (creative.kind === 'githubPath' && !creative.repo) {\n" +
+  "  throw new Error('CREATIVE_REPO_UNRESOLVED: githubPath creative missing repo');\n" +
+  "}\n" +
+  "const plan = {\n" +
+  "  downloadUrl: creative.downloadUrl,\n" +
+  "  filename: creative.filename,\n" +
+  "  expectedMime: creative.expectedMime || (imageUpload && imageUpload.expectedMime) || null,\n" +
+  "  expectedMimeFamily: 'image',\n" +
+  "  resolutionMethod: creative.resolutionMethod,\n" +
+  "  repo: creative.repo || null,\n" +
+  "  branch: creative.branch || null,\n" +
+  "  githubPath: creative.githubPath || null,\n" +
+  "  kind: creative.kind,\n" +
+  "};\n" +
+  "return [{ json: Object.assign({}, prev, { creativeDownloadPlan: plan }) }];";
+
+const validateCreativeBinaryCode =
+  "const prev = $('Resolve Creative Download Plan').first().json;\n" +
+  "const item = $input.first();\n" +
+  "const plan = prev.creativeDownloadPlan;\n" +
+  "const binary = item.binary && (item.binary.data || item.binary[Object.keys(item.binary)[0]]);\n" +
+  "if (!binary) {\n" +
+  "  throw new Error('CREATIVE_BINARY_EMPTY: download returned no binary');\n" +
+  "}\n" +
+  "const mime = String(binary.mimeType || binary.fileType || '').toLowerCase();\n" +
+  "const fileName = binary.fileName || plan.filename;\n" +
+  "const allowed = ['image/png','image/jpeg','image/jpg','image/gif','image/webp'];\n" +
+  "const looksImage = mime.indexOf('image/') === 0 || allowed.indexOf(mime) !== -1;\n" +
+  "if (mime && !looksImage) {\n" +
+  "  throw new Error('CREATIVE_NOT_IMAGE: content-type=' + mime);\n" +
+  "}\n" +
+  "if (plan.expectedMime && mime && mime !== 'image/jpg' && mime !== plan.expectedMime && !(plan.expectedMime === 'image/jpeg' && mime === 'image/jpg')) {\n" +
+  "  // Soft mismatch: still require image/*; exact MIME may vary by CDN.\n" +
+  "  if (mime.indexOf('image/') !== 0) {\n" +
+  "    throw new Error('CREATIVE_NOT_IMAGE: expected ' + plan.expectedMime + ' got ' + mime);\n" +
+  "  }\n" +
+  "}\n" +
+  "let byteSize = 0;\n" +
+  "if (typeof binary.fileSize === 'number') byteSize = binary.fileSize;\n" +
+  "else if (binary.data && typeof binary.data === 'string' && binary.data.length > 0) {\n" +
+  "  byteSize = binary.data.length;\n" +
+  "}\n" +
+  "if (!(byteSize > 0)) {\n" +
+  "  throw new Error('CREATIVE_BINARY_EMPTY: downloaded image has zero bytes');\n" +
+  "}\n" +
+  "const meta = {\n" +
+  "  filename: fileName || plan.filename,\n" +
+  "  mimeType: mime || plan.expectedMime || 'image/png',\n" +
+  "  byteSize: byteSize || null,\n" +
+  "  downloadUrl: plan.downloadUrl,\n" +
+  "  resolutionMethod: plan.resolutionMethod,\n" +
+  "};\n" +
+  "return [{\n" +
+  "  json: Object.assign({}, prev, {\n" +
+  "    metaCreate: Object.assign({}, prev.metaCreate || {}, { creativeBinaryMeta: meta }),\n" +
+  "  }),\n" +
+  "  binary: item.binary,\n" +
+  "}];";
+
+const mergeAfterImageCode =
+  "const prev = $('Validate Creative Binary').first().json;\n" +
   "const created = $input.first().json;\n" +
   "let imageHash = null;\n" +
   "if (created.images) {\n" +
@@ -637,6 +893,10 @@ const fixtureAppJson = JSON.stringify({
   media: { ogImage: { githubPath: 'media/og-image.png' } },
   analytics: { experimentRunId: 'run_human-lab_2026q2_001' },
   experiment: { testBudget: { currency: 'USD', amount: 14, durationDays: 14 } },
+  source: {
+    mockupGithubRepo: 'scootero/Human-Lab-WF1-Sandbox',
+    mockupBranch: 'main',
+  },
   deployment: { landing: { url: 'https://human-lab-wf2-sandbox.vercel.app' } },
 });
 
@@ -893,6 +1153,58 @@ const mergeAdSetId = node({
   },
 });
 
+const resolveCreativeDownloadPlan = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Resolve Creative Download Plan',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: resolveCreativeDownloadPlanCode,
+    },
+  },
+});
+
+const downloadCreativeBinary = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Download Creative Binary',
+    disabled: true,
+    parameters: {
+      method: 'GET',
+      url: expr(
+        "{{ $('Resolve Creative Download Plan').item.json.creativeDownloadPlan.downloadUrl }}"
+      ),
+      authentication: 'none',
+      options: {
+        response: {
+          response: {
+            responseFormat: 'file',
+            outputPropertyName: 'data',
+          },
+        },
+      },
+    },
+  },
+});
+
+const validateCreativeBinary = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Validate Creative Binary',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: validateCreativeBinaryCode,
+    },
+  },
+});
+
 const uploadAdImage = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.3,
@@ -904,14 +1216,15 @@ const uploadAdImage = node({
       url: `${META_GRAPH_BASE}/adimages`,
       authentication: 'predefinedCredentialType',
       nodeCredentialType: 'facebookGraphApi',
-      // Binary source must be resolved before create-paused enablement (fixture githubPath → bytes).
+      // Binary from Download Creative Binary → Validate Creative Binary (not a creative URL pass-through).
       sendBody: true,
       contentType: 'multipart-form-data',
       bodyParameters: {
         parameters: [
           {
+            parameterType: 'formBinaryData',
             name: 'filename',
-            value: expr("{{ $('Merge AdSet Id').item.json.bundle.source.creative.value || 'creative.png' }}"),
+            inputDataFieldName: 'data',
           },
         ],
       },
@@ -1059,6 +1372,9 @@ const createPausedChain = createPausedBlocked
   .to(mergeCampaignId)
   .to(createAdSetPaused)
   .to(mergeAdSetId)
+  .to(resolveCreativeDownloadPlan)
+  .to(downloadCreativeBinary)
+  .to(validateCreativeBinary)
   .to(uploadAdImage)
   .to(mergeImageHash)
   .to(createCreative)

@@ -56,6 +56,10 @@
       "durationDays": 14
     }
   },
+  "source": {
+    "mockupGithubRepo": "scootero/Human-Lab-WF1-Sandbox",
+    "mockupBranch": "main"
+  },
   "deployment": {
     "landing": {
       "url": "https://human-lab-wf2-sandbox.vercel.app"

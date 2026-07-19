@@ -43,8 +43,159 @@ if (typeof globalThis !== "undefined") {
     us: "US",
   };
 
+  /** V1 image creative extensions only (no video). */
+  var IMAGE_EXTENSIONS = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+  };
+
   function roundBudget(value) {
     return Math.round(value * 100) / 100;
+  }
+
+  function normalizeGithubRepo(raw) {
+    if (!raw || typeof raw !== "string") return null;
+    var s = raw.trim();
+    s = s.replace(/^https?:\/\/github\.com\//i, "");
+    s = s.replace(/\.git$/i, "");
+    s = s.replace(/\/+$/, "");
+    var parts = s.split("/");
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    return parts[0] + "/" + parts[1];
+  }
+
+  function filenameFromPath(p) {
+    var parts = String(p || "").split("/");
+    return parts[parts.length - 1] || "";
+  }
+
+  function extensionOf(filename) {
+    var m = String(filename || "")
+      .toLowerCase()
+      .match(/\.([a-z0-9]+)$/);
+    return m ? m[1] : "";
+  }
+
+  /**
+   * Generic creative binary resolution for any app package.
+   * Reads ads.media[] / media.ogImage + source.assetsGithubRepo ?? source.mockupGithubRepo.
+   * Does not hardcode app ids, repos, or filenames.
+   */
+  function resolveCreativeSource(app, creative) {
+    if (!creative || !creative.kind || !creative.value) {
+      return { ok: false, error: "CREATIVE_PATH_MISSING: no usable creative value" };
+    }
+
+    if (creative.kind === "url") {
+      var urlValue = String(creative.value).trim();
+      if (!/^https:\/\//i.test(urlValue)) {
+        return { ok: false, error: "CREATIVE_DOWNLOAD_FAILED: creative url must be HTTPS" };
+      }
+      var urlFilename = filenameFromPath(urlValue.split("?")[0]);
+      var urlExt = extensionOf(urlFilename);
+      if (!IMAGE_EXTENSIONS[urlExt]) {
+        return {
+          ok: false,
+          error:
+            "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
+            (urlExt || "none"),
+        };
+      }
+      return {
+        ok: true,
+        resolved: {
+          kind: "url",
+          value: urlValue,
+          role: creative.role || "primary",
+          resolvedFrom: creative.source,
+          repo: null,
+          branch: null,
+          githubPath: null,
+          url: urlValue,
+          downloadUrl: urlValue,
+          filename: urlFilename,
+          expectedMime: IMAGE_EXTENSIONS[urlExt],
+          expectedMimeFamily: "image",
+          resolutionMethod: "direct_url",
+        },
+      };
+    }
+
+    if (creative.kind !== "githubPath") {
+      return {
+        ok: false,
+        error: "CREATIVE_UNSUPPORTED_TYPE: unsupported creative kind " + creative.kind,
+      };
+    }
+
+    var githubPath = String(creative.value).trim().replace(/^\/+/, "");
+    if (!githubPath) {
+      return { ok: false, error: "CREATIVE_PATH_MISSING: githubPath is empty" };
+    }
+
+    var filename = filenameFromPath(githubPath);
+    var ext = extensionOf(filename);
+    if (!IMAGE_EXTENSIONS[ext]) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
+          (ext || "none"),
+      };
+    }
+
+    var source = (app && app.source) || {};
+    var repoRaw = source.assetsGithubRepo || source.mockupGithubRepo;
+    if (!repoRaw) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_REPO_UNRESOLVED: set source.assetsGithubRepo or source.mockupGithubRepo for githubPath creatives",
+      };
+    }
+    var repo = normalizeGithubRepo(repoRaw);
+    if (!repo) {
+      return {
+        ok: false,
+        error: "CREATIVE_REPO_INVALID: expected owner/repo, got " + String(repoRaw),
+      };
+    }
+
+    var branch = String(source.assetsBranch || source.mockupBranch || "main").trim() || "main";
+    var downloadUrl =
+      "https://raw.githubusercontent.com/" +
+      repo +
+      "/" +
+      encodeURIComponent(branch).replace(/%2F/gi, "/") +
+      "/" +
+      githubPath
+        .split("/")
+        .map(function (seg) {
+          return encodeURIComponent(seg);
+        })
+        .join("/");
+
+    return {
+      ok: true,
+      resolved: {
+        kind: "githubPath",
+        value: githubPath,
+        role: creative.role || "primary",
+        resolvedFrom: creative.source,
+        repo: repo,
+        branch: branch,
+        githubPath: githubPath,
+        url: null,
+        downloadUrl: downloadUrl,
+        filename: filename,
+        expectedMime: IMAGE_EXTENSIONS[ext],
+        expectedMimeFamily: "image",
+        resolutionMethod: "github_raw",
+      },
+    };
   }
 
   function buildUtmQuery(utmTemplate) {
@@ -156,6 +307,11 @@ if (typeof globalThis !== "undefined") {
       return { ok: false, error: "No usable creative (ads.media[] or media.ogImage)" };
     }
 
+    var creativeResolved = resolveCreativeSource(app, creative);
+    if (!creativeResolved.ok) {
+      return { ok: false, error: creativeResolved.error };
+    }
+
     var budget = app.experiment.testBudget;
     if (!budget.durationDays || budget.durationDays <= 0) {
       return { ok: false, error: "experiment.testBudget.durationDays must be > 0" };
@@ -214,6 +370,7 @@ if (typeof globalThis !== "undefined") {
           interests: targeting.interests || null,
         },
         creative: creative,
+        creativeResolved: creativeResolved.resolved,
         landingUrl: landingUrl,
         destinationUrl: destinationUrl,
         budget: {
@@ -325,6 +482,22 @@ if (typeof globalThis !== "undefined") {
           endpoint: "POST /" + adAccountId + "/adimages",
           source: "ads.media githubPath or media.ogImage",
           image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+          resolutionMethod: adPlan.creativeResolved
+            ? adPlan.creativeResolved.resolutionMethod
+            : null,
+          downloadUrl: adPlan.creativeResolved
+            ? adPlan.creativeResolved.downloadUrl
+            : null,
+          filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,
+          repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,
+          branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,
+          githubPath: adPlan.creativeResolved
+            ? adPlan.creativeResolved.githubPath
+            : null,
+          expectedMime: adPlan.creativeResolved
+            ? adPlan.creativeResolved.expectedMime
+            : null,
+          expectedMimeFamily: "image",
         },
         creative: {
           name: adPlan.campaignName + "-creative-a",
@@ -420,10 +593,19 @@ if (typeof globalThis !== "undefined") {
         source: {
           landingUrl: adPlan.landingUrl,
           creative: {
-            kind: adPlan.creative.kind,
-            value: adPlan.creative.value,
-            role: adPlan.creative.role,
-            resolvedFrom: adPlan.creative.source,
+            kind: adPlan.creativeResolved.kind,
+            value: adPlan.creativeResolved.value,
+            role: adPlan.creativeResolved.role,
+            resolvedFrom: adPlan.creativeResolved.resolvedFrom,
+            repo: adPlan.creativeResolved.repo,
+            branch: adPlan.creativeResolved.branch,
+            githubPath: adPlan.creativeResolved.githubPath,
+            url: adPlan.creativeResolved.url,
+            downloadUrl: adPlan.creativeResolved.downloadUrl,
+            filename: adPlan.creativeResolved.filename,
+            expectedMime: adPlan.creativeResolved.expectedMime,
+            expectedMimeFamily: adPlan.creativeResolved.expectedMimeFamily,
+            resolutionMethod: adPlan.creativeResolved.resolutionMethod,
           },
         },
         computed: {
@@ -471,5 +653,7 @@ if (typeof globalThis !== "undefined") {
   exports.buildDryRunBundle = buildDryRunBundle;
   exports.mapAuthorObjective = mapAuthorObjective;
   exports.selectCreative = selectCreative;
+  exports.resolveCreativeSource = resolveCreativeSource;
   exports.checkIdempotency = checkIdempotency;
+  exports.IMAGE_EXTENSIONS = IMAGE_EXTENSIONS;
 })(__wf4Exports);

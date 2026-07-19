@@ -56,7 +56,16 @@
       "kind": "githubPath",
       "value": "media/og-image.png",
       "role": "primary",
-      "resolvedFrom": "ads.media"
+      "resolvedFrom": "ads.media",
+      "repo": "scootero/Human-Lab-WF1-Sandbox",
+      "branch": "main",
+      "githubPath": "media/og-image.png",
+      "url": null,
+      "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+      "filename": "og-image.png",
+      "expectedMime": "image/png",
+      "expectedMimeFamily": "image",
+      "resolutionMethod": "github_raw"
     }
   },
   "computed": {
@@ -114,7 +123,15 @@
     "imageUpload": {
       "endpoint": "POST /act_979257825150251/adimages",
       "source": "ads.media githubPath or media.ogImage",
-      "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+      "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+      "resolutionMethod": "github_raw",
+      "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+      "filename": "og-image.png",
+      "repo": "scootero/Human-Lab-WF1-Sandbox",
+      "branch": "main",
+      "githubPath": "media/og-image.png",
+      "expectedMime": "image/png",
+      "expectedMimeFamily": "image"
     },
     "creative": {
       "name": "human-lab-validation-creative-a",

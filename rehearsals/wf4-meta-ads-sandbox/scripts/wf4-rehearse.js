@@ -116,12 +116,64 @@ function assertMatchesExpectedDryRun(actual, expected) {
   assert(actual.computed.dailyBudget === expected.computed.dailyBudget, "dailyBudget mismatch");
   assert(actual.computed.totalBudget === expected.computed.totalBudget, "totalBudget mismatch");
   assert(actual.source.creative.value === expected.source.creative.value, "creative mismatch");
+  assert(
+    actual.source.creative.resolutionMethod === expected.source.creative.resolutionMethod,
+    "creative resolutionMethod mismatch"
+  );
+  assert(
+    actual.source.creative.downloadUrl === expected.source.creative.downloadUrl,
+    "creative downloadUrl mismatch"
+  );
+  assert(
+    actual.source.creative.filename === expected.source.creative.filename,
+    "creative filename mismatch"
+  );
+  assert(
+    actual.source.creative.repo === expected.source.creative.repo,
+    "creative repo mismatch"
+  );
+  assert(
+    actual.requests.imageUpload.downloadUrl === expected.requests.imageUpload.downloadUrl,
+    "imageUpload downloadUrl mismatch"
+  );
+  assert(
+    actual.requests.imageUpload.filename === expected.requests.imageUpload.filename,
+    "imageUpload filename mismatch"
+  );
   assert(actual.budgetCapCheck.maxDailyBudgetUsd === 2, "maxDailyBudgetUsd must be 2");
   assert(actual.requests.adSet.optimization_goal === expected.requests.adSet.optimization_goal);
   assert(actual.requests.adSet.billing_event === expected.requests.adSet.billing_event);
   assert(
     actual.writeBackAfterCreatePausedOnly.ads.meta.status ===
       expected.writeBackAfterCreatePausedOnly.ads.meta.status
+  );
+}
+
+function testCreativeResolutionFailureMissingRepo() {
+  const app = readJson(appJsonPath);
+  delete app.source;
+  const result = adapter.buildDryRunBundle(
+    app,
+    Object.assign({ mode: "dry_run", wf3GateStatus: "proven" }, SANDBOX_META)
+  );
+  assert(!result.ok, "must fail when source repo missing for githubPath");
+  assert(
+    String(result.error).indexOf("CREATIVE_REPO_UNRESOLVED") !== -1,
+    "must report CREATIVE_REPO_UNRESOLVED"
+  );
+}
+
+function testCreativeResolutionFailureBadType() {
+  const app = readJson(appJsonPath);
+  app.ads.media = [{ githubPath: "media/demo.mp4", role: "video" }];
+  const result = adapter.buildDryRunBundle(
+    app,
+    Object.assign({ mode: "dry_run", wf3GateStatus: "proven" }, SANDBOX_META)
+  );
+  assert(!result.ok, "must fail for non-image githubPath");
+  assert(
+    String(result.error).indexOf("CREATIVE_UNSUPPORTED_TYPE") !== -1,
+    "must report CREATIVE_UNSUPPORTED_TYPE"
   );
 }
 
@@ -172,6 +224,8 @@ function main() {
   testIdempotencyRefusal();
   testBudgetCapExceeded();
   testWritebackFixtureShape();
+  testCreativeResolutionFailureMissingRepo();
+  testCreativeResolutionFailureBadType();
 
   console.log("WF4 local dry-run proof: PASS");
   console.log("  adapter SSOT: lib/meta-adapter.js");
@@ -190,6 +244,9 @@ function main() {
       " / " +
       bundle.requests.adSet.billing_event
   );
+  console.log("  creative downloadUrl: " + bundle.source.creative.downloadUrl);
+  console.log("  creative filename: " + bundle.source.creative.filename);
+  console.log("  creative resolutionMethod: " + bundle.source.creative.resolutionMethod);
   console.log("  writeBack ads.meta.status: " + bundle.writeBackAfterCreatePausedOnly.ads.meta.status);
   console.log("  rootStatusUnchanged: " + bundle.writeBackAfterCreatePausedOnly.rootStatusUnchanged);
   console.log("  ledger phase: " + bundle.ledgerPlan.phase);

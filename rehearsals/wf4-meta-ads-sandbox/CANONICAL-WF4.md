@@ -64,6 +64,8 @@ Create-paused nodes disabled.
 | `architecture/*.md` | Ad Plan / adapter / ledger contracts |
 | `external-proof-status.md` | Confirmed Meta IDs |
 | `meta-ads-contract.md` | V1 contract |
-| `scripts/wf4-rehearse.js` | Local proof |
+| `scripts/wf4-rehearse.js` | Local dry-run proof |
+| `scripts/wf4-resolve-creative.js` | Local creative binary download proof (no Meta) |
 | `scripts/sync-wf4-adapter-into-workflow.js` | Sync SSOT into workflow |
 | `n8n/` | SDK + canonical meta |
+| `external-proof-status.md` | Continuity / left-off / creative proof |

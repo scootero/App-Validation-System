@@ -1,0 +1,782 @@
+{
+  "name": "WF4 - Meta Ads Sandbox",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1d42406c-eed8-4946-b0f6-c888cb27a0b4",
+      "name": "Manual Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mode",
+              "name": "mode",
+              "value": "dry_run",
+              "type": "string"
+            },
+            {
+              "id": "approval",
+              "name": "approval",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "approvalToken",
+              "name": "approvalToken",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "provider",
+              "name": "provider",
+              "value": "meta",
+              "type": "string"
+            },
+            {
+              "id": "metaApiVersion",
+              "name": "metaApiVersion",
+              "value": "v25.0",
+              "type": "string"
+            },
+            {
+              "id": "META_API_VERSION",
+              "name": "META_API_VERSION",
+              "value": "v25.0",
+              "type": "string"
+            },
+            {
+              "id": "MAX_DAILY_BUDGET_USD",
+              "name": "MAX_DAILY_BUDGET_USD",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "META_BUSINESS_PORTFOLIO_ID",
+              "name": "META_BUSINESS_PORTFOLIO_ID",
+              "value": "1074341285117707",
+              "type": "string"
+            },
+            {
+              "id": "META_AD_ACCOUNT_ID",
+              "name": "META_AD_ACCOUNT_ID",
+              "value": "act_979257825150251",
+              "type": "string"
+            },
+            {
+              "id": "META_PAGE_ID",
+              "name": "META_PAGE_ID",
+              "value": "1237104852815793",
+              "type": "string"
+            },
+            {
+              "id": "META_INSTAGRAM_USER_ID",
+              "name": "META_INSTAGRAM_USER_ID",
+              "value": "17841440875992246",
+              "type": "string"
+            },
+            {
+              "id": "wf3GateStatus",
+              "name": "wf3GateStatus",
+              "value": "proven",
+              "type": "string"
+            },
+            {
+              "id": "useFixtureAppJson",
+              "name": "useFixtureAppJson",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "fixtureAppJson",
+              "name": "fixtureAppJson",
+              "value": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null},\"media\":[{\"githubPath\":\"media/og-image.png\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+              "type": "string"
+            },
+            {
+              "id": "wf4CreatePausedApprovalToken",
+              "name": "wf4CreatePausedApprovalToken",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "appId",
+              "name": "appId",
+              "value": "human-lab-wf1-sandbox",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3e5e23b1-07be-4a69-b3fd-891f6fe5c349",
+      "name": "Workflow Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * WF4 Meta Adapter — single source of truth for Ad Plan + Meta request mapping.\n * Consumed by scripts/wf4-rehearse.js and inlined into n8n Process Code via\n * scripts/sync-wf4-adapter-into-workflow.js. Do not duplicate mappings elsewhere.\n *\n * V1 Meta pairing (architecture revision):\n *   objective: OUTCOME_TRAFFIC\n *   optimization_goal: LINK_CLICKS\n *   billing_event: IMPRESSIONS\n * LANDING_PAGE_VIEWS is an alternative pending account validation — not locked for V1.\n */\nvar __wf4Exports =\n  typeof module !== \"undefined\" && module.exports ? module.exports : {};\nif (typeof globalThis !== \"undefined\") {\n  globalThis.WF4MetaAdapter = __wf4Exports;\n}\n\n(function (exports) {\n  \"use strict\";\n\n  var PROVIDER = \"meta\";\n  var DEFAULT_META_API_VERSION = \"v25.0\";\n  var DEFAULT_MAX_DAILY_BUDGET_USD = 2;\n\n  var OBJECTIVE_MAPPING = {\n    traffic: \"OUTCOME_TRAFFIC\",\n    conversions: \"OUTCOME_SALES\",\n    awareness: \"OUTCOME_AWARENESS\",\n    leads: \"OUTCOME_LEADS\",\n    \"app-installs\": \"OUTCOME_APP_PROMOTION\",\n  };\n\n  var V1_OPTIMIZATION_GOAL = \"LINK_CLICKS\";\n  var V1_BILLING_EVENT = \"IMPRESSIONS\";\n  /** Alternative (not V1 default): LANDING_PAGE_VIEWS + IMPRESSIONS — account-validate first. */\n  var ALT_OPTIMIZATION_GOAL = \"LANDING_PAGE_VIEWS\";\n\n  var SPECIAL_AD_CATEGORIES = [];\n  var META_ID_FIELDS = [\"campaignId\", \"adSetId\", \"creativeId\", \"adId\"];\n\n  var LOCATION_TO_COUNTRY = {\n    \"united states\": \"US\",\n    us: \"US\",\n  };\n\n  function roundBudget(value) {\n    return Math.round(value * 100) / 100;\n  }\n\n  function buildUtmQuery(utmTemplate) {\n    var u = utmTemplate || {};\n    var parts = [];\n    if (u.source) parts.push(\"utm_source=\" + encodeURIComponent(u.source));\n    if (u.medium) parts.push(\"utm_medium=\" + encodeURIComponent(u.medium));\n    if (u.campaign) parts.push(\"utm_campaign=\" + encodeURIComponent(u.campaign));\n    if (u.content) parts.push(\"utm_content=\" + encodeURIComponent(u.content));\n    if (u.term) parts.push(\"utm_term=\" + encodeURIComponent(u.term));\n    return parts.join(\"&\");\n  }\n\n  function mapCountries(locations) {\n    var countries = [];\n    for (var i = 0; i < (locations || []).length; i++) {\n      var key = String(locations[i]).trim().toLowerCase();\n      countries.push(LOCATION_TO_COUNTRY[key] || \"VERIFY_COUNTRY_CODE\");\n    }\n    return countries.length ? countries : [\"VERIFY_COUNTRY_CODE\"];\n  }\n\n  function selectCreative(app) {\n    var adsMedia = (app.ads && app.ads.media) || [];\n    for (var i = 0; i < adsMedia.length; i++) {\n      var item = adsMedia[i];\n      if (item.url || item.githubPath) {\n        return {\n          kind: item.url ? \"url\" : \"githubPath\",\n          value: item.url || item.githubPath,\n          role: item.role || \"primary\",\n          source: \"ads.media\",\n        };\n      }\n    }\n    var og = app.media && app.media.ogImage;\n    if (og && (og.url || og.githubPath)) {\n      return {\n        kind: og.url ? \"url\" : \"githubPath\",\n        value: og.url || og.githubPath,\n        role: \"fallback\",\n        source: \"media.ogImage\",\n      };\n    }\n    return null;\n  }\n\n  function checkIdempotency(app, provider) {\n    var meta = (app.ads && app.ads.meta) || {};\n    var runKey = {\n      appId: app.appId,\n      experimentRunId: app.analytics && app.analytics.experimentRunId,\n      provider: provider || PROVIDER,\n    };\n    var existing = META_ID_FIELDS.filter(function (field) {\n      return meta[field] != null && meta[field] !== \"\";\n    });\n    return {\n      runKey: runKey,\n      refused: existing.length > 0,\n      existingFields: existing,\n    };\n  }\n\n  function mapAuthorObjective(authorObjective) {\n    var key = String(authorObjective || \"traffic\").toLowerCase();\n    return OBJECTIVE_MAPPING[key] || OBJECTIVE_MAPPING.traffic;\n  }\n\n  function buildAdPlan(app, config) {\n    config = config || {};\n    var maxDailyBudgetUsd =\n      config.maxDailyBudgetUsd != null\n        ? Number(config.maxDailyBudgetUsd)\n        : DEFAULT_MAX_DAILY_BUDGET_USD;\n    var provider = config.provider || PROVIDER;\n    var mode = config.mode || \"dry_run\";\n\n    if (!app || !app.appId) {\n      return { ok: false, error: \"Missing appId\" };\n    }\n    if (!app.ads) {\n      return { ok: false, error: \"Missing ads section\" };\n    }\n    if (!app.experiment || !app.experiment.testBudget) {\n      return { ok: false, error: \"Missing experiment.testBudget\" };\n    }\n    if (!app.deployment || !app.deployment.landing || !app.deployment.landing.url) {\n      return { ok: false, error: \"Missing deployment.landing.url\" };\n    }\n    if (!/^https:\\/\\//i.test(app.deployment.landing.url)) {\n      return { ok: false, error: \"deployment.landing.url must be HTTPS\" };\n    }\n\n    var targeting = app.ads.targeting || {};\n    if (!targeting.locations || !targeting.locations.length) {\n      return { ok: false, error: \"ads.targeting.locations required\" };\n    }\n    if (targeting.ageMin == null || targeting.ageMax == null) {\n      return { ok: false, error: \"ads.targeting.ageMin and ageMax required\" };\n    }\n    var platforms = app.ads.platforms || [];\n    if (platforms.indexOf(\"facebook\") === -1 && platforms.indexOf(\"instagram\") === -1) {\n      return { ok: false, error: \"ads.platforms must include facebook and/or instagram\" };\n    }\n\n    var creative = selectCreative(app);\n    if (!creative) {\n      return { ok: false, error: \"No usable creative (ads.media[] or media.ogImage)\" };\n    }\n\n    var budget = app.experiment.testBudget;\n    if (!budget.durationDays || budget.durationDays <= 0) {\n      return { ok: false, error: \"experiment.testBudget.durationDays must be > 0\" };\n    }\n    if (budget.currency && budget.currency !== \"USD\") {\n      return { ok: false, error: \"experiment.testBudget.currency must be USD for V1 cap check\" };\n    }\n    var dailyBudgetUsd = roundBudget(Number(budget.amount) / Number(budget.durationDays));\n    if (dailyBudgetUsd > maxDailyBudgetUsd) {\n      return {\n        ok: false,\n        error:\n          \"Daily budget \" +\n          dailyBudgetUsd +\n          \" USD exceeds MAX_DAILY_BUDGET_USD=\" +\n          maxDailyBudgetUsd +\n          \" (fail-closed; never clamp)\",\n      };\n    }\n\n    var idem = checkIdempotency(app, provider);\n    if (idem.refused) {\n      return {\n        ok: false,\n        error:\n          \"Idempotency refusal: ads.meta already has \" +\n          idem.existingFields.join(\", \") +\n          \" for runKey \" +\n          JSON.stringify(idem.runKey),\n      };\n    }\n\n    var landingUrl = app.deployment.landing.url;\n    var utmQuery = buildUtmQuery(app.ads.utmTemplate);\n    var destinationUrl = utmQuery ? landingUrl + \"?\" + utmQuery : landingUrl;\n\n    return {\n      ok: true,\n      adPlan: {\n        mode: mode,\n        provider: provider,\n        appId: app.appId,\n        experimentRunId: app.analytics && app.analytics.experimentRunId,\n        runKey: idem.runKey,\n        authorObjective: app.ads.objective || \"traffic\",\n        campaignName: app.ads.campaignName,\n        callToAction: app.ads.callToAction,\n        headlines: app.ads.headlines || [],\n        primaryTexts: app.ads.primaryTexts || [],\n        descriptions: app.ads.descriptions || [],\n        platforms: platforms,\n        targeting: {\n          locations: targeting.locations,\n          ageMin: targeting.ageMin,\n          ageMax: targeting.ageMax,\n          interests: targeting.interests || null,\n        },\n        creative: creative,\n        landingUrl: landingUrl,\n        destinationUrl: destinationUrl,\n        budget: {\n          currency: budget.currency,\n          totalAmount: budget.amount,\n          durationDays: budget.durationDays,\n          dailyBudgetUsd: dailyBudgetUsd,\n        },\n        budgetCapCheck: {\n          maxDailyBudgetUsd: maxDailyBudgetUsd,\n          passed: true,\n        },\n        wf3Gate: {\n          required: true,\n          status: config.wf3GateStatus || \"proven\",\n          requiredEvents: [\n            \"page_view\",\n            \"email_captured\",\n            \"buy_now_clicked\",\n            \"mockup_interacted\",\n          ],\n        },\n        rootStatusPreserved: app.status || null,\n      },\n    };\n  }\n\n  function buildMetaRequests(adPlan, config) {\n    config = config || {};\n    var metaApiVersion = config.metaApiVersion || DEFAULT_META_API_VERSION;\n    var pageId = config.pageId || \"CONFIG_META_PAGE_ID\";\n    var adAccountId = config.adAccountId || \"act_{META_AD_ACCOUNT_ID}\";\n    var instagramUserId = config.instagramUserId || null;\n    var dailyBudgetMinor = Math.round(adPlan.budget.dailyBudgetUsd * 100);\n    var metaObjective = mapAuthorObjective(adPlan.authorObjective);\n\n    var adSetTargeting = {\n      geo_locations: { countries: mapCountries(adPlan.targeting.locations) },\n      age_min: adPlan.targeting.ageMin,\n      age_max: adPlan.targeting.ageMax,\n      publisher_platforms: adPlan.platforms,\n    };\n    if (adPlan.targeting.interests && adPlan.targeting.interests.length) {\n      adSetTargeting.interests = adPlan.targeting.interests.map(function () {\n        return \"VERIFY_INTEREST_ID\";\n      });\n    }\n\n    var headline = adPlan.headlines[0];\n    var primaryText = adPlan.primaryTexts[0];\n    var description = (adPlan.descriptions && adPlan.descriptions[0]) || \"\";\n\n    var objectStorySpec = {\n      page_id: pageId,\n      link_data: {\n        link: adPlan.destinationUrl,\n        message: primaryText,\n        name: headline,\n        description: description,\n        call_to_action: {\n          type: adPlan.callToAction,\n          value: { link: adPlan.destinationUrl },\n        },\n        image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n      },\n    };\n    if (\n      instagramUserId &&\n      adPlan.platforms &&\n      adPlan.platforms.indexOf(\"instagram\") !== -1\n    ) {\n      objectStorySpec.instagram_user_id = instagramUserId;\n    }\n\n    return {\n      metaApiVersion: metaApiVersion,\n      v1Pairing: {\n        objective: metaObjective,\n        optimization_goal: V1_OPTIMIZATION_GOAL,\n        billing_event: V1_BILLING_EVENT,\n        note:\n          \"LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.\",\n        alternativeOptimizationGoal: ALT_OPTIMIZATION_GOAL,\n      },\n      pausedStatuses: {\n        campaign: \"PAUSED\",\n        adSet: \"PAUSED\",\n        creative: \"N/A_ASSET\",\n        ad: \"PAUSED\",\n      },\n      statusForDeliveryEntities: \"PAUSED\",\n      neverSendActive: true,\n      requests: {\n        campaign: {\n          name: adPlan.campaignName,\n          objective: metaObjective,\n          status: \"PAUSED\",\n          special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),\n        },\n        adSet: {\n          name: adPlan.campaignName + \"-adset-v1\",\n          status: \"PAUSED\",\n          daily_budget: dailyBudgetMinor,\n          billing_event: V1_BILLING_EVENT,\n          optimization_goal: V1_OPTIMIZATION_GOAL,\n          targeting: adSetTargeting,\n        },\n        imageUpload: {\n          endpoint: \"POST /\" + adAccountId + \"/adimages\",\n          source: \"ads.media githubPath or media.ogImage\",\n          image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n        },\n        creative: {\n          name: adPlan.campaignName + \"-creative-a\",\n          object_story_spec: objectStorySpec,\n        },\n        ad: {\n          name: adPlan.campaignName + \"-ad-a\",\n          status: \"PAUSED\",\n          creative: { creative_id: \"CREATIVE_ID_FROM_CREATE_CREATIVE\" },\n        },\n      },\n    };\n  }\n\n  function buildLedgerPlan(adPlan) {\n    var operationKey = [adPlan.appId, adPlan.experimentRunId, adPlan.provider].join(\"|\");\n    return {\n      operationKey: operationKey,\n      appId: adPlan.appId,\n      experimentRunId: adPlan.experimentRunId,\n      provider: adPlan.provider,\n      phase: \"planned\",\n      campaignId: null,\n      adSetId: null,\n      imageHash: null,\n      creativeId: null,\n      adId: null,\n      lastError: null,\n      reconciliation:\n        \"V1: detect existing op → resume if safe → else manual_review_required; no auto-delete\",\n    };\n  }\n\n  function buildWriteBackPreview(adPlan, ids) {\n    ids = ids || {};\n    return {\n      ads: {\n        meta: {\n          status: \"created_paused\",\n          campaignId: ids.campaignId || \"<campaign-id>\",\n          adSetId: ids.adSetId || \"<ad-set-id>\",\n          creativeId: ids.creativeId || \"<creative-id>\",\n          adId: ids.adId || \"<ad-id>\",\n          landingUrl: adPlan.destinationUrl,\n          dailyBudget: adPlan.budget.dailyBudgetUsd,\n          createdAt: ids.createdAt || \"<iso8601>\",\n          lastSyncedAt: null,\n        },\n      },\n      rootStatusUnchanged: true,\n      rootStatusNote:\n        \"Preserve existing root status (e.g. ready). Set validating only after human-approved activation.\",\n    };\n  }\n\n  function buildDryRunBundle(app, config) {\n    config = config || {};\n    var planResult = buildAdPlan(app, config);\n    if (!planResult.ok) {\n      return planResult;\n    }\n    var adPlan = planResult.adPlan;\n    var meta = buildMetaRequests(adPlan, config);\n    var ledgerPlan = buildLedgerPlan(adPlan);\n    var writeBackPreview = buildWriteBackPreview(adPlan);\n\n    return {\n      ok: true,\n      bundle: {\n        mode: adPlan.mode,\n        appId: adPlan.appId,\n        provider: adPlan.provider,\n        runKey: adPlan.runKey,\n        metaApiVersion: meta.metaApiVersion,\n        adAccountIdRef: \"n8n.config.META_AD_ACCOUNT_ID\",\n        pageIdRef: \"n8n.config.META_PAGE_ID\",\n        metaAccountConfig: {\n          META_BUSINESS_PORTFOLIO_ID: config.businessPortfolioId || null,\n          META_AD_ACCOUNT_ID: config.adAccountId || null,\n          META_PAGE_ID: config.pageId || null,\n          META_INSTAGRAM_USER_ID: config.instagramUserId || null,\n        },\n        wf3Gate: adPlan.wf3Gate,\n        adPlan: {\n          authorObjective: adPlan.authorObjective,\n          campaignName: adPlan.campaignName,\n          platforms: adPlan.platforms,\n          targeting: adPlan.targeting,\n          budget: adPlan.budget,\n          destinationUrl: adPlan.destinationUrl,\n          rootStatusPreserved: adPlan.rootStatusPreserved,\n        },\n        source: {\n          landingUrl: adPlan.landingUrl,\n          creative: {\n            kind: adPlan.creative.kind,\n            value: adPlan.creative.value,\n            role: adPlan.creative.role,\n            resolvedFrom: adPlan.creative.source,\n          },\n        },\n        computed: {\n          destinationUrl: adPlan.destinationUrl,\n          dailyBudget: adPlan.budget.dailyBudgetUsd,\n          currency: adPlan.budget.currency,\n          totalBudget: adPlan.budget.totalAmount,\n          durationDays: adPlan.budget.durationDays,\n          pausedStatuses: meta.pausedStatuses,\n          statusForDeliveryEntities: meta.statusForDeliveryEntities,\n        },\n        budgetCapCheck: adPlan.budgetCapCheck,\n        v1Pairing: meta.v1Pairing,\n        requests: meta.requests,\n        ledgerPlan: ledgerPlan,\n        writeBackAfterCreatePausedOnly: writeBackPreview,\n        safety: {\n          externalWritePerformed: false,\n          liveAdsCreated: false,\n          spendPossible: false,\n          requiresExplicitApprovalBeforeCreatePaused: true,\n          neverSendActive: true,\n          tripleApprovalRequired: {\n            mode: \"create_paused\",\n            approval: true,\n            approvalToken: \"WF4_CREATE_PAUSED_APPROVAL_TOKEN\",\n          },\n        },\n      },\n    };\n  }\n\n  exports.PROVIDER = PROVIDER;\n  exports.DEFAULT_META_API_VERSION = DEFAULT_META_API_VERSION;\n  exports.DEFAULT_MAX_DAILY_BUDGET_USD = DEFAULT_MAX_DAILY_BUDGET_USD;\n  exports.OBJECTIVE_MAPPING = OBJECTIVE_MAPPING;\n  exports.V1_OPTIMIZATION_GOAL = V1_OPTIMIZATION_GOAL;\n  exports.V1_BILLING_EVENT = V1_BILLING_EVENT;\n  exports.ALT_OPTIMIZATION_GOAL = ALT_OPTIMIZATION_GOAL;\n  exports.SPECIAL_AD_CATEGORIES = SPECIAL_AD_CATEGORIES;\n  exports.buildAdPlan = buildAdPlan;\n  exports.buildMetaRequests = buildMetaRequests;\n  exports.buildLedgerPlan = buildLedgerPlan;\n  exports.buildWriteBackPreview = buildWriteBackPreview;\n  exports.buildDryRunBundle = buildDryRunBundle;\n  exports.mapAuthorObjective = mapAuthorObjective;\n  exports.selectCreative = selectCreative;\n  exports.checkIdempotency = checkIdempotency;\n})(__wf4Exports);\n\nconst input = $input.first().json;\nconst mode = input.mode || 'dry_run';\nconst approval = Boolean(input.approval);\nconst approvalToken = input.approvalToken || '';\nconst configToken = input.wf4CreatePausedApprovalToken || '';\nlet app = null;\nif (input.appJson && typeof input.appJson === 'object') {\n  app = input.appJson;\n} else if (input.useFixtureAppJson) {\n  app = JSON.parse(input.fixtureAppJson || '{}');\n} else {\n  throw new Error('No appJson provided and fixture disabled');\n}\nconst result = WF4MetaAdapter.buildDryRunBundle(app, {\n  mode: mode,\n  provider: input.provider || 'meta',\n  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n  wf3GateStatus: input.wf3GateStatus || 'proven',\n  pageId: input.META_PAGE_ID || 'CONFIG_META_PAGE_ID',\n  adAccountId: input.META_AD_ACCOUNT_ID || null,\n  instagramUserId: input.META_INSTAGRAM_USER_ID || null,\n  businessPortfolioId: input.META_BUSINESS_PORTFOLIO_ID || null,\n});\nif (!result.ok) {\n  throw new Error(result.error || 'WF4 dry-run bundle failed');\n}\nconst tripleApproved = mode === 'create_paused' && approval === true && approvalToken && configToken && approvalToken === configToken;\nreturn [{ json: Object.assign({}, input, { bundle: result.bundle, tripleApproved: tripleApproved, _createPausedAllowed: false }) }];\n"
+      },
+      "id": "a48cc10d-a7e3-415a-97b0-d1c35cc13927",
+      "name": "Process WF4 Dry Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "triple-approved",
+              "leftValue": "={{ $json.tripleApproved === true && $json._createPausedAllowed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "97d38440-8d9f-4ff8-9ebc-9e138840a205",
+      "name": "Triple Approval Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nif (item._createPausedAllowed !== true) {\n  throw new Error('CREATE_PAUSED_DISABLED: Meta mutations are not enabled. Keep create nodes disabled until explicit operator approval.');\n}\nreturn [{ json: item }];"
+      },
+      "id": "e6a9edb0-9598-476c-a6c9-231fb05c6bfa",
+      "name": "Create Paused Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/act_979257825150251/campaigns",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Ledger Idempotency Check').item.json.bundle.requests.campaign) }}",
+        "options": {}
+      },
+      "id": "26a7ebeb-dba7-4447-aa5e-549ccfd5977f",
+      "name": "Create Campaign PAUSED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1120,
+        0
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "pphgFAkucBMaBs8A",
+          "name": "Meta Marketing API - Orro"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ok: true, mode: 'dry_run', bundle: item.bundle, safety: item.bundle.safety, runKey: item.bundle.runKey, externalWritePerformed: false, metaHttpCalls: 0, driveWrites: 0 } }];"
+      },
+      "id": "d8397525-8213-46b6-8575-74e62df12eac",
+      "name": "Respond Dry Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Yys4vVmQGk8fTxag",
+          "cachedResultName": "WF4 Operation Ledger"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operationKey",
+              "keyValue": "={{ $json.bundle.ledgerPlan.operationKey }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "4540da94-1a39-4aa9-a76a-0f94dc6a0d36",
+      "name": "Ledger Lookup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "alwaysOutputData": true,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Create Paused Blocked').first().json;\nconst rows = $input.all().map(function (i) { return i.json; }).filter(function (r) {\n  return r && (r.operationKey || r.phase);\n});\nconst ledgerRow = rows[0] || null;\nconst hasLedger = Boolean(ledgerRow);\nif (hasLedger) {\n  const phase = String(ledgerRow.phase || '');\n  const ids = ['campaignId','adSetId','creativeId','adId'].filter(function (f) {\n    return ledgerRow[f] != null && String(ledgerRow[f]).trim() !== '';\n  });\n  if (phase === 'verified' || phase === 'writeback_done' || ids.length === 4) {\n    throw new Error('LEDGER_IDEMPOTENCY_REFUSE: operation already verified for ' + (item.bundle && item.bundle.ledgerPlan && item.bundle.ledgerPlan.operationKey));\n  }\n  if (ids.length > 0 || (phase && phase !== 'planned')) {\n    throw new Error('LEDGER_MANUAL_REVIEW_REQUIRED: partial ledger row phase=' + phase + ' ids=' + ids.join(','));\n  }\n}\nreturn [{ json: Object.assign({}, item, { ledgerExisting: hasLedger ? ledgerRow : null, ledgerAction: 'upsert_planned' }) }];"
+      },
+      "id": "191bcae1-b437-4cce-bf15-d142b0126c65",
+      "name": "Ledger Idempotency Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Yys4vVmQGk8fTxag",
+          "cachedResultName": "WF4 Operation Ledger"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operationKey",
+              "keyValue": "={{ $json.bundle.ledgerPlan.operationKey }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "operationKey"
+          ],
+          "value": {
+            "operationKey": "={{ $json.bundle.ledgerPlan.operationKey }}",
+            "appId": "={{ $json.bundle.ledgerPlan.appId }}",
+            "experimentRunId": "={{ $json.bundle.ledgerPlan.experimentRunId }}",
+            "provider": "={{ $json.bundle.ledgerPlan.provider }}",
+            "phase": "planned",
+            "campaignId": "",
+            "adSetId": "",
+            "imageHash": "",
+            "creativeId": "",
+            "adId": "",
+            "lastError": ""
+          }
+        },
+        "options": {}
+      },
+      "id": "8db277ae-0cf6-47b5-9ebc-09d3717b9191",
+      "name": "Ledger Upsert Planned",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Ledger Idempotency Check').first().json;\nconst created = $input.first().json;\nconst campaignId = created.id || created.campaign_id;\nif (!campaignId) throw new Error('Create Campaign PAUSED returned no id');\nreturn [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { campaignId: String(campaignId) }) }) }];"
+      },
+      "id": "4cdf8e5f-f881-4dee-bf51-2b8baa7e1225",
+      "name": "Merge Campaign Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Merge Campaign Id').item.json.bundle.requests.adSet, { campaign_id: $('Merge Campaign Id').item.json.metaCreate.campaignId })) }}",
+        "options": {}
+      },
+      "id": "4c872ed6-c4be-435b-828b-ce8f48db9fe4",
+      "name": "Create Ad Set PAUSED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1792,
+        0
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "pphgFAkucBMaBs8A",
+          "name": "Meta Marketing API - Orro"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Merge Campaign Id').first().json;\nconst created = $input.first().json;\nconst adSetId = created.id || created.adset_id;\nif (!adSetId) throw new Error('Create Ad Set PAUSED returned no id');\nreturn [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { adSetId: String(adSetId) }) }) }];"
+      },
+      "id": "475f20c3-8348-4d22-a810-9904d695b1d0",
+      "name": "Merge AdSet Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/act_979257825150251/adimages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "filename",
+              "value": "={{ $('Merge AdSet Id').item.json.bundle.source.creative.value || 'creative.png' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c000d3ae-e198-4df4-92f8-796a2480f69c",
+      "name": "Upload Ad Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2240,
+        0
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "pphgFAkucBMaBs8A",
+          "name": "Meta Marketing API - Orro"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Merge AdSet Id').first().json;\nconst created = $input.first().json;\nlet imageHash = null;\nif (created.images) {\n  const keys = Object.keys(created.images);\n  if (keys.length) imageHash = created.images[keys[0]].hash || null;\n}\nimageHash = imageHash || created.hash || created.image_hash;\nif (!imageHash) throw new Error('Upload Ad Image returned no image_hash');\nreturn [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { imageHash: String(imageHash) }) }) }];"
+      },
+      "id": "adfdedaf-7ea1-4f3e-8bb2-80dc660c2869",
+      "name": "Merge Image Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/act_979257825150251/adcreatives",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify((function () { var c = JSON.parse(JSON.stringify($('Merge Image Hash').item.json.bundle.requests.creative)); c.object_story_spec.link_data.image_hash = $('Merge Image Hash').item.json.metaCreate.imageHash; return c; })()) }}",
+        "options": {}
+      },
+      "id": "0ef406c8-2e10-44b9-8a68-61692def7c2c",
+      "name": "Create Creative",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        896,
+        160
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "pphgFAkucBMaBs8A",
+          "name": "Meta Marketing API - Orro"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Merge Image Hash').first().json;\nconst created = $input.first().json;\nconst creativeId = created.id || created.creative_id;\nif (!creativeId) throw new Error('Create Creative returned no id');\nreturn [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { creativeId: String(creativeId) }) }) }];"
+      },
+      "id": "73b1cceb-b86a-4fb2-8b80-cb3a4eece505",
+      "name": "Merge Creative Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        160
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/act_979257825150251/ads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $('Merge Creative Id').item.json.bundle.requests.ad.name, status: 'PAUSED', adset_id: $('Merge Creative Id').item.json.metaCreate.adSetId, creative: { creative_id: $('Merge Creative Id').item.json.metaCreate.creativeId } }) }}",
+        "options": {}
+      },
+      "id": "37a8b698-5a43-48ca-a0b4-397ced3d4326",
+      "name": "Create Ad PAUSED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        160
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "pphgFAkucBMaBs8A",
+          "name": "Meta Marketing API - Orro"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Merge Creative Id').first().json;\nconst created = $input.first().json;\nconst adId = created.id || created.ad_id;\nif (!adId) throw new Error('Create Ad PAUSED returned no id');\nconst mc = Object.assign({}, prev.metaCreate || {}, { adId: String(adId) });\nconst plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\nreturn [{ json: Object.assign({}, prev, {\n  metaCreate: mc,\n  ledgerUpsert: {\n    operationKey: plan.operationKey,\n    appId: plan.appId,\n    experimentRunId: plan.experimentRunId,\n    provider: plan.provider || 'meta',\n    phase: 'verified',\n    campaignId: mc.campaignId || '',\n    adSetId: mc.adSetId || '',\n    imageHash: mc.imageHash || '',\n    creativeId: mc.creativeId || '',\n    adId: mc.adId || '',\n    lastError: '',\n  }\n}) }];"
+      },
+      "id": "f9b9176f-c270-47cc-bdbe-5a06181cf99f",
+      "name": "Prepare Ledger Verified",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        160
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Yys4vVmQGk8fTxag",
+          "cachedResultName": "WF4 Operation Ledger"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operationKey",
+              "keyValue": "={{ $json.ledgerUpsert.operationKey }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "operationKey"
+          ],
+          "value": {
+            "operationKey": "={{ $json.ledgerUpsert.operationKey }}",
+            "appId": "={{ $json.ledgerUpsert.appId }}",
+            "experimentRunId": "={{ $json.ledgerUpsert.experimentRunId }}",
+            "provider": "={{ $json.ledgerUpsert.provider }}",
+            "phase": "={{ $json.ledgerUpsert.phase }}",
+            "campaignId": "={{ $json.ledgerUpsert.campaignId }}",
+            "adSetId": "={{ $json.ledgerUpsert.adSetId }}",
+            "imageHash": "={{ $json.ledgerUpsert.imageHash }}",
+            "creativeId": "={{ $json.ledgerUpsert.creativeId }}",
+            "adId": "={{ $json.ledgerUpsert.adId }}",
+            "lastError": "={{ $json.ledgerUpsert.lastError }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "1b0d3e66-5b51-4d3e-8107-06f554ac00b0",
+      "name": "Ledger Mark Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        160
+      ],
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Run": {
+      "main": [
+        [
+          {
+            "node": "Workflow Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Config": {
+      "main": [
+        [
+          {
+            "node": "Process WF4 Dry Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process WF4 Dry Run": {
+      "main": [
+        [
+          {
+            "node": "Triple Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triple Approval Gate": {
+      "main": [
+        [
+          {
+            "node": "Create Paused Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Dry Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Paused Blocked": {
+      "main": [
+        [
+          {
+            "node": "Ledger Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger Lookup": {
+      "main": [
+        [
+          {
+            "node": "Ledger Idempotency Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger Idempotency Check": {
+      "main": [
+        [
+          {
+            "node": "Ledger Upsert Planned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger Upsert Planned": {
+      "main": [
+        [
+          {
+            "node": "Create Campaign PAUSED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Campaign PAUSED": {
+      "main": [
+        [
+          {
+            "node": "Merge Campaign Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Campaign Id": {
+      "main": [
+        [
+          {
+            "node": "Create Ad Set PAUSED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ad Set PAUSED": {
+      "main": [
+        [
+          {
+            "node": "Merge AdSet Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge AdSet Id": {
+      "main": [
+        [
+          {
+            "node": "Upload Ad Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Ad Image": {
+      "main": [
+        [
+          {
+            "node": "Merge Image Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Image Hash": {
+      "main": [
+        [
+          {
+            "node": "Create Creative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Creative": {
+      "main": [
+        [
+          {
+            "node": "Merge Creative Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Creative Id": {
+      "main": [
+        [
+          {
+            "node": "Create Ad PAUSED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ad PAUSED": {
+      "main": [
+        [
+          {
+            "node": "Prepare Ledger Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Ledger Verified": {
+      "main": [
+        [
+          {
+            "node": "Ledger Mark Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "ce6f88da-2f05-4711-b7d6-a7bc405f8f39",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "8e5d07dd7f0ea2bd97e3be464253272525bd4a331e62cc5afa76dc0049f90877"
+  },
+  "nodeGroups": [],
+  "id": "YIc53GBq4upelYp6",
+  "tags": []
+}

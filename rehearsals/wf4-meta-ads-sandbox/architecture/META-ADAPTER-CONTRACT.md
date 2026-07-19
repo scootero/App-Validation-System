@@ -21,9 +21,12 @@ Author `ads.objective` is mapped in the adapter (`traffic` → `OUTCOME_TRAFFIC`
 - Budget minor units (USD cents)
 - `special_ad_categories: []`
 - Payload builders: campaign / ad set / image upload / creative / ad
-- Create order: Campaign → Ad Set → image upload → Creative → Ad
+- **Creative binary resolution plan** via `resolveCreativeSource` (repo/branch/path → `downloadUrl` / `filename`; V1 image extensions only)
+- Create order: Campaign → Ad Set → **download binary** → image upload (`adimages`) → Creative → Ad
 - PAUSED: Campaign, Ad Set, Ad only; Creative/image are assets; never ACTIVE
 - Read-back / write-back preview (`ads.meta.status = created_paused`; root status unchanged)
+
+Dry-run bundles include `source.creative.downloadUrl` and `requests.imageUpload.*` resolution fields. Runtime download + Meta multipart upload live in the workflow template (disabled until create-paused). Adapter must not hardcode app ids, repos, or filenames.
 
 ## Operator Config (not adapter)
 
