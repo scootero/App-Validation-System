@@ -60,6 +60,23 @@ const processWf4Code =
   "\n" +
   "  var SPECIAL_AD_CATEGORIES = [];\n" +
   "  var META_ID_FIELDS = [\"campaignId\", \"adSetId\", \"creativeId\", \"adId\"];\n" +
+  "  var DEFAULT_ENVIRONMENT = \"sandbox\";\n" +
+  "  var DEFAULT_CREATIVE_REVISION = \"image-v1\";\n" +
+  "  var DEFAULT_WORKFLOW_VERSION = \"wf4-image-v1\";\n" +
+  "  var LOCK_TTL_MS = 5 * 60 * 1000;\n" +
+  "  /** Feed-first V1 — Stories/Reels excluded. */\n" +
+  "  var V1_FACEBOOK_POSITIONS = [\"feed\"];\n" +
+  "  var V1_INSTAGRAM_POSITIONS = [\"stream\"];\n" +
+  "  var V1_PLACEMENT_SET = \"facebook:feed|instagram:stream\";\n" +
+  "  var STAGE_ORDER = [\n" +
+  "    \"campaign\",\n" +
+  "    \"adset\",\n" +
+  "    \"image\",\n" +
+  "    \"creative\",\n" +
+  "    \"ad\",\n" +
+  "    \"verified\",\n" +
+  "    \"writeback_done\",\n" +
+  "  ];\n" +
   "\n" +
   "  var LOCATION_TO_COUNTRY = {\n" +
   "    \"united states\": \"US\",\n" +
@@ -77,6 +94,336 @@ const processWf4Code =
   "\n" +
   "  function roundBudget(value) {\n" +
   "    return Math.round(value * 100) / 100;\n" +
+  "  }\n" +
+  "\n" +
+  "  function getCrypto() {\n" +
+  "    try {\n" +
+  "      if (typeof require === \"function\") return require(\"crypto\");\n" +
+  "    } catch (e) {\n" +
+  "      /* n8n / browser */\n" +
+  "    }\n" +
+  "    return null;\n" +
+  "  }\n" +
+  "\n" +
+  "  function sha256Hex(value) {\n" +
+  "    var crypto = getCrypto();\n" +
+  "    if (!crypto || !crypto.createHash) {\n" +
+  "      throw new Error(\"SHA256_UNAVAILABLE: crypto.createHash required\");\n" +
+  "    }\n" +
+  "    return crypto.createHash(\"sha256\").update(String(value), \"utf8\").digest(\"hex\");\n" +
+  "  }\n" +
+  "\n" +
+  "  function sha256BytesHex(buf) {\n" +
+  "    var crypto = getCrypto();\n" +
+  "    if (!crypto || !crypto.createHash) {\n" +
+  "      throw new Error(\"SHA256_UNAVAILABLE: crypto.createHash required\");\n" +
+  "    }\n" +
+  "    return crypto.createHash(\"sha256\").update(buf).digest(\"hex\");\n" +
+  "  }\n" +
+  "\n" +
+  "  function stableStringify(value) {\n" +
+  "    if (value === null || typeof value !== \"object\") {\n" +
+  "      return JSON.stringify(value);\n" +
+  "    }\n" +
+  "    if (Array.isArray(value)) {\n" +
+  "      return \"[\" + value.map(stableStringify).join(\",\") + \"]\";\n" +
+  "    }\n" +
+  "    var keys = Object.keys(value).sort();\n" +
+  "    return (\n" +
+  "      \"{\" +\n" +
+  "      keys\n" +
+  "        .map(function (k) {\n" +
+  "          return JSON.stringify(k) + \":\" + stableStringify(value[k]);\n" +
+  "        })\n" +
+  "        .join(\",\") +\n" +
+  "      \"}\"\n" +
+  "    );\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildOperationKey(parts) {\n" +
+  "    return [parts.appId, parts.environment, parts.provider, parts.creativeRevision].join(\"|\");\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildPlacementSet(platforms) {\n" +
+  "    var parts = [];\n" +
+  "    if (!platforms || platforms.indexOf(\"facebook\") !== -1) parts.push(\"facebook:feed\");\n" +
+  "    if (platforms && platforms.indexOf(\"instagram\") !== -1) parts.push(\"instagram:stream\");\n" +
+  "    return parts.join(\"|\") || V1_PLACEMENT_SET;\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildCopyFingerprint(adPlan) {\n" +
+  "    return sha256Hex(\n" +
+  "      stableStringify({\n" +
+  "        headlines: adPlan.headlines || [],\n" +
+  "        primaryTexts: adPlan.primaryTexts || [],\n" +
+  "        descriptions: adPlan.descriptions || [],\n" +
+  "        callToAction: adPlan.callToAction || \"\",\n" +
+  "      })\n" +
+  "    );\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildTargetingFingerprint(adPlan) {\n" +
+  "    return sha256Hex(\n" +
+  "      stableStringify({\n" +
+  "        locations: adPlan.targeting.locations,\n" +
+  "        ageMin: adPlan.targeting.ageMin,\n" +
+  "        ageMax: adPlan.targeting.ageMax,\n" +
+  "        platforms: adPlan.platforms,\n" +
+  "        facebook_positions: V1_FACEBOOK_POSITIONS,\n" +
+  "        instagram_positions: V1_INSTAGRAM_POSITIONS,\n" +
+  "      })\n" +
+  "    );\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildBudgetFingerprint(adPlan) {\n" +
+  "    return sha256Hex(\n" +
+  "      stableStringify({\n" +
+  "        dailyBudgetUsd: adPlan.budget.dailyBudgetUsd,\n" +
+  "        currency: adPlan.budget.currency,\n" +
+  "        durationDays: adPlan.budget.durationDays,\n" +
+  "        totalAmount: adPlan.budget.totalAmount,\n" +
+  "      })\n" +
+  "    );\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildContentFingerprint(adPlan, identity) {\n" +
+  "    var payload = {\n" +
+  "      appId: adPlan.appId,\n" +
+  "      environment: identity.environment,\n" +
+  "      workflowVersion: identity.workflowVersion,\n" +
+  "      objective: mapAuthorObjective(adPlan.authorObjective),\n" +
+  "      optimization: V1_OPTIMIZATION_GOAL,\n" +
+  "      billing: V1_BILLING_EVENT,\n" +
+  "      landingUrl: adPlan.landingUrl,\n" +
+  "      targetingFingerprint: buildTargetingFingerprint(adPlan),\n" +
+  "      budgetFingerprint: buildBudgetFingerprint(adPlan),\n" +
+  "      creativeSha256: identity.creativeSha256,\n" +
+  "      copyFingerprint: buildCopyFingerprint(adPlan),\n" +
+  "      creativeRevision: identity.creativeRevision,\n" +
+  "      placementSet: identity.placementSet,\n" +
+  "    };\n" +
+  "    return sha256Hex(stableStringify(payload));\n" +
+  "  }\n" +
+  "\n" +
+  "  function firstMissingStage(row) {\n" +
+  "    row = row || {};\n" +
+  "    if (!row.campaignId) return \"campaign\";\n" +
+  "    if (!row.adSetId) return \"adset\";\n" +
+  "    if (!row.imageHash) return \"image\";\n" +
+  "    if (!row.creativeId) return \"creative\";\n" +
+  "    if (!row.adId) return \"ad\";\n" +
+  "    var phase = String(row.phase || \"\");\n" +
+  "    if (phase !== \"verified\" && phase !== \"writeback_done\") return \"verified\";\n" +
+  "    if (phase !== \"writeback_done\") return \"writeback_done\";\n" +
+  "    return null;\n" +
+  "  }\n" +
+  "\n" +
+  "  function isCompleteLedgerRow(row) {\n" +
+  "    if (!row) return false;\n" +
+  "    var phase = String(row.phase || \"\");\n" +
+  "    var ids = META_ID_FIELDS.filter(function (f) {\n" +
+  "      return row[f] != null && String(row[f]).trim() !== \"\";\n" +
+  "    });\n" +
+  "    return phase === \"writeback_done\" || phase === \"verified\" || ids.length === 4;\n" +
+  "  }\n" +
+  "\n" +
+  "  function lockIsHeld(row, executionId, nowMs) {\n" +
+  "    if (!row || !row.lockOwner) return false;\n" +
+  "    if (String(row.lockOwner) === String(executionId)) return false;\n" +
+  "    if (!row.lockExpiresAt) return true;\n" +
+  "    var exp = Date.parse(row.lockExpiresAt);\n" +
+  "    if (isNaN(exp)) return true;\n" +
+  "    return exp > nowMs;\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Pure ledger decision for claim / resume / already_complete / conflicts.\n" +
+  "   * Does not perform I/O — caller runs Lookup → decide → Upsert → re-Lookup confirm.\n" +
+  "   */\n" +
+  "  function evaluateLedgerDecision(ledgerRow, opts) {\n" +
+  "    opts = opts || {};\n" +
+  "    var executionId = opts.executionId || \"local\";\n" +
+  "    var nowMs = opts.nowMs != null ? opts.nowMs : Date.now();\n" +
+  "    var contentFingerprint = opts.contentFingerprint;\n" +
+  "    var operationKey = opts.operationKey;\n" +
+  "\n" +
+  "    if (ledgerRow && lockIsHeld(ledgerRow, executionId, nowMs)) {\n" +
+  "      return {\n" +
+  "        action: \"lock_held\",\n" +
+  "        outcome: \"failed\",\n" +
+  "        error: \"LEDGER_LOCK_HELD: operationKey=\" + operationKey,\n" +
+  "        resumeFrom: null,\n" +
+  "        metaCreate: null,\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    if (!ledgerRow) {\n" +
+  "      return {\n" +
+  "        action: \"claim\",\n" +
+  "        outcome: \"in_progress\",\n" +
+  "        resumeFrom: \"campaign\",\n" +
+  "        metaCreate: {},\n" +
+  "        lockOwner: executionId,\n" +
+  "        lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var rowFp = ledgerRow.contentFingerprint || \"\";\n" +
+  "    if (rowFp && contentFingerprint && rowFp !== contentFingerprint) {\n" +
+  "      if (isCompleteLedgerRow(ledgerRow) || firstMissingStage(ledgerRow) !== \"campaign\") {\n" +
+  "        return {\n" +
+  "          action: \"revision_conflict\",\n" +
+  "          outcome: \"manual_review_required\",\n" +
+  "          error:\n" +
+  "            \"LEDGER_REVISION_CONFLICT: fingerprint mismatch for \" +\n" +
+  "            operationKey +\n" +
+  "            \" — bump ads.meta.creativeRevision for a deliberate new variant\",\n" +
+  "          resumeFrom: null,\n" +
+  "          metaCreate: null,\n" +
+  "        };\n" +
+  "      }\n" +
+  "    }\n" +
+  "\n" +
+  "    if (isCompleteLedgerRow(ledgerRow) && (!rowFp || rowFp === contentFingerprint)) {\n" +
+  "      return {\n" +
+  "        action: \"already_complete\",\n" +
+  "        outcome: \"already_complete\",\n" +
+  "        resumeFrom: null,\n" +
+  "        metaCreate: {\n" +
+  "          campaignId: ledgerRow.campaignId || null,\n" +
+  "          adSetId: ledgerRow.adSetId || null,\n" +
+  "          imageHash: ledgerRow.imageHash || null,\n" +
+  "          creativeId: ledgerRow.creativeId || null,\n" +
+  "          adId: ledgerRow.adId || null,\n" +
+  "        },\n" +
+  "        error: null,\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var resumeFrom = firstMissingStage(ledgerRow);\n" +
+  "    if (resumeFrom && resumeFrom !== \"campaign\") {\n" +
+  "      return {\n" +
+  "        action: \"resume\",\n" +
+  "        outcome: \"resumed\",\n" +
+  "        resumeFrom: resumeFrom,\n" +
+  "        metaCreate: {\n" +
+  "          campaignId: ledgerRow.campaignId || null,\n" +
+  "          adSetId: ledgerRow.adSetId || null,\n" +
+  "          imageHash: ledgerRow.imageHash || null,\n" +
+  "          creativeId: ledgerRow.creativeId || null,\n" +
+  "          adId: ledgerRow.adId || null,\n" +
+  "        },\n" +
+  "        lockOwner: executionId,\n" +
+  "        lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    return {\n" +
+  "      action: \"claim\",\n" +
+  "      outcome: \"in_progress\",\n" +
+  "      resumeFrom: \"campaign\",\n" +
+  "      metaCreate: {\n" +
+  "        campaignId: ledgerRow.campaignId || null,\n" +
+  "        adSetId: ledgerRow.adSetId || null,\n" +
+  "        imageHash: ledgerRow.imageHash || null,\n" +
+  "        creativeId: ledgerRow.creativeId || null,\n" +
+  "        adId: ledgerRow.adId || null,\n" +
+  "      },\n" +
+  "      lockOwner: executionId,\n" +
+  "      lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),\n" +
+  "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Approval + safety gates for create_paused. Never logs token values.\n" +
+  "   */\n" +
+  "  function evaluateCreatePausedGates(input) {\n" +
+  "    input = input || {};\n" +
+  "    var mode = input.mode || \"dry_run\";\n" +
+  "    var approval = Boolean(input.approval);\n" +
+  "    var approvalToken = input.approvalToken || \"\";\n" +
+  "    var configToken = input.configToken || input.wf4CreatePausedApprovalToken || \"\";\n" +
+  "    var createPausedAllowed = input.createPausedAllowed === true;\n" +
+  "    var tokenPresent = Boolean(approvalToken);\n" +
+  "    var configTokenPresent = Boolean(configToken);\n" +
+  "    var tokenMatch =\n" +
+  "      tokenPresent && configTokenPresent && approvalToken === configToken;\n" +
+  "    var tripleApproved =\n" +
+  "      mode === \"create_paused\" && approval === true && tokenMatch;\n" +
+  "    var failures = [];\n" +
+  "\n" +
+  "    if (mode !== \"create_paused\") failures.push(\"mode_not_create_paused\");\n" +
+  "    if (!approval) failures.push(\"approval_false\");\n" +
+  "    if (!tokenPresent) failures.push(\"missing_approval_token\");\n" +
+  "    if (!configTokenPresent) failures.push(\"missing_config_token\");\n" +
+  "    if (tokenPresent && configTokenPresent && !tokenMatch) failures.push(\"wrong_approval_token\");\n" +
+  "    if (!createPausedAllowed) failures.push(\"create_paused_hard_gate_false\");\n" +
+  "    if (input.budgetCapPassed === false) failures.push(\"over_budget\");\n" +
+  "    if (input.ledgerDecisionAction === \"lock_held\") failures.push(\"ledger_lock_held\");\n" +
+  "    if (input.ledgerDecisionAction === \"revision_conflict\") failures.push(\"ledger_revision_conflict\");\n" +
+  "    if (input.ledgerDecisionAction === \"already_complete\") failures.push(\"already_complete\");\n" +
+  "    if (input.requiredMetaIdsPresent === false) failures.push(\"missing_meta_ids\");\n" +
+  "    if (input.landingUrlValid === false) failures.push(\"invalid_landing_url\");\n" +
+  "    if (input.creativeValid === false) failures.push(\"invalid_creative\");\n" +
+  "\n" +
+  "    return {\n" +
+  "      mode: mode,\n" +
+  "      approval: approval,\n" +
+  "      tokenPresent: tokenPresent,\n" +
+  "      configTokenPresent: configTokenPresent,\n" +
+  "      tokenMatch: tokenMatch,\n" +
+  "      tripleApproved: tripleApproved,\n" +
+  "      createPausedAllowed: createPausedAllowed,\n" +
+  "      createPathOpen: tripleApproved && createPausedAllowed && failures.length === 0,\n" +
+  "      failures: failures,\n" +
+  "      redacted: true,\n" +
+  "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  function redactSensitiveFields(obj) {\n" +
+  "    if (!obj || typeof obj !== \"object\") return obj;\n" +
+  "    var clone = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);\n" +
+  "    var keys = Object.keys(clone);\n" +
+  "    for (var i = 0; i < keys.length; i++) {\n" +
+  "      var k = keys[i];\n" +
+  "      var lower = k.toLowerCase();\n" +
+  "      if (\n" +
+  "        lower.indexOf(\"approvaltoken\") !== -1 ||\n" +
+  "        lower === \"wf4createpausedapprovaltoken\" ||\n" +
+  "        lower.indexOf(\"accesstoken\") !== -1\n" +
+  "      ) {\n" +
+  "        clone[k] = clone[k] ? \"[REDACTED]\" : \"\";\n" +
+  "      } else if (clone[k] && typeof clone[k] === \"object\") {\n" +
+  "        clone[k] = redactSensitiveFields(clone[k]);\n" +
+  "      }\n" +
+  "    }\n" +
+  "    return clone;\n" +
+  "  }\n" +
+  "\n" +
+  "  function buildLedgerStageUpsert(plan, metaCreate, phase, lock) {\n" +
+  "    metaCreate = metaCreate || {};\n" +
+  "    lock = lock || {};\n" +
+  "    return {\n" +
+  "      operationKey: plan.operationKey,\n" +
+  "      appId: plan.appId,\n" +
+  "      experimentRunId: plan.experimentRunId || \"\",\n" +
+  "      provider: plan.provider || PROVIDER,\n" +
+  "      environment: plan.environment,\n" +
+  "      creativeRevision: plan.creativeRevision,\n" +
+  "      contentFingerprint: plan.contentFingerprint,\n" +
+  "      creativeSha256: plan.creativeSha256,\n" +
+  "      phase: phase,\n" +
+  "      campaignId: metaCreate.campaignId || \"\",\n" +
+  "      adSetId: metaCreate.adSetId || \"\",\n" +
+  "      imageHash: metaCreate.imageHash || \"\",\n" +
+  "      creativeId: metaCreate.creativeId || \"\",\n" +
+  "      adId: metaCreate.adId || \"\",\n" +
+  "      lockOwner: lock.lockOwner != null ? lock.lockOwner : \"\",\n" +
+  "      lockExpiresAt: lock.lockExpiresAt != null ? lock.lockExpiresAt : \"\",\n" +
+  "      resumeFrom: lock.resumeFrom || \"\",\n" +
+  "      outcome: lock.outcome || \"in_progress\",\n" +
+  "      lastError: lock.lastError || \"\",\n" +
+  "    };\n" +
   "  }\n" +
   "\n" +
   "  function normalizeGithubRepo(raw) {\n" +
@@ -370,54 +717,91 @@ const processWf4Code =
   "    var landingUrl = app.deployment.landing.url;\n" +
   "    var utmQuery = buildUtmQuery(app.ads.utmTemplate);\n" +
   "    var destinationUrl = utmQuery ? landingUrl + \"?\" + utmQuery : landingUrl;\n" +
+  "    var environment = config.environment || DEFAULT_ENVIRONMENT;\n" +
+  "    var creativeRevision =\n" +
+  "      (app.ads.meta && app.ads.meta.creativeRevision) ||\n" +
+  "      config.creativeRevision ||\n" +
+  "      DEFAULT_CREATIVE_REVISION;\n" +
+  "    var workflowVersion = config.workflowVersion || DEFAULT_WORKFLOW_VERSION;\n" +
+  "    var creativeSha256 = config.creativeSha256 || null;\n" +
+  "    if (!creativeSha256) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error:\n" +
+  "          \"CREATIVE_SHA256_REQUIRED: pass config.creativeSha256 (binary hash) for operation fingerprint\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var placementSet = buildPlacementSet(platforms);\n" +
+  "    var operationKey = buildOperationKey({\n" +
+  "      appId: app.appId,\n" +
+  "      environment: environment,\n" +
+  "      provider: provider,\n" +
+  "      creativeRevision: creativeRevision,\n" +
+  "    });\n" +
+  "\n" +
+  "    var adPlan = {\n" +
+  "      mode: mode,\n" +
+  "      provider: provider,\n" +
+  "      appId: app.appId,\n" +
+  "      experimentRunId: app.analytics && app.analytics.experimentRunId,\n" +
+  "      runKey: idem.runKey,\n" +
+  "      environment: environment,\n" +
+  "      creativeRevision: creativeRevision,\n" +
+  "      workflowVersion: workflowVersion,\n" +
+  "      creativeSha256: creativeSha256,\n" +
+  "      operationKey: operationKey,\n" +
+  "      placementSet: placementSet,\n" +
+  "      authorObjective: app.ads.objective || \"traffic\",\n" +
+  "      campaignName: app.ads.campaignName,\n" +
+  "      callToAction: app.ads.callToAction,\n" +
+  "      headlines: app.ads.headlines || [],\n" +
+  "      primaryTexts: app.ads.primaryTexts || [],\n" +
+  "      descriptions: app.ads.descriptions || [],\n" +
+  "      platforms: platforms,\n" +
+  "      targeting: {\n" +
+  "        locations: targeting.locations,\n" +
+  "        ageMin: targeting.ageMin,\n" +
+  "        ageMax: targeting.ageMax,\n" +
+  "        interests: targeting.interests || null,\n" +
+  "      },\n" +
+  "      creative: creative,\n" +
+  "      creativeResolved: creativeResolved.resolved,\n" +
+  "      landingUrl: landingUrl,\n" +
+  "      destinationUrl: destinationUrl,\n" +
+  "      budget: {\n" +
+  "        currency: budget.currency,\n" +
+  "        totalAmount: budget.amount,\n" +
+  "        durationDays: budget.durationDays,\n" +
+  "        dailyBudgetUsd: dailyBudgetUsd,\n" +
+  "      },\n" +
+  "      budgetCapCheck: {\n" +
+  "        maxDailyBudgetUsd: maxDailyBudgetUsd,\n" +
+  "        passed: true,\n" +
+  "      },\n" +
+  "      wf3Gate: {\n" +
+  "        required: true,\n" +
+  "        status: config.wf3GateStatus || \"proven\",\n" +
+  "        requiredEvents: [\n" +
+  "          \"page_view\",\n" +
+  "          \"email_captured\",\n" +
+  "          \"buy_now_clicked\",\n" +
+  "          \"mockup_interacted\",\n" +
+  "        ],\n" +
+  "      },\n" +
+  "      rootStatusPreserved: app.status || null,\n" +
+  "    };\n" +
+  "\n" +
+  "    adPlan.contentFingerprint = buildContentFingerprint(adPlan, {\n" +
+  "      environment: environment,\n" +
+  "      workflowVersion: workflowVersion,\n" +
+  "      creativeSha256: creativeSha256,\n" +
+  "      creativeRevision: creativeRevision,\n" +
+  "      placementSet: placementSet,\n" +
+  "    });\n" +
   "\n" +
   "    return {\n" +
   "      ok: true,\n" +
-  "      adPlan: {\n" +
-  "        mode: mode,\n" +
-  "        provider: provider,\n" +
-  "        appId: app.appId,\n" +
-  "        experimentRunId: app.analytics && app.analytics.experimentRunId,\n" +
-  "        runKey: idem.runKey,\n" +
-  "        authorObjective: app.ads.objective || \"traffic\",\n" +
-  "        campaignName: app.ads.campaignName,\n" +
-  "        callToAction: app.ads.callToAction,\n" +
-  "        headlines: app.ads.headlines || [],\n" +
-  "        primaryTexts: app.ads.primaryTexts || [],\n" +
-  "        descriptions: app.ads.descriptions || [],\n" +
-  "        platforms: platforms,\n" +
-  "        targeting: {\n" +
-  "          locations: targeting.locations,\n" +
-  "          ageMin: targeting.ageMin,\n" +
-  "          ageMax: targeting.ageMax,\n" +
-  "          interests: targeting.interests || null,\n" +
-  "        },\n" +
-  "        creative: creative,\n" +
-  "        creativeResolved: creativeResolved.resolved,\n" +
-  "        landingUrl: landingUrl,\n" +
-  "        destinationUrl: destinationUrl,\n" +
-  "        budget: {\n" +
-  "          currency: budget.currency,\n" +
-  "          totalAmount: budget.amount,\n" +
-  "          durationDays: budget.durationDays,\n" +
-  "          dailyBudgetUsd: dailyBudgetUsd,\n" +
-  "        },\n" +
-  "        budgetCapCheck: {\n" +
-  "          maxDailyBudgetUsd: maxDailyBudgetUsd,\n" +
-  "          passed: true,\n" +
-  "        },\n" +
-  "        wf3Gate: {\n" +
-  "          required: true,\n" +
-  "          status: config.wf3GateStatus || \"proven\",\n" +
-  "          requiredEvents: [\n" +
-  "            \"page_view\",\n" +
-  "            \"email_captured\",\n" +
-  "            \"buy_now_clicked\",\n" +
-  "            \"mockup_interacted\",\n" +
-  "          ],\n" +
-  "        },\n" +
-  "        rootStatusPreserved: app.status || null,\n" +
-  "      },\n" +
+  "      adPlan: adPlan,\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
@@ -435,6 +819,8 @@ const processWf4Code =
   "      age_min: adPlan.targeting.ageMin,\n" +
   "      age_max: adPlan.targeting.ageMax,\n" +
   "      publisher_platforms: adPlan.platforms,\n" +
+  "      facebook_positions: V1_FACEBOOK_POSITIONS.slice(),\n" +
+  "      instagram_positions: V1_INSTAGRAM_POSITIONS.slice(),\n" +
   "    };\n" +
   "    if (adPlan.targeting.interests && adPlan.targeting.interests.length) {\n" +
   "      adSetTargeting.interests = adPlan.targeting.interests.map(function () {\n" +
@@ -536,21 +922,29 @@ const processWf4Code =
   "  }\n" +
   "\n" +
   "  function buildLedgerPlan(adPlan) {\n" +
-  "    var operationKey = [adPlan.appId, adPlan.experimentRunId, adPlan.provider].join(\"|\");\n" +
   "    return {\n" +
-  "      operationKey: operationKey,\n" +
+  "      operationKey: adPlan.operationKey,\n" +
   "      appId: adPlan.appId,\n" +
   "      experimentRunId: adPlan.experimentRunId,\n" +
   "      provider: adPlan.provider,\n" +
+  "      environment: adPlan.environment,\n" +
+  "      creativeRevision: adPlan.creativeRevision,\n" +
+  "      contentFingerprint: adPlan.contentFingerprint,\n" +
+  "      creativeSha256: adPlan.creativeSha256,\n" +
+  "      placementSet: adPlan.placementSet,\n" +
   "      phase: \"planned\",\n" +
   "      campaignId: null,\n" +
   "      adSetId: null,\n" +
   "      imageHash: null,\n" +
   "      creativeId: null,\n" +
   "      adId: null,\n" +
+  "      lockOwner: null,\n" +
+  "      lockExpiresAt: null,\n" +
+  "      resumeFrom: null,\n" +
+  "      outcome: null,\n" +
   "      lastError: null,\n" +
   "      reconciliation:\n" +
-  "        \"V1: detect existing op → resume if safe → else manual_review_required; no auto-delete\",\n" +
+  "        \"V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete\",\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
@@ -644,6 +1038,15 @@ const processWf4Code =
   "        v1Pairing: meta.v1Pairing,\n" +
   "        requests: meta.requests,\n" +
   "        ledgerPlan: ledgerPlan,\n" +
+  "        operationIdentity: {\n" +
+  "          operationKey: adPlan.operationKey,\n" +
+  "          contentFingerprint: adPlan.contentFingerprint,\n" +
+  "          creativeSha256: adPlan.creativeSha256,\n" +
+  "          creativeRevision: adPlan.creativeRevision,\n" +
+  "          environment: adPlan.environment,\n" +
+  "          placementSet: adPlan.placementSet,\n" +
+  "          workflowVersion: adPlan.workflowVersion,\n" +
+  "        },\n" +
   "        writeBackAfterCreatePausedOnly: writeBackPreview,\n" +
   "        safety: {\n" +
   "          externalWritePerformed: false,\n" +
@@ -654,8 +1057,10 @@ const processWf4Code =
   "          tripleApprovalRequired: {\n" +
   "            mode: \"create_paused\",\n" +
   "            approval: true,\n" +
-  "            approvalToken: \"WF4_CREATE_PAUSED_APPROVAL_TOKEN\",\n" +
+  "            approvalToken: \"[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]\",\n" +
   "          },\n" +
+  "          feedFirstPlacements: true,\n" +
+  "          storiesReelsOutOfV1: true,\n" +
   "        },\n" +
   "      },\n" +
   "    };\n" +
@@ -664,6 +1069,13 @@ const processWf4Code =
   "  exports.PROVIDER = PROVIDER;\n" +
   "  exports.DEFAULT_META_API_VERSION = DEFAULT_META_API_VERSION;\n" +
   "  exports.DEFAULT_MAX_DAILY_BUDGET_USD = DEFAULT_MAX_DAILY_BUDGET_USD;\n" +
+  "  exports.DEFAULT_ENVIRONMENT = DEFAULT_ENVIRONMENT;\n" +
+  "  exports.DEFAULT_CREATIVE_REVISION = DEFAULT_CREATIVE_REVISION;\n" +
+  "  exports.DEFAULT_WORKFLOW_VERSION = DEFAULT_WORKFLOW_VERSION;\n" +
+  "  exports.V1_FACEBOOK_POSITIONS = V1_FACEBOOK_POSITIONS;\n" +
+  "  exports.V1_INSTAGRAM_POSITIONS = V1_INSTAGRAM_POSITIONS;\n" +
+  "  exports.V1_PLACEMENT_SET = V1_PLACEMENT_SET;\n" +
+  "  exports.STAGE_ORDER = STAGE_ORDER;\n" +
   "  exports.OBJECTIVE_MAPPING = OBJECTIVE_MAPPING;\n" +
   "  exports.V1_OPTIMIZATION_GOAL = V1_OPTIMIZATION_GOAL;\n" +
   "  exports.V1_BILLING_EVENT = V1_BILLING_EVENT;\n" +
@@ -674,6 +1086,15 @@ const processWf4Code =
   "  exports.buildLedgerPlan = buildLedgerPlan;\n" +
   "  exports.buildWriteBackPreview = buildWriteBackPreview;\n" +
   "  exports.buildDryRunBundle = buildDryRunBundle;\n" +
+  "  exports.buildOperationKey = buildOperationKey;\n" +
+  "  exports.buildContentFingerprint = buildContentFingerprint;\n" +
+  "  exports.evaluateLedgerDecision = evaluateLedgerDecision;\n" +
+  "  exports.evaluateCreatePausedGates = evaluateCreatePausedGates;\n" +
+  "  exports.redactSensitiveFields = redactSensitiveFields;\n" +
+  "  exports.buildLedgerStageUpsert = buildLedgerStageUpsert;\n" +
+  "  exports.sha256Hex = sha256Hex;\n" +
+  "  exports.sha256BytesHex = sha256BytesHex;\n" +
+  "  exports.firstMissingStage = firstMissingStage;\n" +
   "  exports.mapAuthorObjective = mapAuthorObjective;\n" +
   "  exports.selectCreative = selectCreative;\n" +
   "  exports.resolveCreativeSource = resolveCreativeSource;\n" +
@@ -694,9 +1115,16 @@ const processWf4Code =
   "} else {\n" +
   "  throw new Error('No appJson provided and fixture disabled');\n" +
   "}\n" +
+  "const creativeSha256 = input.WF4_CREATIVE_SHA256 || input.creativeSha256 || '';\n" +
+  "if (!creativeSha256) {\n" +
+  "  throw new Error('CREATIVE_SHA256_REQUIRED: set WF4_CREATIVE_SHA256 in Workflow Config (sandbox planning hash)');\n" +
+  "}\n" +
   "const result = WF4MetaAdapter.buildDryRunBundle(app, {\n" +
   "  mode: mode,\n" +
   "  provider: input.provider || 'meta',\n" +
+  "  environment: input.environment || 'sandbox',\n" +
+  "  workflowVersion: input.workflowVersion || 'wf4-image-v1',\n" +
+  "  creativeSha256: creativeSha256,\n" +
   "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n" +
   "  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n" +
   "  wf3GateStatus: input.wf3GateStatus || 'proven',\n" +
@@ -708,13 +1136,55 @@ const processWf4Code =
   "if (!result.ok) {\n" +
   "  throw new Error(result.error || 'WF4 dry-run bundle failed');\n" +
   "}\n" +
-  "const tripleApproved = mode === 'create_paused' && approval === true && approvalToken && configToken && approvalToken === configToken;\n" +
-  "return [{ json: Object.assign({}, input, { bundle: result.bundle, tripleApproved: tripleApproved, _createPausedAllowed: false }) }];\n" +
+  "const gate = WF4MetaAdapter.evaluateCreatePausedGates({\n" +
+  "  mode: mode,\n" +
+  "  approval: approval,\n" +
+  "  approvalToken: approvalToken,\n" +
+  "  configToken: configToken,\n" +
+  "  createPausedAllowed: false,\n" +
+  "  budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,\n" +
+  "  requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),\n" +
+  "  landingUrlValid: Boolean(result.bundle.computed && result.bundle.computed.destinationUrl),\n" +
+  "  creativeValid: Boolean(result.bundle.source && result.bundle.source.creative),\n" +
+  "});\n" +
+  "const safeOut = WF4MetaAdapter.redactSensitiveFields({\n" +
+  "  bundle: result.bundle,\n" +
+  "  tripleApproved: gate.tripleApproved,\n" +
+  "  approvalGate: gate,\n" +
+  "  _createPausedAllowed: false,\n" +
+  "});\n" +
+  "return [{ json: Object.assign({}, WF4MetaAdapter.redactSensitiveFields(input), safeOut) }];\n" +
   "";
 
 const respondDryRunCode =
   "const item = $input.first().json;\n" +
-  "return [{ json: { ok: true, mode: 'dry_run', bundle: item.bundle, safety: item.bundle.safety, runKey: item.bundle.runKey, externalWritePerformed: false, metaHttpCalls: 0, driveWrites: 0 } }];";
+  "function redact(obj) {\n" +
+  "  if (!obj || typeof obj !== 'object') return obj;\n" +
+  "  var clone = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);\n" +
+  "  Object.keys(clone).forEach(function (k) {\n" +
+  "    var lower = k.toLowerCase();\n" +
+  "    if (lower.indexOf('approvaltoken') !== -1 || lower === 'wf4createpausedapprovaltoken' || lower.indexOf('accesstoken') !== -1) {\n" +
+  "      clone[k] = clone[k] ? '[REDACTED]' : '';\n" +
+  "    } else if (clone[k] && typeof clone[k] === 'object') {\n" +
+  "      clone[k] = redact(clone[k]);\n" +
+  "    }\n" +
+  "  });\n" +
+  "  return clone;\n" +
+  "}\n" +
+  "const redacted = redact(item);\n" +
+  "return [{ json: {\n" +
+  "  ok: true,\n" +
+  "  mode: 'dry_run',\n" +
+  "  bundle: redacted.bundle,\n" +
+  "  safety: redacted.bundle && redacted.bundle.safety,\n" +
+  "  runKey: redacted.bundle && redacted.bundle.runKey,\n" +
+  "  operationKey: redacted.bundle && redacted.bundle.ledgerPlan && redacted.bundle.ledgerPlan.operationKey,\n" +
+  "  approvalGate: redacted.approvalGate || null,\n" +
+  "  externalWritePerformed: false,\n" +
+  "  metaHttpCalls: 0,\n" +
+  "  driveWrites: 0,\n" +
+  "  _createPausedAllowed: false\n" +
+  "} }];";
 
 const createPausedBlockedCode =
   "const item = $input.first().json;\n" +
@@ -724,25 +1194,74 @@ const createPausedBlockedCode =
   "return [{ json: item }];";
 
 const ledgerIdempotencyCode =
+  "function firstMissingStage(row) {\n" +
+  "  row = row || {};\n" +
+  "  if (!row.campaignId) return 'campaign';\n" +
+  "  if (!row.adSetId) return 'adset';\n" +
+  "  if (!row.imageHash) return 'image';\n" +
+  "  if (!row.creativeId) return 'creative';\n" +
+  "  if (!row.adId) return 'ad';\n" +
+  "  var phase = String(row.phase || '');\n" +
+  "  if (phase !== 'verified' && phase !== 'writeback_done') return 'verified';\n" +
+  "  if (phase !== 'writeback_done') return 'writeback_done';\n" +
+  "  return null;\n" +
+  "}\n" +
+  "function isComplete(row) {\n" +
+  "  if (!row) return false;\n" +
+  "  var phase = String(row.phase || '');\n" +
+  "  var ids = ['campaignId','adSetId','creativeId','adId'].filter(function (f) {\n" +
+  "    return row[f] != null && String(row[f]).trim() !== '';\n" +
+  "  });\n" +
+  "  return phase === 'writeback_done' || phase === 'verified' || ids.length === 4;\n" +
+  "}\n" +
+  "function evaluate(ledgerRow, opts) {\n" +
+  "  var executionId = opts.executionId;\n" +
+  "  var nowMs = opts.nowMs;\n" +
+  "  var contentFingerprint = opts.contentFingerprint;\n" +
+  "  var operationKey = opts.operationKey;\n" +
+  "  if (ledgerRow && ledgerRow.lockOwner && String(ledgerRow.lockOwner) !== String(executionId)) {\n" +
+  "    var exp = ledgerRow.lockExpiresAt ? Date.parse(ledgerRow.lockExpiresAt) : NaN;\n" +
+  "    if (isNaN(exp) || exp > nowMs) {\n" +
+  "      return { action: 'lock_held', error: 'LEDGER_LOCK_HELD: operationKey=' + operationKey };\n" +
+  "    }\n" +
+  "  }\n" +
+  "  if (!ledgerRow) {\n" +
+  "    return { action: 'claim', outcome: 'in_progress', resumeFrom: 'campaign', metaCreate: {}, lockOwner: executionId, lockExpiresAt: new Date(nowMs + 300000).toISOString() };\n" +
+  "  }\n" +
+  "  var rowFp = ledgerRow.contentFingerprint || '';\n" +
+  "  if (rowFp && contentFingerprint && rowFp !== contentFingerprint && (isComplete(ledgerRow) || firstMissingStage(ledgerRow) !== 'campaign')) {\n" +
+  "    return { action: 'revision_conflict', error: 'LEDGER_REVISION_CONFLICT: fingerprint mismatch for ' + operationKey };\n" +
+  "  }\n" +
+  "  if (isComplete(ledgerRow) && (!rowFp || rowFp === contentFingerprint)) {\n" +
+  "    return { action: 'already_complete', outcome: 'already_complete', metaCreate: { campaignId: ledgerRow.campaignId || null, adSetId: ledgerRow.adSetId || null, imageHash: ledgerRow.imageHash || null, creativeId: ledgerRow.creativeId || null, adId: ledgerRow.adId || null } };\n" +
+  "  }\n" +
+  "  var resumeFrom = firstMissingStage(ledgerRow);\n" +
+  "  var metaCreate = { campaignId: ledgerRow.campaignId || null, adSetId: ledgerRow.adSetId || null, imageHash: ledgerRow.imageHash || null, creativeId: ledgerRow.creativeId || null, adId: ledgerRow.adId || null };\n" +
+  "  if (resumeFrom && resumeFrom !== 'campaign') {\n" +
+  "    return { action: 'resume', outcome: 'resumed', resumeFrom: resumeFrom, metaCreate: metaCreate, lockOwner: executionId, lockExpiresAt: new Date(nowMs + 300000).toISOString() };\n" +
+  "  }\n" +
+  "  return { action: 'claim', outcome: 'in_progress', resumeFrom: 'campaign', metaCreate: metaCreate, lockOwner: executionId, lockExpiresAt: new Date(nowMs + 300000).toISOString() };\n" +
+  "}\n" +
   "const item = $('Create Paused Blocked').first().json;\n" +
   "const rows = $input.all().map(function (i) { return i.json; }).filter(function (r) {\n" +
   "  return r && (r.operationKey || r.phase);\n" +
   "});\n" +
   "const ledgerRow = rows[0] || null;\n" +
-  "const hasLedger = Boolean(ledgerRow);\n" +
-  "if (hasLedger) {\n" +
-  "  const phase = String(ledgerRow.phase || '');\n" +
-  "  const ids = ['campaignId','adSetId','creativeId','adId'].filter(function (f) {\n" +
-  "    return ledgerRow[f] != null && String(ledgerRow[f]).trim() !== '';\n" +
-  "  });\n" +
-  "  if (phase === 'verified' || phase === 'writeback_done' || ids.length === 4) {\n" +
-  "    throw new Error('LEDGER_IDEMPOTENCY_REFUSE: operation already verified for ' + (item.bundle && item.bundle.ledgerPlan && item.bundle.ledgerPlan.operationKey));\n" +
-  "  }\n" +
-  "  if (ids.length > 0 || (phase && phase !== 'planned')) {\n" +
-  "    throw new Error('LEDGER_MANUAL_REVIEW_REQUIRED: partial ledger row phase=' + phase + ' ids=' + ids.join(','));\n" +
-  "  }\n" +
+  "const plan = (item.bundle && item.bundle.ledgerPlan) || {};\n" +
+  "const executionId = String(($execution && $execution.id) || ('local-' + Date.now()));\n" +
+  "const decision = evaluate(ledgerRow, {\n" +
+  "  operationKey: plan.operationKey,\n" +
+  "  contentFingerprint: plan.contentFingerprint,\n" +
+  "  executionId: executionId,\n" +
+  "  nowMs: Date.now(),\n" +
+  "});\n" +
+  "if (decision.action === 'lock_held') throw new Error(decision.error || 'LEDGER_LOCK_HELD');\n" +
+  "if (decision.action === 'revision_conflict') throw new Error(decision.error || 'LEDGER_REVISION_CONFLICT');\n" +
+  "if (decision.action === 'already_complete') {\n" +
+  "  return [{ json: Object.assign({}, item, { ledgerExisting: ledgerRow, ledgerAction: 'already_complete', ledgerDecision: decision, metaCreate: decision.metaCreate || {}, outcome: 'already_complete' }) }];\n" +
   "}\n" +
-  "return [{ json: Object.assign({}, item, { ledgerExisting: hasLedger ? ledgerRow : null, ledgerAction: 'upsert_planned' }) }];";
+  "const ledgerAction = decision.action === 'resume' ? 'resume' : 'upsert_planned';\n" +
+  "return [{ json: Object.assign({}, item, { ledgerExisting: ledgerRow, ledgerAction: ledgerAction, ledgerDecision: decision, metaCreate: decision.metaCreate || {}, resumeFrom: decision.resumeFrom || 'campaign', ledgerClaim: { lockOwner: decision.lockOwner, lockExpiresAt: decision.lockExpiresAt, outcome: decision.outcome } }) }];";
 
 const mergeAfterCampaignCode =
   "const prev = $('Ledger Idempotency Check').first().json;\n" +
@@ -861,7 +1380,7 @@ const prepareLedgerVerifiedCode =
   "  ledgerUpsert: {\n" +
   "    operationKey: plan.operationKey,\n" +
   "    appId: plan.appId,\n" +
-  "    experimentRunId: plan.experimentRunId,\n" +
+  "    experimentRunId: plan.experimentRunId || '',\n" +
   "    provider: plan.provider || 'meta',\n" +
   "    phase: 'verified',\n" +
   "    campaignId: mc.campaignId || '',\n" +
@@ -887,7 +1406,7 @@ const fixtureAppJson = JSON.stringify({
     callToAction: 'SIGN_UP',
     utmTemplate: { source: 'facebook', medium: 'paid_social', campaign: 'human-lab-validation' },
     targeting: { locations: ['United States'], ageMin: 25, ageMax: 55 },
-    meta: { status: null, campaignId: null, adSetId: null, creativeId: null, adId: null, landingUrl: null, dailyBudget: null, createdAt: null, lastSyncedAt: null },
+    meta: { status: null, campaignId: null, adSetId: null, creativeId: null, adId: null, landingUrl: null, dailyBudget: null, createdAt: null, lastSyncedAt: null, creativeRevision: 'image-v1' },
     media: [{ githubPath: 'media/og-image.png', role: 'primary' }],
   },
   media: { ogImage: { githubPath: 'media/og-image.png' } },
@@ -931,6 +1450,9 @@ const workflowConfig = node({
           { id: 'useFixtureAppJson', name: 'useFixtureAppJson', value: true, type: 'boolean' },
           { id: 'fixtureAppJson', name: 'fixtureAppJson', value: fixtureAppJson, type: 'string' },
           { id: 'wf4CreatePausedApprovalToken', name: 'wf4CreatePausedApprovalToken', value: '', type: 'string' },
+          { id: 'environment', name: 'environment', value: 'sandbox', type: 'string' },
+          { id: 'workflowVersion', name: 'workflowVersion', value: 'wf4-image-v1', type: 'string' },
+          { id: 'WF4_CREATIVE_SHA256', name: 'WF4_CREATIVE_SHA256', value: 'ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d', type: 'string' },
           { id: 'appId', name: 'appId', value: 'human-lab-wf1-sandbox', type: 'string' },
         ],
       },
@@ -1069,11 +1591,11 @@ const ledgerUpsertPlanned = node({
           experimentRunId: expr('{{ $json.bundle.ledgerPlan.experimentRunId }}'),
           provider: expr('{{ $json.bundle.ledgerPlan.provider }}'),
           phase: 'planned',
-          campaignId: '',
-          adSetId: '',
-          imageHash: '',
-          creativeId: '',
-          adId: '',
+          campaignId: expr("{{ ($json.metaCreate && $json.metaCreate.campaignId) || '' }}"),
+          adSetId: expr("{{ ($json.metaCreate && $json.metaCreate.adSetId) || '' }}"),
+          imageHash: expr("{{ ($json.metaCreate && $json.metaCreate.imageHash) || '' }}"),
+          creativeId: expr("{{ ($json.metaCreate && $json.metaCreate.creativeId) || '' }}"),
+          adId: expr("{{ ($json.metaCreate && $json.metaCreate.adId) || '' }}"),
           lastError: '',
         },
       },

@@ -117,6 +117,12 @@
         "publisher_platforms": [
           "facebook",
           "instagram"
+        ],
+        "facebook_positions": [
+          "feed"
+        ],
+        "instagram_positions": [
+          "stream"
         ]
       }
     },
@@ -162,18 +168,36 @@
     }
   },
   "ledgerPlan": {
-    "operationKey": "human-lab-wf1-sandbox|run_human-lab_2026q2_001|meta",
+    "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
     "appId": "human-lab-wf1-sandbox",
     "experimentRunId": "run_human-lab_2026q2_001",
     "provider": "meta",
+    "environment": "sandbox",
+    "creativeRevision": "image-v1",
+    "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+    "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+    "placementSet": "facebook:feed|instagram:stream",
     "phase": "planned",
     "campaignId": null,
     "adSetId": null,
     "imageHash": null,
     "creativeId": null,
     "adId": null,
+    "lockOwner": null,
+    "lockExpiresAt": null,
+    "resumeFrom": null,
+    "outcome": null,
     "lastError": null,
-    "reconciliation": "V1: detect existing op → resume if safe → else manual_review_required; no auto-delete"
+    "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+  },
+  "operationIdentity": {
+    "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+    "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+    "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+    "creativeRevision": "image-v1",
+    "environment": "sandbox",
+    "placementSet": "facebook:feed|instagram:stream",
+    "workflowVersion": "wf4-image-v1"
   },
   "writeBackAfterCreatePausedOnly": {
     "ads": {
@@ -201,7 +225,9 @@
     "tripleApprovalRequired": {
       "mode": "create_paused",
       "approval": true,
-      "approvalToken": "WF4_CREATE_PAUSED_APPROVAL_TOKEN"
-    }
+      "approvalToken": "[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]"
+    },
+    "feedFirstPlacements": true,
+    "storiesReelsOutOfV1": true
   }
 }

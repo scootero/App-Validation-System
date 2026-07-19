@@ -32,7 +32,8 @@
       "landingUrl": null,
       "dailyBudget": null,
       "createdAt": null,
-      "lastSyncedAt": null
+      "lastSyncedAt": null,
+      "creativeRevision": "image-v1"
     },
     "media": [
       {

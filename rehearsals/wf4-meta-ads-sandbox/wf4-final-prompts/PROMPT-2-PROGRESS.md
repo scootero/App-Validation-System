@@ -1,6 +1,6 @@
 # Prompt 2 Progress — Image Create-Paused V1
 
-**Status:** Not started
+**Status:** Phase 4 local implementation PASS — awaiting Scott approval for Phase 5 (live n8n sync + dry_run still operator-gated)
 
 **On resume:** Read this file first, then [`PROMPT-2.md`](PROMPT-2.md). Continue only the next unchecked phase after Scott approves.
 
@@ -9,20 +9,21 @@
 - Prompt: [`PROMPT-2.md`](PROMPT-2.md)
 - Proof SSOT: [`../external-proof-status.md`](../external-proof-status.md)
 - Canonical: [`../CANONICAL-WF4.md`](../CANONICAL-WF4.md)
-- Creative specs (living, created in Phase 1): [`../CREATIVE-ASSET-SPECS.md`](../CREATIVE-ASSET-SPECS.md)
+- Creative specs (living): [`../CREATIVE-ASSET-SPECS.md`](../CREATIVE-ASSET-SPECS.md)
+- Create-paused contract: [`../architecture/CREATE-PAUSED-V1-CONTRACT.md`](../architecture/CREATE-PAUSED-V1-CONTRACT.md)
 
 ---
 
 ## Prerequisites (from Prompt 1)
 
-- [ ] Prompt 1 verdict PASS
-- [ ] Live dry_run execution ID recorded
-- [ ] Live WF4 inactive, clean graph, create-path disabled
-- [ ] Prompt 1 handoff pasted into the Prompt 2 chat
+- [x] Prompt 1 verdict PASS
+- [x] Live dry_run execution ID recorded
+- [x] Live WF4 inactive, clean graph, create-path disabled
+- [x] Prompt 1 handoff pasted into the Prompt 2 chat
 
-Prompt 1 execution ID: `_pending_`
+Prompt 1 execution ID: `48`
 
-Prompt 1 handoff summary: `_pending_`
+Prompt 1 handoff summary: PASS — live WF4 `YIc53GBq4upelYp6` inactive; dry_run execution 48; create-path disabled; `_createPausedAllowed: false`.
 
 ---
 
@@ -30,47 +31,47 @@ Prompt 1 handoff summary: `_pending_`
 
 ### Phase 1 — Blockers + living creative specs (plan only)
 
-- [ ] Blocker table completed
-- [ ] `CREATIVE-ASSET-SPECS.md` created/updated (living stub OK)
-- [ ] Actual `og-image.png` dimensions/MIME/size recorded
-- [ ] Feed-first V1 placements proposed
-- [ ] Stories/Reels marked out of V1 (unless Scott approved variants)
-- [ ] Scott approved moving to Phase 2
+- [x] Blocker table completed
+- [x] `CREATIVE-ASSET-SPECS.md` created/updated (living stub OK)
+- [x] Actual `og-image.png` dimensions/MIME/size recorded
+- [x] Feed-first V1 placements proposed
+- [x] Stories/Reels marked out of V1 (unless Scott approved variants)
+- [x] Scott approved moving to Phase 2
 
 ### Phase 2 — Idempotency contract (design only)
 
-- [ ] Same-request behavior defined
-- [ ] Concurrent single-writer design defined
-- [ ] Partial-failure resume defined
-- [ ] Post-Meta / pre-ledger reconciliation defined
-- [ ] Revision model defined
-- [ ] Operation fingerprint includes creative SHA-256 (not timestamp-only)
-- [ ] Scott approved moving to Phase 3
+- [x] Same-request behavior defined
+- [x] Concurrent single-writer design defined
+- [x] Partial-failure resume defined
+- [x] Post-Meta / pre-ledger reconciliation defined
+- [x] Revision model defined
+- [x] Operation fingerprint includes creative SHA-256 (not timestamp-only)
+- [x] Scott approved moving to Phase 3 *(combined 2+3)*
 
 ### Phase 3 — Approval-token design (design only)
 
-- [ ] Secret storage location proposed
-- [ ] Operator setup steps proposed
-- [ ] Redacted logging / rotation / rollback proposed
-- [ ] Gate requirements listed (mode + approval + token + caps + locks)
-- [ ] Scott approved design
+- [x] Secret storage location proposed
+- [x] Operator setup steps proposed
+- [x] Redacted logging / rotation / rollback proposed
+- [x] Gate requirements listed (mode + approval + token + caps + locks)
+- [x] Scott approved design
 
 ### Phase 4 — Implement gates, idempotency, recovery
 
-- [ ] Approval check implemented
-- [ ] Deterministic operation key implemented
-- [ ] Duplicate detection implemented
-- [ ] Concurrency protection implemented
-- [ ] Ledger phases / resume-from-partial implemented
-- [ ] Local rehearsal PASS
-- [ ] Live dry_run PASS
-- [ ] Missing-token → zero writes
-- [ ] Wrong-token → zero writes
-- [ ] approval=false → zero writes
-- [ ] Over-budget → zero writes
-- [ ] Duplicate-operation dry test PASS
-- [ ] Partial-failure simulation documented/proven
-- [ ] Concurrent-lock: live-proven **or** design/simulation-proven (circle which)
+- [x] Approval check implemented
+- [x] Deterministic operation key implemented
+- [x] Duplicate detection implemented
+- [x] Concurrency protection implemented
+- [x] Ledger phases / resume-from-partial implemented *(decision + seeding; mid-phase Data Table upsert nodes still deferred to create enablement)*
+- [x] Local rehearsal PASS
+- [ ] Live dry_run PASS *(blocked: n8n MCP unavailable; live workflow not yet re-synced from workflow.ts)*
+- [x] Missing-token → zero writes
+- [x] Wrong-token → zero writes
+- [x] approval=false → zero writes
+- [x] Over-budget → zero writes
+- [x] Duplicate-operation dry test PASS
+- [x] Partial-failure simulation documented/proven
+- [x] Concurrent-lock: **simulation-proven**
 - [ ] Scott approved moving to Phase 5
 
 ### Phase 5 — Create-paused preflight
@@ -135,27 +136,63 @@ Meta IDs:
 
 ## Open blockers / wait for Scott
 
-_None yet. Agent appends here at each stop._
+1. **Approve Phase 4 → Phase 5** after reviewing local proofs.
+2. **Live n8n sync:** Re-import/update live WF4 `YIc53GBq4upelYp6` from [`wf4-meta-ads-sandbox.workflow.ts`](../n8n/wf4-meta-ads-sandbox.workflow.ts) (or export→import-ready), then Manual `dry_run` — expect `metaHttpCalls: 0`, new `operationKey`, Feed positions, `approvalGate` redacted. n8n MCP was unavailable this session.
+3. Before create-paused: add ledger Data Table columns (`environment`, `creativeRevision`, `contentFingerprint`, `creativeSha256`, `lockOwner`, `lockExpiresAt`, `resumeFrom`, `outcome`) + mid-phase upsert nodes on create enablement.
+4. Create Header Auth vault when ready (still empty Config token until enablement).
+5. Do **not** create Meta objects until exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
 
 ---
 
 ## Latest compact handoff
 
 ```text
-Status: Not started
-Last completed phase: none
-Next phase: Phase 1 (after Prompt 1 PASS)
-Live WF4 ID: YIc53GBq4upelYp6
-Dry-run execution ID: (from Prompt 1)
-Create-paused: not started
+Status: Phase 4 local PASS — live dry_run pending n8n sync; create-path still disabled
+Last completed phase: Phase 4 (local gates/idempotency/resume simulation)
+Next phase: Phase 5 preflight — after Scott approves + live dry_run recorded
+Live WF4 ID: YIc53GBq4upelYp6 (repo SDK updated; live may lag until re-sync)
+Dry-run execution ID: 48 (Prompt 1); Phase 4 live dry_run: pending
+Create-paused: NOT enabled (_createPausedAllowed=false)
 Meta objects: none
-Git: (update when relevant)
-Blockers: waiting for Prompt 1 PASS + start of Prompt 2
-Exact next action: Paste PROMPT-2.md + Prompt 1 handoff into a new Agent chat; agent reads this progress file first.
+operationKey: human-lab-wf1-sandbox|sandbox|meta|image-v1
+contentFingerprint: 114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d
+creativeSha256: ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d
+Placements: facebook_positions=[feed], instagram_positions=[stream]
+Local proofs: wf4-rehearse.js PASS; wf4-resolve-creative.js PASS; concurrent-lock simulation-proven
+Git: adapter + workflow.ts + fixtures + dry-run payload + progress (uncommitted unless Scott asks)
+Exact next action: Scott reviews Phase 4; sync live n8n; approve Phase 5 — still no Meta creates without exact phrase
 ```
+
+---
+
+## Phase 4 local proof summary (2026-07-19)
+
+| Test | Result |
+|------|--------|
+| `node scripts/wf4-rehearse.js` | PASS (incl. gates, ledger decisions, redaction, Feed positions) |
+| `node scripts/wf4-resolve-creative.js` | PASS (SHA matches Phase 1) |
+| Missing / wrong token / approval=false / over-budget | PASS → `createPathOpen=false` |
+| Partial resume simulation | PASS → `resume` + reuse `campaignId` |
+| Lock held / expired | PASS (simulation-proven) |
+| already_complete | PASS |
+| revision_conflict | PASS |
+| Live n8n dry_run | Pending sync (MCP down) |
 
 ---
 
 ## Handoff history (append-only)
 
-<!-- Agent: append dated mini-handoffs below; keep Latest compact handoff above current. -->
+### 2026-07-19 — Phase 1 complete
+
+- Measured og-image; created CREATIVE-ASSET-SPECS.md; Feed-first policy
+
+### 2026-07-19 — Phases 2+3 design complete
+
+- CREATE-PAUSED-V1-CONTRACT.md + OPERATION-LEDGER.md
+
+### 2026-07-19 — Phase 4 local implement
+
+- Adapter: operationKey, contentFingerprint, evaluateLedgerDecision, evaluateCreatePausedGates, redact, Feed positions
+- Process: WF4_CREATIVE_SHA256 config, approvalGate redacted, `_createPausedAllowed=false`
+- Ledger Idempotency Check: resume / already_complete / lock / revision_conflict
+- Local rehearse + resolve PASS; live dry_run pending n8n re-sync

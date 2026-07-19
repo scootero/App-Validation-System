@@ -28,9 +28,16 @@ const processBody =
   "} else {\n" +
   "  throw new Error('No appJson provided and fixture disabled');\n" +
   "}\n" +
+  "const creativeSha256 = input.WF4_CREATIVE_SHA256 || input.creativeSha256 || '';\n" +
+  "if (!creativeSha256) {\n" +
+  "  throw new Error('CREATIVE_SHA256_REQUIRED: set WF4_CREATIVE_SHA256 in Workflow Config (sandbox planning hash)');\n" +
+  "}\n" +
   "const result = WF4MetaAdapter.buildDryRunBundle(app, {\n" +
   "  mode: mode,\n" +
   "  provider: input.provider || 'meta',\n" +
+  "  environment: input.environment || 'sandbox',\n" +
+  "  workflowVersion: input.workflowVersion || 'wf4-image-v1',\n" +
+  "  creativeSha256: creativeSha256,\n" +
   "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n" +
   "  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n" +
   "  wf3GateStatus: input.wf3GateStatus || 'proven',\n" +
@@ -42,8 +49,24 @@ const processBody =
   "if (!result.ok) {\n" +
   "  throw new Error(result.error || 'WF4 dry-run bundle failed');\n" +
   "}\n" +
-  "const tripleApproved = mode === 'create_paused' && approval === true && approvalToken && configToken && approvalToken === configToken;\n" +
-  "return [{ json: Object.assign({}, input, { bundle: result.bundle, tripleApproved: tripleApproved, _createPausedAllowed: false }) }];\n";
+  "const gate = WF4MetaAdapter.evaluateCreatePausedGates({\n" +
+  "  mode: mode,\n" +
+  "  approval: approval,\n" +
+  "  approvalToken: approvalToken,\n" +
+  "  configToken: configToken,\n" +
+  "  createPausedAllowed: false,\n" +
+  "  budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,\n" +
+  "  requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),\n" +
+  "  landingUrlValid: Boolean(result.bundle.computed && result.bundle.computed.destinationUrl),\n" +
+  "  creativeValid: Boolean(result.bundle.source && result.bundle.source.creative),\n" +
+  "});\n" +
+  "const safeOut = WF4MetaAdapter.redactSensitiveFields({\n" +
+  "  bundle: result.bundle,\n" +
+  "  tripleApproved: gate.tripleApproved,\n" +
+  "  approvalGate: gate,\n" +
+  "  _createPausedAllowed: false,\n" +
+  "});\n" +
+  "return [{ json: Object.assign({}, WF4MetaAdapter.redactSensitiveFields(input), safeOut) }];\n";
 
 function toTsStringLiteral(code) {
   return (

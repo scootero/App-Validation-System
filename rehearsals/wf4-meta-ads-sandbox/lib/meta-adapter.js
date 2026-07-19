@@ -37,6 +37,23 @@ if (typeof globalThis !== "undefined") {
 
   var SPECIAL_AD_CATEGORIES = [];
   var META_ID_FIELDS = ["campaignId", "adSetId", "creativeId", "adId"];
+  var DEFAULT_ENVIRONMENT = "sandbox";
+  var DEFAULT_CREATIVE_REVISION = "image-v1";
+  var DEFAULT_WORKFLOW_VERSION = "wf4-image-v1";
+  var LOCK_TTL_MS = 5 * 60 * 1000;
+  /** Feed-first V1 — Stories/Reels excluded. */
+  var V1_FACEBOOK_POSITIONS = ["feed"];
+  var V1_INSTAGRAM_POSITIONS = ["stream"];
+  var V1_PLACEMENT_SET = "facebook:feed|instagram:stream";
+  var STAGE_ORDER = [
+    "campaign",
+    "adset",
+    "image",
+    "creative",
+    "ad",
+    "verified",
+    "writeback_done",
+  ];
 
   var LOCATION_TO_COUNTRY = {
     "united states": "US",
@@ -54,6 +71,336 @@ if (typeof globalThis !== "undefined") {
 
   function roundBudget(value) {
     return Math.round(value * 100) / 100;
+  }
+
+  function getCrypto() {
+    try {
+      if (typeof require === "function") return require("crypto");
+    } catch (e) {
+      /* n8n / browser */
+    }
+    return null;
+  }
+
+  function sha256Hex(value) {
+    var crypto = getCrypto();
+    if (!crypto || !crypto.createHash) {
+      throw new Error("SHA256_UNAVAILABLE: crypto.createHash required");
+    }
+    return crypto.createHash("sha256").update(String(value), "utf8").digest("hex");
+  }
+
+  function sha256BytesHex(buf) {
+    var crypto = getCrypto();
+    if (!crypto || !crypto.createHash) {
+      throw new Error("SHA256_UNAVAILABLE: crypto.createHash required");
+    }
+    return crypto.createHash("sha256").update(buf).digest("hex");
+  }
+
+  function stableStringify(value) {
+    if (value === null || typeof value !== "object") {
+      return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+      return "[" + value.map(stableStringify).join(",") + "]";
+    }
+    var keys = Object.keys(value).sort();
+    return (
+      "{" +
+      keys
+        .map(function (k) {
+          return JSON.stringify(k) + ":" + stableStringify(value[k]);
+        })
+        .join(",") +
+      "}"
+    );
+  }
+
+  function buildOperationKey(parts) {
+    return [parts.appId, parts.environment, parts.provider, parts.creativeRevision].join("|");
+  }
+
+  function buildPlacementSet(platforms) {
+    var parts = [];
+    if (!platforms || platforms.indexOf("facebook") !== -1) parts.push("facebook:feed");
+    if (platforms && platforms.indexOf("instagram") !== -1) parts.push("instagram:stream");
+    return parts.join("|") || V1_PLACEMENT_SET;
+  }
+
+  function buildCopyFingerprint(adPlan) {
+    return sha256Hex(
+      stableStringify({
+        headlines: adPlan.headlines || [],
+        primaryTexts: adPlan.primaryTexts || [],
+        descriptions: adPlan.descriptions || [],
+        callToAction: adPlan.callToAction || "",
+      })
+    );
+  }
+
+  function buildTargetingFingerprint(adPlan) {
+    return sha256Hex(
+      stableStringify({
+        locations: adPlan.targeting.locations,
+        ageMin: adPlan.targeting.ageMin,
+        ageMax: adPlan.targeting.ageMax,
+        platforms: adPlan.platforms,
+        facebook_positions: V1_FACEBOOK_POSITIONS,
+        instagram_positions: V1_INSTAGRAM_POSITIONS,
+      })
+    );
+  }
+
+  function buildBudgetFingerprint(adPlan) {
+    return sha256Hex(
+      stableStringify({
+        dailyBudgetUsd: adPlan.budget.dailyBudgetUsd,
+        currency: adPlan.budget.currency,
+        durationDays: adPlan.budget.durationDays,
+        totalAmount: adPlan.budget.totalAmount,
+      })
+    );
+  }
+
+  function buildContentFingerprint(adPlan, identity) {
+    var payload = {
+      appId: adPlan.appId,
+      environment: identity.environment,
+      workflowVersion: identity.workflowVersion,
+      objective: mapAuthorObjective(adPlan.authorObjective),
+      optimization: V1_OPTIMIZATION_GOAL,
+      billing: V1_BILLING_EVENT,
+      landingUrl: adPlan.landingUrl,
+      targetingFingerprint: buildTargetingFingerprint(adPlan),
+      budgetFingerprint: buildBudgetFingerprint(adPlan),
+      creativeSha256: identity.creativeSha256,
+      copyFingerprint: buildCopyFingerprint(adPlan),
+      creativeRevision: identity.creativeRevision,
+      placementSet: identity.placementSet,
+    };
+    return sha256Hex(stableStringify(payload));
+  }
+
+  function firstMissingStage(row) {
+    row = row || {};
+    if (!row.campaignId) return "campaign";
+    if (!row.adSetId) return "adset";
+    if (!row.imageHash) return "image";
+    if (!row.creativeId) return "creative";
+    if (!row.adId) return "ad";
+    var phase = String(row.phase || "");
+    if (phase !== "verified" && phase !== "writeback_done") return "verified";
+    if (phase !== "writeback_done") return "writeback_done";
+    return null;
+  }
+
+  function isCompleteLedgerRow(row) {
+    if (!row) return false;
+    var phase = String(row.phase || "");
+    var ids = META_ID_FIELDS.filter(function (f) {
+      return row[f] != null && String(row[f]).trim() !== "";
+    });
+    return phase === "writeback_done" || phase === "verified" || ids.length === 4;
+  }
+
+  function lockIsHeld(row, executionId, nowMs) {
+    if (!row || !row.lockOwner) return false;
+    if (String(row.lockOwner) === String(executionId)) return false;
+    if (!row.lockExpiresAt) return true;
+    var exp = Date.parse(row.lockExpiresAt);
+    if (isNaN(exp)) return true;
+    return exp > nowMs;
+  }
+
+  /**
+   * Pure ledger decision for claim / resume / already_complete / conflicts.
+   * Does not perform I/O — caller runs Lookup → decide → Upsert → re-Lookup confirm.
+   */
+  function evaluateLedgerDecision(ledgerRow, opts) {
+    opts = opts || {};
+    var executionId = opts.executionId || "local";
+    var nowMs = opts.nowMs != null ? opts.nowMs : Date.now();
+    var contentFingerprint = opts.contentFingerprint;
+    var operationKey = opts.operationKey;
+
+    if (ledgerRow && lockIsHeld(ledgerRow, executionId, nowMs)) {
+      return {
+        action: "lock_held",
+        outcome: "failed",
+        error: "LEDGER_LOCK_HELD: operationKey=" + operationKey,
+        resumeFrom: null,
+        metaCreate: null,
+      };
+    }
+
+    if (!ledgerRow) {
+      return {
+        action: "claim",
+        outcome: "in_progress",
+        resumeFrom: "campaign",
+        metaCreate: {},
+        lockOwner: executionId,
+        lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+      };
+    }
+
+    var rowFp = ledgerRow.contentFingerprint || "";
+    if (rowFp && contentFingerprint && rowFp !== contentFingerprint) {
+      if (isCompleteLedgerRow(ledgerRow) || firstMissingStage(ledgerRow) !== "campaign") {
+        return {
+          action: "revision_conflict",
+          outcome: "manual_review_required",
+          error:
+            "LEDGER_REVISION_CONFLICT: fingerprint mismatch for " +
+            operationKey +
+            " — bump ads.meta.creativeRevision for a deliberate new variant",
+          resumeFrom: null,
+          metaCreate: null,
+        };
+      }
+    }
+
+    if (isCompleteLedgerRow(ledgerRow) && (!rowFp || rowFp === contentFingerprint)) {
+      return {
+        action: "already_complete",
+        outcome: "already_complete",
+        resumeFrom: null,
+        metaCreate: {
+          campaignId: ledgerRow.campaignId || null,
+          adSetId: ledgerRow.adSetId || null,
+          imageHash: ledgerRow.imageHash || null,
+          creativeId: ledgerRow.creativeId || null,
+          adId: ledgerRow.adId || null,
+        },
+        error: null,
+      };
+    }
+
+    var resumeFrom = firstMissingStage(ledgerRow);
+    if (resumeFrom && resumeFrom !== "campaign") {
+      return {
+        action: "resume",
+        outcome: "resumed",
+        resumeFrom: resumeFrom,
+        metaCreate: {
+          campaignId: ledgerRow.campaignId || null,
+          adSetId: ledgerRow.adSetId || null,
+          imageHash: ledgerRow.imageHash || null,
+          creativeId: ledgerRow.creativeId || null,
+          adId: ledgerRow.adId || null,
+        },
+        lockOwner: executionId,
+        lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+      };
+    }
+
+    return {
+      action: "claim",
+      outcome: "in_progress",
+      resumeFrom: "campaign",
+      metaCreate: {
+        campaignId: ledgerRow.campaignId || null,
+        adSetId: ledgerRow.adSetId || null,
+        imageHash: ledgerRow.imageHash || null,
+        creativeId: ledgerRow.creativeId || null,
+        adId: ledgerRow.adId || null,
+      },
+      lockOwner: executionId,
+      lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+    };
+  }
+
+  /**
+   * Approval + safety gates for create_paused. Never logs token values.
+   */
+  function evaluateCreatePausedGates(input) {
+    input = input || {};
+    var mode = input.mode || "dry_run";
+    var approval = Boolean(input.approval);
+    var approvalToken = input.approvalToken || "";
+    var configToken = input.configToken || input.wf4CreatePausedApprovalToken || "";
+    var createPausedAllowed = input.createPausedAllowed === true;
+    var tokenPresent = Boolean(approvalToken);
+    var configTokenPresent = Boolean(configToken);
+    var tokenMatch =
+      tokenPresent && configTokenPresent && approvalToken === configToken;
+    var tripleApproved =
+      mode === "create_paused" && approval === true && tokenMatch;
+    var failures = [];
+
+    if (mode !== "create_paused") failures.push("mode_not_create_paused");
+    if (!approval) failures.push("approval_false");
+    if (!tokenPresent) failures.push("missing_approval_token");
+    if (!configTokenPresent) failures.push("missing_config_token");
+    if (tokenPresent && configTokenPresent && !tokenMatch) failures.push("wrong_approval_token");
+    if (!createPausedAllowed) failures.push("create_paused_hard_gate_false");
+    if (input.budgetCapPassed === false) failures.push("over_budget");
+    if (input.ledgerDecisionAction === "lock_held") failures.push("ledger_lock_held");
+    if (input.ledgerDecisionAction === "revision_conflict") failures.push("ledger_revision_conflict");
+    if (input.ledgerDecisionAction === "already_complete") failures.push("already_complete");
+    if (input.requiredMetaIdsPresent === false) failures.push("missing_meta_ids");
+    if (input.landingUrlValid === false) failures.push("invalid_landing_url");
+    if (input.creativeValid === false) failures.push("invalid_creative");
+
+    return {
+      mode: mode,
+      approval: approval,
+      tokenPresent: tokenPresent,
+      configTokenPresent: configTokenPresent,
+      tokenMatch: tokenMatch,
+      tripleApproved: tripleApproved,
+      createPausedAllowed: createPausedAllowed,
+      createPathOpen: tripleApproved && createPausedAllowed && failures.length === 0,
+      failures: failures,
+      redacted: true,
+    };
+  }
+
+  function redactSensitiveFields(obj) {
+    if (!obj || typeof obj !== "object") return obj;
+    var clone = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);
+    var keys = Object.keys(clone);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var lower = k.toLowerCase();
+      if (
+        lower.indexOf("approvaltoken") !== -1 ||
+        lower === "wf4createpausedapprovaltoken" ||
+        lower.indexOf("accesstoken") !== -1
+      ) {
+        clone[k] = clone[k] ? "[REDACTED]" : "";
+      } else if (clone[k] && typeof clone[k] === "object") {
+        clone[k] = redactSensitiveFields(clone[k]);
+      }
+    }
+    return clone;
+  }
+
+  function buildLedgerStageUpsert(plan, metaCreate, phase, lock) {
+    metaCreate = metaCreate || {};
+    lock = lock || {};
+    return {
+      operationKey: plan.operationKey,
+      appId: plan.appId,
+      experimentRunId: plan.experimentRunId || "",
+      provider: plan.provider || PROVIDER,
+      environment: plan.environment,
+      creativeRevision: plan.creativeRevision,
+      contentFingerprint: plan.contentFingerprint,
+      creativeSha256: plan.creativeSha256,
+      phase: phase,
+      campaignId: metaCreate.campaignId || "",
+      adSetId: metaCreate.adSetId || "",
+      imageHash: metaCreate.imageHash || "",
+      creativeId: metaCreate.creativeId || "",
+      adId: metaCreate.adId || "",
+      lockOwner: lock.lockOwner != null ? lock.lockOwner : "",
+      lockExpiresAt: lock.lockExpiresAt != null ? lock.lockExpiresAt : "",
+      resumeFrom: lock.resumeFrom || "",
+      outcome: lock.outcome || "in_progress",
+      lastError: lock.lastError || "",
+    };
   }
 
   function normalizeGithubRepo(raw) {
@@ -347,54 +694,91 @@ if (typeof globalThis !== "undefined") {
     var landingUrl = app.deployment.landing.url;
     var utmQuery = buildUtmQuery(app.ads.utmTemplate);
     var destinationUrl = utmQuery ? landingUrl + "?" + utmQuery : landingUrl;
+    var environment = config.environment || DEFAULT_ENVIRONMENT;
+    var creativeRevision =
+      (app.ads.meta && app.ads.meta.creativeRevision) ||
+      config.creativeRevision ||
+      DEFAULT_CREATIVE_REVISION;
+    var workflowVersion = config.workflowVersion || DEFAULT_WORKFLOW_VERSION;
+    var creativeSha256 = config.creativeSha256 || null;
+    if (!creativeSha256) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_SHA256_REQUIRED: pass config.creativeSha256 (binary hash) for operation fingerprint",
+      };
+    }
+    var placementSet = buildPlacementSet(platforms);
+    var operationKey = buildOperationKey({
+      appId: app.appId,
+      environment: environment,
+      provider: provider,
+      creativeRevision: creativeRevision,
+    });
+
+    var adPlan = {
+      mode: mode,
+      provider: provider,
+      appId: app.appId,
+      experimentRunId: app.analytics && app.analytics.experimentRunId,
+      runKey: idem.runKey,
+      environment: environment,
+      creativeRevision: creativeRevision,
+      workflowVersion: workflowVersion,
+      creativeSha256: creativeSha256,
+      operationKey: operationKey,
+      placementSet: placementSet,
+      authorObjective: app.ads.objective || "traffic",
+      campaignName: app.ads.campaignName,
+      callToAction: app.ads.callToAction,
+      headlines: app.ads.headlines || [],
+      primaryTexts: app.ads.primaryTexts || [],
+      descriptions: app.ads.descriptions || [],
+      platforms: platforms,
+      targeting: {
+        locations: targeting.locations,
+        ageMin: targeting.ageMin,
+        ageMax: targeting.ageMax,
+        interests: targeting.interests || null,
+      },
+      creative: creative,
+      creativeResolved: creativeResolved.resolved,
+      landingUrl: landingUrl,
+      destinationUrl: destinationUrl,
+      budget: {
+        currency: budget.currency,
+        totalAmount: budget.amount,
+        durationDays: budget.durationDays,
+        dailyBudgetUsd: dailyBudgetUsd,
+      },
+      budgetCapCheck: {
+        maxDailyBudgetUsd: maxDailyBudgetUsd,
+        passed: true,
+      },
+      wf3Gate: {
+        required: true,
+        status: config.wf3GateStatus || "proven",
+        requiredEvents: [
+          "page_view",
+          "email_captured",
+          "buy_now_clicked",
+          "mockup_interacted",
+        ],
+      },
+      rootStatusPreserved: app.status || null,
+    };
+
+    adPlan.contentFingerprint = buildContentFingerprint(adPlan, {
+      environment: environment,
+      workflowVersion: workflowVersion,
+      creativeSha256: creativeSha256,
+      creativeRevision: creativeRevision,
+      placementSet: placementSet,
+    });
 
     return {
       ok: true,
-      adPlan: {
-        mode: mode,
-        provider: provider,
-        appId: app.appId,
-        experimentRunId: app.analytics && app.analytics.experimentRunId,
-        runKey: idem.runKey,
-        authorObjective: app.ads.objective || "traffic",
-        campaignName: app.ads.campaignName,
-        callToAction: app.ads.callToAction,
-        headlines: app.ads.headlines || [],
-        primaryTexts: app.ads.primaryTexts || [],
-        descriptions: app.ads.descriptions || [],
-        platforms: platforms,
-        targeting: {
-          locations: targeting.locations,
-          ageMin: targeting.ageMin,
-          ageMax: targeting.ageMax,
-          interests: targeting.interests || null,
-        },
-        creative: creative,
-        creativeResolved: creativeResolved.resolved,
-        landingUrl: landingUrl,
-        destinationUrl: destinationUrl,
-        budget: {
-          currency: budget.currency,
-          totalAmount: budget.amount,
-          durationDays: budget.durationDays,
-          dailyBudgetUsd: dailyBudgetUsd,
-        },
-        budgetCapCheck: {
-          maxDailyBudgetUsd: maxDailyBudgetUsd,
-          passed: true,
-        },
-        wf3Gate: {
-          required: true,
-          status: config.wf3GateStatus || "proven",
-          requiredEvents: [
-            "page_view",
-            "email_captured",
-            "buy_now_clicked",
-            "mockup_interacted",
-          ],
-        },
-        rootStatusPreserved: app.status || null,
-      },
+      adPlan: adPlan,
     };
   }
 
@@ -412,6 +796,8 @@ if (typeof globalThis !== "undefined") {
       age_min: adPlan.targeting.ageMin,
       age_max: adPlan.targeting.ageMax,
       publisher_platforms: adPlan.platforms,
+      facebook_positions: V1_FACEBOOK_POSITIONS.slice(),
+      instagram_positions: V1_INSTAGRAM_POSITIONS.slice(),
     };
     if (adPlan.targeting.interests && adPlan.targeting.interests.length) {
       adSetTargeting.interests = adPlan.targeting.interests.map(function () {
@@ -513,21 +899,29 @@ if (typeof globalThis !== "undefined") {
   }
 
   function buildLedgerPlan(adPlan) {
-    var operationKey = [adPlan.appId, adPlan.experimentRunId, adPlan.provider].join("|");
     return {
-      operationKey: operationKey,
+      operationKey: adPlan.operationKey,
       appId: adPlan.appId,
       experimentRunId: adPlan.experimentRunId,
       provider: adPlan.provider,
+      environment: adPlan.environment,
+      creativeRevision: adPlan.creativeRevision,
+      contentFingerprint: adPlan.contentFingerprint,
+      creativeSha256: adPlan.creativeSha256,
+      placementSet: adPlan.placementSet,
       phase: "planned",
       campaignId: null,
       adSetId: null,
       imageHash: null,
       creativeId: null,
       adId: null,
+      lockOwner: null,
+      lockExpiresAt: null,
+      resumeFrom: null,
+      outcome: null,
       lastError: null,
       reconciliation:
-        "V1: detect existing op → resume if safe → else manual_review_required; no auto-delete",
+        "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete",
     };
   }
 
@@ -621,6 +1015,15 @@ if (typeof globalThis !== "undefined") {
         v1Pairing: meta.v1Pairing,
         requests: meta.requests,
         ledgerPlan: ledgerPlan,
+        operationIdentity: {
+          operationKey: adPlan.operationKey,
+          contentFingerprint: adPlan.contentFingerprint,
+          creativeSha256: adPlan.creativeSha256,
+          creativeRevision: adPlan.creativeRevision,
+          environment: adPlan.environment,
+          placementSet: adPlan.placementSet,
+          workflowVersion: adPlan.workflowVersion,
+        },
         writeBackAfterCreatePausedOnly: writeBackPreview,
         safety: {
           externalWritePerformed: false,
@@ -631,8 +1034,10 @@ if (typeof globalThis !== "undefined") {
           tripleApprovalRequired: {
             mode: "create_paused",
             approval: true,
-            approvalToken: "WF4_CREATE_PAUSED_APPROVAL_TOKEN",
+            approvalToken: "[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]",
           },
+          feedFirstPlacements: true,
+          storiesReelsOutOfV1: true,
         },
       },
     };
@@ -641,6 +1046,13 @@ if (typeof globalThis !== "undefined") {
   exports.PROVIDER = PROVIDER;
   exports.DEFAULT_META_API_VERSION = DEFAULT_META_API_VERSION;
   exports.DEFAULT_MAX_DAILY_BUDGET_USD = DEFAULT_MAX_DAILY_BUDGET_USD;
+  exports.DEFAULT_ENVIRONMENT = DEFAULT_ENVIRONMENT;
+  exports.DEFAULT_CREATIVE_REVISION = DEFAULT_CREATIVE_REVISION;
+  exports.DEFAULT_WORKFLOW_VERSION = DEFAULT_WORKFLOW_VERSION;
+  exports.V1_FACEBOOK_POSITIONS = V1_FACEBOOK_POSITIONS;
+  exports.V1_INSTAGRAM_POSITIONS = V1_INSTAGRAM_POSITIONS;
+  exports.V1_PLACEMENT_SET = V1_PLACEMENT_SET;
+  exports.STAGE_ORDER = STAGE_ORDER;
   exports.OBJECTIVE_MAPPING = OBJECTIVE_MAPPING;
   exports.V1_OPTIMIZATION_GOAL = V1_OPTIMIZATION_GOAL;
   exports.V1_BILLING_EVENT = V1_BILLING_EVENT;
@@ -651,6 +1063,15 @@ if (typeof globalThis !== "undefined") {
   exports.buildLedgerPlan = buildLedgerPlan;
   exports.buildWriteBackPreview = buildWriteBackPreview;
   exports.buildDryRunBundle = buildDryRunBundle;
+  exports.buildOperationKey = buildOperationKey;
+  exports.buildContentFingerprint = buildContentFingerprint;
+  exports.evaluateLedgerDecision = evaluateLedgerDecision;
+  exports.evaluateCreatePausedGates = evaluateCreatePausedGates;
+  exports.redactSensitiveFields = redactSensitiveFields;
+  exports.buildLedgerStageUpsert = buildLedgerStageUpsert;
+  exports.sha256Hex = sha256Hex;
+  exports.sha256BytesHex = sha256BytesHex;
+  exports.firstMissingStage = firstMissingStage;
   exports.mapAuthorObjective = mapAuthorObjective;
   exports.selectCreative = selectCreative;
   exports.resolveCreativeSource = resolveCreativeSource;

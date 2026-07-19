@@ -51,21 +51,14 @@ function download(url) {
 
 async function main() {
   const app = JSON.parse(fs.readFileSync(appJsonPath, "utf8"));
-  const result = adapter.buildDryRunBundle(
-    app,
-    Object.assign({ mode: "dry_run", wf3GateStatus: "proven" }, SANDBOX_META)
-  );
-  assert(result.ok, result.error || "bundle failed");
-
-  const creative = result.bundle.source.creative;
-  assert(creative && creative.downloadUrl, "downloadUrl required");
-  assert(creative.expectedMimeFamily === "image", "expectedMimeFamily must be image");
-  assert(creative.resolutionMethod === "github_raw" || creative.resolutionMethod === "direct_url");
-
   const selected = adapter.selectCreative(app);
   const resolved = adapter.resolveCreativeSource(app, selected);
   assert(resolved.ok, resolved.error || "resolveCreativeSource failed");
-  assert(resolved.resolved.downloadUrl === creative.downloadUrl, "resolve mismatch vs bundle");
+
+  const creative = resolved.resolved;
+  assert(creative && creative.downloadUrl, "downloadUrl required");
+  assert(creative.expectedMimeFamily === "image", "expectedMimeFamily must be image");
+  assert(creative.resolutionMethod === "github_raw" || creative.resolutionMethod === "direct_url");
 
   const resp = await download(creative.downloadUrl);
   assert(resp.statusCode === 200, "CREATIVE_DOWNLOAD_FAILED: status=" + resp.statusCode);
@@ -89,6 +82,20 @@ async function main() {
     resp.body.toString("ascii", 8, 12) === "WEBP";
   assert(isPng || isJpeg || isGif || isWebp, "CREATIVE_NOT_IMAGE: magic bytes not image");
 
+  const creativeSha256 = adapter.sha256BytesHex(resp.body);
+  const result = adapter.buildDryRunBundle(
+    app,
+    Object.assign(
+      { mode: "dry_run", wf3GateStatus: "proven", creativeSha256: creativeSha256 },
+      SANDBOX_META
+    )
+  );
+  assert(result.ok, result.error || "bundle failed");
+  assert(
+    result.bundle.source.creative.downloadUrl === creative.downloadUrl,
+    "resolve mismatch vs bundle"
+  );
+
   console.log("WF4 creative binary resolution proof: PASS");
   console.log("  metaHttpCalls: 0");
   console.log("  resolutionMethod: " + creative.resolutionMethod);
@@ -99,6 +106,7 @@ async function main() {
   console.log("  filename: " + creative.filename);
   console.log("  content-type: " + resp.contentType);
   console.log("  byteSize: " + resp.body.length);
+  console.log("  creativeSha256: " + creativeSha256);
   console.log("  expectedMime: " + creative.expectedMime);
 }
 

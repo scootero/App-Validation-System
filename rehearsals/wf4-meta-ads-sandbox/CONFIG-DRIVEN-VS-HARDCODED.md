@@ -13,6 +13,9 @@
 | `provider` | `meta` |
 | `mode` default | `dry_run` |
 | `useFixtureAppJson` | `true` for sandbox dry-run |
+| `environment` | `sandbox` |
+| `workflowVersion` | `wf4-image-v1` |
+| `WF4_CREATIVE_SHA256` | Planning hash of `og-image.png` bytes (not a secret) |
 
 **Not in Config:** objective mapping, billing_event, optimization_goal, payloads — [`lib/meta-adapter.js`](./lib/meta-adapter.js).  
 **Not in Config:** Meta access token.
