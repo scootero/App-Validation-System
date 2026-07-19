@@ -1,0 +1,227 @@
+ mismatch for " +
+            operationKey +
+            " — bump ads.meta.creativeRevision for a deliberate new variant",
+          resumeFrom: null,
+          metaCreate: null,
+        };
+      }
+    }
+
+    if (isCompleteLedgerRow(ledgerRow) && (!rowFp || rowFp === contentFingerprint)) {
+      return {
+        action: "already_complete",
+        outcome: "already_complete",
+        resumeFrom: null,
+        metaCreate: {
+          campaignId: ledgerRow.campaignId || null,
+          adSetId: ledgerRow.adSetId || null,
+          imageHash: ledgerRow.imageHash || null,
+          creativeId: ledgerRow.creativeId || null,
+          adId: ledgerRow.adId || null,
+        },
+        error: null,
+      };
+    }
+
+    var resumeFrom = firstMissingStage(ledgerRow);
+    if (resumeFrom && resumeFrom !== "campaign") {
+      return {
+        action: "resume",
+        outcome: "resumed",
+        resumeFrom: resumeFrom,
+        metaCreate: {
+          campaignId: ledgerRow.campaignId || null,
+          adSetId: ledgerRow.adSetId || null,
+          imageHash: ledgerRow.imageHash || null,
+          creativeId: ledgerRow.creativeId || null,
+          adId: ledgerRow.adId || null,
+        },
+        lockOwner: executionId,
+        lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+      };
+    }
+
+    return {
+      action: "claim",
+      outcome: "in_progress",
+      resumeFrom: "campaign",
+      metaCreate: {
+        campaignId: ledgerRow.campaignId || null,
+        adSetId: ledgerRow.adSetId || null,
+        imageHash: ledgerRow.imageHash || null,
+        creativeId: ledgerRow.creativeId || null,
+        adId: ledgerRow.adId || null,
+      },
+      lockOwner: executionId,
+      lockExpiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+    };
+  }
+
+  /**
+   * Approval + safety gates for create_paused. Never logs token values.
+   */
+  function evaluateCreatePausedGates(input) {
+    input = input || {};
+    var mode = input.mode || "dry_run";
+    var approval = Boolean(input.approval);
+    var approvalToken = input.approvalToken || "";
+    var configToken = input.configToken || input.wf4CreatePausedApprovalToken || "";
+    var createPausedAllowed = input.createPausedAllowed === true;
+    var tokenPresent = Boolean(approvalToken);
+    var configTokenPresent = Boolean(configToken);
+    var tokenMatch =
+      tokenPresent && configTokenPresent && approvalToken === configToken;
+    var tripleApproved =
+      mode === "create_paused" && approval === true && tokenMatch;
+    var failures = [];
+
+    if (mode !== "create_paused") failures.push("mode_not_create_paused");
+    if (!approval) failures.push("approval_false");
+    if (!tokenPresent) failures.push("missing_approval_token");
+    if (!configTokenPresent) failures.push("missing_config_token");
+    if (tokenPresent && configTokenPresent && !tokenMatch) failures.push("wrong_approval_token");
+    if (!createPausedAllowed) failures.push("create_paused_hard_gate_false");
+    if (input.budgetCapPassed === false) failures.push("over_budget");
+    if (input.ledgerDecisionAction === "lock_held") failures.push("ledger_lock_held");
+    if (input.ledgerDecisionAction === "revision_conflict") failures.push("ledger_revision_conflict");
+    if (input.ledgerDecisionAction === "already_complete") failures.push("already_complete");
+    if (input.requiredMetaIdsPresent === false) failures.push("missing_meta_ids");
+    if (input.landingUrlValid === false) failures.push("invalid_landing_url");
+    if (input.creativeValid === false) failures.push("invalid_creative");
+
+    return {
+      mode: mode,
+      approval: approval,
+      tokenPresent: tokenPresent,
+      configTokenPresent: configTokenPresent,
+      tokenMatch: tokenMatch,
+      tripleApproved: tripleApproved,
+      createPausedAllowed: createPausedAllowed,
+      createPathOpen: tripleApproved && createPausedAllowed && failures.length === 0,
+      failures: failures,
+      redacted: true,
+    };
+  }
+
+  function redactSensitiveFields(obj) {
+    if (!obj || typeof obj !== "object") return obj;
+    var clone = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);
+    var keys = Object.keys(clone);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var lower = k.toLowerCase();
+      if (
+        lower.indexOf("approvaltoken") !== -1 ||
+        lower === "wf4createpausedapprovaltoken" ||
+        lower.indexOf("accesstoken") !== -1
+      ) {
+        clone[k] = clone[k] ? "[REDACTED]" : "";
+      } else if (clone[k] && typeof clone[k] === "object") {
+        clone[k] = redactSensitiveFields(clone[k]);
+      }
+    }
+    return clone;
+  }
+
+  function buildLedgerStageUpsert(plan, metaCreate, phase, lock) {
+    metaCreate = metaCreate || {};
+    lock = lock || {};
+    return {
+      operationKey: plan.operationKey,
+      appId: plan.appId,
+      experimentRunId: plan.experimentRunId || "",
+      provider: plan.provider || PROVIDER,
+      environment: plan.environment,
+      creativeRevision: plan.creativeRevision,
+      contentFingerprint: plan.contentFingerprint,
+      creativeSha256: plan.creativeSha256,
+      phase: phase,
+      campaignId: metaCreate.campaignId || "",
+      adSetId: metaCreate.adSetId || "",
+      imageHash: metaCreate.imageHash || "",
+      creativeId: metaCreate.creativeId || "",
+      adId: metaCreate.adId || "",
+      lockOwner: lock.lockOwner != null ? lock.lockOwner : "",
+      lockExpiresAt: lock.lockExpiresAt != null ? lock.lockExpiresAt : "",
+      resumeFrom: lock.resumeFrom || "",
+      outcome: lock.outcome || "in_progress",
+      lastError: lock.lastError || "",
+    };
+  }
+
+  function normalizeGithubRepo(raw) {
+    if (!raw || typeof raw !== "string") return null;
+    var s = raw.trim();
+    s = s.replace(/^https?:\/\/github\.com\//i, "");
+    s = s.replace(/\.git$/i, "");
+    s = s.replace(/\/+$/, "");
+    var parts = s.split("/");
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    return parts[0] + "/" + parts[1];
+  }
+
+  function filenameFromPath(p) {
+    var parts = String(p || "").split("/");
+    return parts[parts.length - 1] || "";
+  }
+
+  function extensionOf(filename) {
+    var m = String(filename || "")
+      .toLowerCase()
+      .match(/\.([a-z0-9]+)$/);
+    return m ? m[1] : "";
+  }
+
+  /**
+   * Generic creative binary resolution for any app package.
+   * Reads ads.media[] / media.ogImage + source.assetsGithubRepo ?? source.mockupGithubRepo.
+   * Does not hardcode app ids, repos, or filenames.
+   */
+  function resolveCreativeSource(app, creative) {
+    if (!creative || !creative.kind || !creative.value) {
+      return { ok: false, error: "CREATIVE_PATH_MISSING: no usable creative value" };
+    }
+
+    if (creative.kind === "url") {
+      var urlValue = String(creative.value).trim();
+      if (!/^https:\/\//i.test(urlValue)) {
+        return { ok: false, error: "CREATIVE_DOWNLOAD_FAILED: creative url must be HTTPS" };
+      }
+      var urlFilename = filenameFromPath(urlValue.split("?")[0]);
+      var urlExt = extensionOf(urlFilename);
+      if (!IMAGE_EXTENSIONS[urlExt]) {
+        return {
+          ok: false,
+          error:
+            "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
+            (urlExt || "none"),
+        };
+      }
+      return {
+        ok: true,
+        resolved: {
+          kind: "url",
+          value: urlValue,
+          role: creative.role || "primary",
+          resolvedFrom: creative.source,
+          repo: null,
+          branch: null,
+          githubPath: null,
+          url: urlValue,
+          downloadUrl: urlValue,
+          filename: urlFilename,
+          expectedMime: IMAGE_EXTENSIONS[urlExt],
+          expectedMimeFamily: "image",
+          resolutionMethod: "direct_url",
+        },
+      };
+    }
+
+    if (creative.kind !== "githubPath") {
+      return {
+        ok: false,
+        error: "CREATIVE_UNSUPPORTED_TYPE: unsupported creative kind " + creative.kind,
+      };
+    }
+
+    var githubPath = String(creative.value).trim()

@@ -1,0 +1,244 @@
+.replace(/^\/+/, "");
+    if (!githubPath) {
+      return { ok: false, error: "CREATIVE_PATH_MISSING: githubPath is empty" };
+    }
+
+    var filename = filenameFromPath(githubPath);
+    var ext = extensionOf(filename);
+    if (!IMAGE_EXTENSIONS[ext]) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
+          (ext || "none"),
+      };
+    }
+
+    var source = (app && app.source) || {};
+    var repoRaw = source.assetsGithubRepo || source.mockupGithubRepo;
+    if (!repoRaw) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_REPO_UNRESOLVED: set source.assetsGithubRepo or source.mockupGithubRepo for githubPath creatives",
+      };
+    }
+    var repo = normalizeGithubRepo(repoRaw);
+    if (!repo) {
+      return {
+        ok: false,
+        error: "CREATIVE_REPO_INVALID: expected owner/repo, got " + String(repoRaw),
+      };
+    }
+
+    var branch = String(source.assetsBranch || source.mockupBranch || "main").trim() || "main";
+    var downloadUrl =
+      "https://raw.githubusercontent.com/" +
+      repo +
+      "/" +
+      encodeURIComponent(branch).replace(/%2F/gi, "/") +
+      "/" +
+      githubPath
+        .split("/")
+        .map(function (seg) {
+          return encodeURIComponent(seg);
+        })
+        .join("/");
+
+    return {
+      ok: true,
+      resolved: {
+        kind: "githubPath",
+        value: githubPath,
+        role: creative.role || "primary",
+        resolvedFrom: creative.source,
+        repo: repo,
+        branch: branch,
+        githubPath: githubPath,
+        url: null,
+        downloadUrl: downloadUrl,
+        filename: filename,
+        expectedMime: IMAGE_EXTENSIONS[ext],
+        expectedMimeFamily: "image",
+        resolutionMethod: "github_raw",
+      },
+    };
+  }
+
+  function buildUtmQuery(utmTemplate) {
+    var u = utmTemplate || {};
+    var parts = [];
+    if (u.source) parts.push("utm_source=" + encodeURIComponent(u.source));
+    if (u.medium) parts.push("utm_medium=" + encodeURIComponent(u.medium));
+    if (u.campaign) parts.push("utm_campaign=" + encodeURIComponent(u.campaign));
+    if (u.content) parts.push("utm_content=" + encodeURIComponent(u.content));
+    if (u.term) parts.push("utm_term=" + encodeURIComponent(u.term));
+    return parts.join("&");
+  }
+
+  function mapCountries(locations) {
+    var countries = [];
+    for (var i = 0; i < (locations || []).length; i++) {
+      var key = String(locations[i]).trim().toLowerCase();
+      countries.push(LOCATION_TO_COUNTRY[key] || "VERIFY_COUNTRY_CODE");
+    }
+    return countries.length ? countries : ["VERIFY_COUNTRY_CODE"];
+  }
+
+  function selectCreative(app) {
+    var adsMedia = (app.ads && app.ads.media) || [];
+    for (var i = 0; i < adsMedia.length; i++) {
+      var item = adsMedia[i];
+      if (item.url || item.githubPath) {
+        return {
+          kind: item.url ? "url" : "githubPath",
+          value: item.url || item.githubPath,
+          role: item.role || "primary",
+          source: "ads.media",
+        };
+      }
+    }
+    var og = app.media && app.media.ogImage;
+    if (og && (og.url || og.githubPath)) {
+      return {
+        kind: og.url ? "url" : "githubPath",
+        value: og.url || og.githubPath,
+        role: "fallback",
+        source: "media.ogImage",
+      };
+    }
+    return null;
+  }
+
+  function checkIdempotency(app, provider) {
+    var meta = (app.ads && app.ads.meta) || {};
+    var runKey = {
+      appId: app.appId,
+      experimentRunId: app.analytics && app.analytics.experimentRunId,
+      provider: provider || PROVIDER,
+    };
+    var existing = META_ID_FIELDS.filter(function (field) {
+      return meta[field] != null && meta[field] !== "";
+    });
+    return {
+      runKey: runKey,
+      refused: existing.length > 0,
+      existingFields: existing,
+    };
+  }
+
+  function mapAuthorObjective(authorObjective) {
+    var key = String(authorObjective || "traffic").toLowerCase();
+    return OBJECTIVE_MAPPING[key] || OBJECTIVE_MAPPING.traffic;
+  }
+
+  function buildAdPlan(app, config) {
+    config = config || {};
+    var maxDailyBudgetUsd =
+      config.maxDailyBudgetUsd != null
+        ? Number(config.maxDailyBudgetUsd)
+        : DEFAULT_MAX_DAILY_BUDGET_USD;
+    var provider = config.provider || PROVIDER;
+    var mode = config.mode || "dry_run";
+
+    if (!app || !app.appId) {
+      return { ok: false, error: "Missing appId" };
+    }
+    if (!app.ads) {
+      return { ok: false, error: "Missing ads section" };
+    }
+    if (!app.experiment || !app.experiment.testBudget) {
+      return { ok: false, error: "Missing experiment.testBudget" };
+    }
+    if (!app.deployment || !app.deployment.landing || !app.deployment.landing.url) {
+      return { ok: false, error: "Missing deployment.landing.url" };
+    }
+    if (!/^https:\/\//i.test(app.deployment.landing.url)) {
+      return { ok: false, error: "deployment.landing.url must be HTTPS" };
+    }
+
+    var targeting = app.ads.targeting || {};
+    if (!targeting.locations || !targeting.locations.length) {
+      return { ok: false, error: "ads.targeting.locations required" };
+    }
+    if (targeting.ageMin == null || targeting.ageMax == null) {
+      return { ok: false, error: "ads.targeting.ageMin and ageMax required" };
+    }
+    var platforms = app.ads.platforms || [];
+    if (platforms.indexOf("facebook") === -1 && platforms.indexOf("instagram") === -1) {
+      return { ok: false, error: "ads.platforms must include facebook and/or instagram" };
+    }
+
+    var creative = selectCreative(app);
+    if (!creative) {
+      return { ok: false, error: "No usable creative (ads.media[] or media.ogImage)" };
+    }
+
+    var creativeResolved = resolveCreativeSource(app, creative);
+    if (!creativeResolved.ok) {
+      return { ok: false, error: creativeResolved.error };
+    }
+
+    var budget = app.experiment.testBudget;
+    if (!budget.durationDays || budget.durationDays <= 0) {
+      return { ok: false, error: "experiment.testBudget.durationDays must be > 0" };
+    }
+    if (budget.currency && budget.currency !== "USD") {
+      return { ok: false, error: "experiment.testBudget.currency must be USD for V1 cap check" };
+    }
+    var dailyBudgetUsd = roundBudget(Number(budget.amount) / Number(budget.durationDays));
+    if (dailyBudgetUsd > maxDailyBudgetUsd) {
+      return {
+        ok: false,
+        error:
+          "Daily budget " +
+          dailyBudgetUsd +
+          " USD exceeds MAX_DAILY_BUDGET_USD=" +
+          maxDailyBudgetUsd +
+          " (fail-closed; never clamp)",
+      };
+    }
+
+    var idem = checkIdempotency(app, provider);
+    if (idem.refused) {
+      return {
+        ok: false,
+        error:
+          "Idempotency refusal: ads.meta already has " +
+          idem.existingFields.join(", ") +
+          " for runKey " +
+          JSON.stringify(idem.runKey),
+      };
+    }
+
+    var landingUrl = app.deployment.landing.url;
+    var utmQuery = buildUtmQuery(app.ads.utmTemplate);
+    var destinationUrl = utmQuery ? landingUrl + "?" + utmQuery : landingUrl;
+    var environment = config.environment || DEFAULT_ENVIRONMENT;
+    var creativeRevision =
+      (app.ads.meta && app.ads.meta.creativeRevision) ||
+      config.creativeRevision ||
+      DEFAULT_CREATIVE_REVISION;
+    var workflowVersion = config.workflowVersion || DEFAULT_WORKFLOW_VERSION;
+    var creativeSha256 = config.creativeSha256 || null;
+    if (!creativeSha256) {
+      return {
+        ok: false,
+        error:
+          "CREATIVE_SHA256_REQUIRED: pass config.creativeSha256 (binary hash) for operation fingerprint",
+      };
+    }
+    var placementSet = buildPlacementSet(platforms);
+    var operationKey = buildOperationKey({
+      appId: app.appId,
+      environment: environment,
+      provider: provider,
+      creativeRevision: creativeRevision,
+    });
+
+    var adPlan = {
+      mode: mode,
+      provider: provider,
+      appId: app.appId,
+      experimentRunId: app.analytics && app.analytics.experimentRunId,
+      runKey

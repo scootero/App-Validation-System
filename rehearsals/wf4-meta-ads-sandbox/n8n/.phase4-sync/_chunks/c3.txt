@@ -1,0 +1,244 @@
+: idem.runKey,
+      environment: environment,
+      creativeRevision: creativeRevision,
+      workflowVersion: workflowVersion,
+      creativeSha256: creativeSha256,
+      operationKey: operationKey,
+      placementSet: placementSet,
+      authorObjective: app.ads.objective || "traffic",
+      campaignName: app.ads.campaignName,
+      callToAction: app.ads.callToAction,
+      headlines: app.ads.headlines || [],
+      primaryTexts: app.ads.primaryTexts || [],
+      descriptions: app.ads.descriptions || [],
+      platforms: platforms,
+      targeting: {
+        locations: targeting.locations,
+        ageMin: targeting.ageMin,
+        ageMax: targeting.ageMax,
+        interests: targeting.interests || null,
+      },
+      creative: creative,
+      creativeResolved: creativeResolved.resolved,
+      landingUrl: landingUrl,
+      destinationUrl: destinationUrl,
+      budget: {
+        currency: budget.currency,
+        totalAmount: budget.amount,
+        durationDays: budget.durationDays,
+        dailyBudgetUsd: dailyBudgetUsd,
+      },
+      budgetCapCheck: {
+        maxDailyBudgetUsd: maxDailyBudgetUsd,
+        passed: true,
+      },
+      wf3Gate: {
+        required: true,
+        status: config.wf3GateStatus || "proven",
+        requiredEvents: [
+          "page_view",
+          "email_captured",
+          "buy_now_clicked",
+          "mockup_interacted",
+        ],
+      },
+      rootStatusPreserved: app.status || null,
+    };
+
+    adPlan.contentFingerprint = buildContentFingerprint(adPlan, {
+      environment: environment,
+      workflowVersion: workflowVersion,
+      creativeSha256: creativeSha256,
+      creativeRevision: creativeRevision,
+      placementSet: placementSet,
+    });
+
+    return {
+      ok: true,
+      adPlan: adPlan,
+    };
+  }
+
+  function buildMetaRequests(adPlan, config) {
+    config = config || {};
+    var metaApiVersion = config.metaApiVersion || DEFAULT_META_API_VERSION;
+    var pageId = config.pageId || "CONFIG_META_PAGE_ID";
+    var adAccountId = config.adAccountId || "act_{META_AD_ACCOUNT_ID}";
+    var instagramUserId = config.instagramUserId || null;
+    var dailyBudgetMinor = Math.round(adPlan.budget.dailyBudgetUsd * 100);
+    var metaObjective = mapAuthorObjective(adPlan.authorObjective);
+
+    var adSetTargeting = {
+      geo_locations: { countries: mapCountries(adPlan.targeting.locations) },
+      age_min: adPlan.targeting.ageMin,
+      age_max: adPlan.targeting.ageMax,
+      publisher_platforms: adPlan.platforms,
+      facebook_positions: V1_FACEBOOK_POSITIONS.slice(),
+      instagram_positions: V1_INSTAGRAM_POSITIONS.slice(),
+    };
+    if (adPlan.targeting.interests && adPlan.targeting.interests.length) {
+      adSetTargeting.interests = adPlan.targeting.interests.map(function () {
+        return "VERIFY_INTEREST_ID";
+      });
+    }
+
+    var headline = adPlan.headlines[0];
+    var primaryText = adPlan.primaryTexts[0];
+    var description = (adPlan.descriptions && adPlan.descriptions[0]) || "";
+
+    var objectStorySpec = {
+      page_id: pageId,
+      link_data: {
+        link: adPlan.destinationUrl,
+        message: primaryText,
+        name: headline,
+        description: description,
+        call_to_action: {
+          type: adPlan.callToAction,
+          value: { link: adPlan.destinationUrl },
+        },
+        image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+      },
+    };
+    if (
+      instagramUserId &&
+      adPlan.platforms &&
+      adPlan.platforms.indexOf("instagram") !== -1
+    ) {
+      objectStorySpec.instagram_user_id = instagramUserId;
+    }
+
+    return {
+      metaApiVersion: metaApiVersion,
+      v1Pairing: {
+        objective: metaObjective,
+        optimization_goal: V1_OPTIMIZATION_GOAL,
+        billing_event: V1_BILLING_EVENT,
+        note:
+          "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+        alternativeOptimizationGoal: ALT_OPTIMIZATION_GOAL,
+      },
+      pausedStatuses: {
+        campaign: "PAUSED",
+        adSet: "PAUSED",
+        creative: "N/A_ASSET",
+        ad: "PAUSED",
+      },
+      statusForDeliveryEntities: "PAUSED",
+      neverSendActive: true,
+      requests: {
+        campaign: {
+          name: adPlan.campaignName,
+          objective: metaObjective,
+          status: "PAUSED",
+          special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),
+        },
+        adSet: {
+          name: adPlan.campaignName + "-adset-v1",
+          status: "PAUSED",
+          daily_budget: dailyBudgetMinor,
+          billing_event: V1_BILLING_EVENT,
+          optimization_goal: V1_OPTIMIZATION_GOAL,
+          targeting: adSetTargeting,
+        },
+        imageUpload: {
+          endpoint: "POST /" + adAccountId + "/adimages",
+          source: "ads.media githubPath or media.ogImage",
+          image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+          resolutionMethod: adPlan.creativeResolved
+            ? adPlan.creativeResolved.resolutionMethod
+            : null,
+          downloadUrl: adPlan.creativeResolved
+            ? adPlan.creativeResolved.downloadUrl
+            : null,
+          filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,
+          repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,
+          branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,
+          githubPath: adPlan.creativeResolved
+            ? adPlan.creativeResolved.githubPath
+            : null,
+          expectedMime: adPlan.creativeResolved
+            ? adPlan.creativeResolved.expectedMime
+            : null,
+          expectedMimeFamily: "image",
+        },
+        creative: {
+          name: adPlan.campaignName + "-creative-a",
+          object_story_spec: objectStorySpec,
+        },
+        ad: {
+          name: adPlan.campaignName + "-ad-a",
+          status: "PAUSED",
+          creative: { creative_id: "CREATIVE_ID_FROM_CREATE_CREATIVE" },
+        },
+      },
+    };
+  }
+
+  function buildLedgerPlan(adPlan) {
+    return {
+      operationKey: adPlan.operationKey,
+      appId: adPlan.appId,
+      experimentRunId: adPlan.experimentRunId,
+      provider: adPlan.provider,
+      environment: adPlan.environment,
+      creativeRevision: adPlan.creativeRevision,
+      contentFingerprint: adPlan.contentFingerprint,
+      creativeSha256: adPlan.creativeSha256,
+      placementSet: adPlan.placementSet,
+      phase: "planned",
+      campaignId: null,
+      adSetId: null,
+      imageHash: null,
+      creativeId: null,
+      adId: null,
+      lockOwner: null,
+      lockExpiresAt: null,
+      resumeFrom: null,
+      outcome: null,
+      lastError: null,
+      reconciliation:
+        "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete",
+    };
+  }
+
+  function buildWriteBackPreview(adPlan, ids) {
+    ids = ids || {};
+    return {
+      ads: {
+        meta: {
+          status: "created_paused",
+          campaignId: ids.campaignId || "<campaign-id>",
+          adSetId: ids.adSetId || "<ad-set-id>",
+          creativeId: ids.creativeId || "<creative-id>",
+          adId: ids.adId || "<ad-id>",
+          landingUrl: adPlan.destinationUrl,
+          dailyBudget: adPlan.budget.dailyBudgetUsd,
+          createdAt: ids.createdAt || "<iso8601>",
+          lastSyncedAt: null,
+        },
+      },
+      rootStatusUnchanged: true,
+      rootStatusNote:
+        "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+    };
+  }
+
+  function buildDryRunBundle(app, config) {
+    config = config || {};
+    var planResult = buildAdPlan(app, config);
+    if (!planResult.ok) {
+      return planResult;
+    }
+    var adPlan = planResult.adPlan;
+    var meta = buildMetaRequests(adPlan, config);
+    var ledgerPlan = buildLedgerPlan(adPlan);
+    var writeBackPreview = buildWriteBackPreview(adPlan);
+
+    return {
+      ok: true,
+      bundle: {
+        mode: adPlan.mode,
+        appId: adPlan.appId,
+        provider: adPlan.provider,
+        runKey: adPlan.runK

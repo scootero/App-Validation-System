@@ -1,0 +1,167 @@
+ey,
+        metaApiVersion: meta.metaApiVersion,
+        adAccountIdRef: "n8n.config.META_AD_ACCOUNT_ID",
+        pageIdRef: "n8n.config.META_PAGE_ID",
+        metaAccountConfig: {
+          META_BUSINESS_PORTFOLIO_ID: config.businessPortfolioId || null,
+          META_AD_ACCOUNT_ID: config.adAccountId || null,
+          META_PAGE_ID: config.pageId || null,
+          META_INSTAGRAM_USER_ID: config.instagramUserId || null,
+        },
+        wf3Gate: adPlan.wf3Gate,
+        adPlan: {
+          authorObjective: adPlan.authorObjective,
+          campaignName: adPlan.campaignName,
+          platforms: adPlan.platforms,
+          targeting: adPlan.targeting,
+          budget: adPlan.budget,
+          destinationUrl: adPlan.destinationUrl,
+          rootStatusPreserved: adPlan.rootStatusPreserved,
+        },
+        source: {
+          landingUrl: adPlan.landingUrl,
+          creative: {
+            kind: adPlan.creativeResolved.kind,
+            value: adPlan.creativeResolved.value,
+            role: adPlan.creativeResolved.role,
+            resolvedFrom: adPlan.creativeResolved.resolvedFrom,
+            repo: adPlan.creativeResolved.repo,
+            branch: adPlan.creativeResolved.branch,
+            githubPath: adPlan.creativeResolved.githubPath,
+            url: adPlan.creativeResolved.url,
+            downloadUrl: adPlan.creativeResolved.downloadUrl,
+            filename: adPlan.creativeResolved.filename,
+            expectedMime: adPlan.creativeResolved.expectedMime,
+            expectedMimeFamily: adPlan.creativeResolved.expectedMimeFamily,
+            resolutionMethod: adPlan.creativeResolved.resolutionMethod,
+          },
+        },
+        computed: {
+          destinationUrl: adPlan.destinationUrl,
+          dailyBudget: adPlan.budget.dailyBudgetUsd,
+          currency: adPlan.budget.currency,
+          totalBudget: adPlan.budget.totalAmount,
+          durationDays: adPlan.budget.durationDays,
+          pausedStatuses: meta.pausedStatuses,
+          statusForDeliveryEntities: meta.statusForDeliveryEntities,
+        },
+        budgetCapCheck: adPlan.budgetCapCheck,
+        v1Pairing: meta.v1Pairing,
+        requests: meta.requests,
+        ledgerPlan: ledgerPlan,
+        operationIdentity: {
+          operationKey: adPlan.operationKey,
+          contentFingerprint: adPlan.contentFingerprint,
+          creativeSha256: adPlan.creativeSha256,
+          creativeRevision: adPlan.creativeRevision,
+          environment: adPlan.environment,
+          placementSet: adPlan.placementSet,
+          workflowVersion: adPlan.workflowVersion,
+        },
+        writeBackAfterCreatePausedOnly: writeBackPreview,
+        safety: {
+          externalWritePerformed: false,
+          liveAdsCreated: false,
+          spendPossible: false,
+          requiresExplicitApprovalBeforeCreatePaused: true,
+          neverSendActive: true,
+          tripleApprovalRequired: {
+            mode: "create_paused",
+            approval: true,
+            approvalToken: "[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]",
+          },
+          feedFirstPlacements: true,
+          storiesReelsOutOfV1: true,
+        },
+      },
+    };
+  }
+
+  exports.PROVIDER = PROVIDER;
+  exports.DEFAULT_META_API_VERSION = DEFAULT_META_API_VERSION;
+  exports.DEFAULT_MAX_DAILY_BUDGET_USD = DEFAULT_MAX_DAILY_BUDGET_USD;
+  exports.DEFAULT_ENVIRONMENT = DEFAULT_ENVIRONMENT;
+  exports.DEFAULT_CREATIVE_REVISION = DEFAULT_CREATIVE_REVISION;
+  exports.DEFAULT_WORKFLOW_VERSION = DEFAULT_WORKFLOW_VERSION;
+  exports.V1_FACEBOOK_POSITIONS = V1_FACEBOOK_POSITIONS;
+  exports.V1_INSTAGRAM_POSITIONS = V1_INSTAGRAM_POSITIONS;
+  exports.V1_PLACEMENT_SET = V1_PLACEMENT_SET;
+  exports.STAGE_ORDER = STAGE_ORDER;
+  exports.OBJECTIVE_MAPPING = OBJECTIVE_MAPPING;
+  exports.V1_OPTIMIZATION_GOAL = V1_OPTIMIZATION_GOAL;
+  exports.V1_BILLING_EVENT = V1_BILLING_EVENT;
+  exports.ALT_OPTIMIZATION_GOAL = ALT_OPTIMIZATION_GOAL;
+  exports.SPECIAL_AD_CATEGORIES = SPECIAL_AD_CATEGORIES;
+  exports.buildAdPlan = buildAdPlan;
+  exports.buildMetaRequests = buildMetaRequests;
+  exports.buildLedgerPlan = buildLedgerPlan;
+  exports.buildWriteBackPreview = buildWriteBackPreview;
+  exports.buildDryRunBundle = buildDryRunBundle;
+  exports.buildOperationKey = buildOperationKey;
+  exports.buildContentFingerprint = buildContentFingerprint;
+  exports.evaluateLedgerDecision = evaluateLedgerDecision;
+  exports.evaluateCreatePausedGates = evaluateCreatePausedGates;
+  exports.redactSensitiveFields = redactSensitiveFields;
+  exports.buildLedgerStageUpsert = buildLedgerStageUpsert;
+  exports.sha256Hex = sha256Hex;
+  exports.sha256BytesHex = sha256BytesHex;
+  exports.firstMissingStage = firstMissingStage;
+  exports.mapAuthorObjective = mapAuthorObjective;
+  exports.selectCreative = selectCreative;
+  exports.resolveCreativeSource = resolveCreativeSource;
+  exports.checkIdempotency = checkIdempotency;
+  exports.IMAGE_EXTENSIONS = IMAGE_EXTENSIONS;
+})(__wf4Exports);
+
+const input = $input.first().json;
+const mode = input.mode || 'dry_run';
+const approval = Boolean(input.approval);
+const approvalToken = input.approvalToken || '';
+const configToken = input.wf4CreatePausedApprovalToken || '';
+let app = null;
+if (input.appJson && typeof input.appJson === 'object') {
+  app = input.appJson;
+} else if (input.useFixtureAppJson) {
+  app = JSON.parse(input.fixtureAppJson || '{}');
+} else {
+  throw new Error('No appJson provided and fixture disabled');
+}
+const creativeSha256 = input.WF4_CREATIVE_SHA256 || input.creativeSha256 || '';
+if (!creativeSha256) {
+  throw new Error('CREATIVE_SHA256_REQUIRED: set WF4_CREATIVE_SHA256 in Workflow Config (sandbox planning hash)');
+}
+const result = WF4MetaAdapter.buildDryRunBundle(app, {
+  mode: mode,
+  provider: input.provider || 'meta',
+  environment: input.environment || 'sandbox',
+  workflowVersion: input.workflowVersion || 'wf4-image-v1',
+  creativeSha256: creativeSha256,
+  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,
+  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',
+  wf3GateStatus: input.wf3GateStatus || 'proven',
+  pageId: input.META_PAGE_ID || 'CONFIG_META_PAGE_ID',
+  adAccountId: input.META_AD_ACCOUNT_ID || null,
+  instagramUserId: input.META_INSTAGRAM_USER_ID || null,
+  businessPortfolioId: input.META_BUSINESS_PORTFOLIO_ID || null,
+});
+if (!result.ok) {
+  throw new Error(result.error || 'WF4 dry-run bundle failed');
+}
+const gate = WF4MetaAdapter.evaluateCreatePausedGates({
+  mode: mode,
+  approval: approval,
+  approvalToken: approvalToken,
+  configToken: configToken,
+  createPausedAllowed: false,
+  budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,
+  requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),
+  landingUrlValid: Boolean(result.bundle.computed && result.bundle.computed.destinationUrl),
+  creativeValid: Boolean(result.bundle.source && result.bundle.source.creative),
+});
+const safeOut = WF4MetaAdapter.redactSensitiveFields({
+  bundle: result.bundle,
+  tripleApproved: gate.tripleApproved,
+  approvalGate: gate,
+  _createPausedAllowed: false,
+});
+return [{ json: Object.assign({}, WF4MetaAdapter.redactSensitiveFields(input), safeOut) }];

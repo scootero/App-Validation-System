@@ -1,0 +1,1 @@
+{"ready":true,"payloadPath":"/Users/scott/Desktop/App-Validation/App-Validation-System/rehearsals/wf4-meta-ads-sandbox/n8n/.phase4-sync/_callmcp_payload.json","valueLen":39249,"hasEvaluateCreatePausedGates":true,"hasWF4_CREATIVE_SHA256":true,"note":"CallMcpTool update_workflow with JSON.parse(fs.readFileSync(payloadPath))"}

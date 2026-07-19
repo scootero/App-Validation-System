@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "n8n": {
+      "url": "REPLACE_ME"
+    }
+  }
+}
