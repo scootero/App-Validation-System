@@ -148,7 +148,7 @@
       },
       {
         "id": "screenshots",
-        "enabled": true,
+        "enabled": false,
         "source": "media"
       },
       {

@@ -169,10 +169,11 @@ SCOPE — stage 2 only (spec 1.5.0):
    repo = source.assetsGithubRepo ?? source.mockupGithubRepo
    branch = source.assetsBranch ?? source.mockupBranch ?? "main"
    root = source.assetsRootDirectory ?? ""
-4. For each media asset (screenshots[], logo, ogImage, icon if used):
+4. For each media asset (screenshots[] when screenshots section enabled, logo, ogImage, icon if used):
    - Prefer mediaAsset.url if set → HTTP GET
    - Else mediaAsset.githubPath → GitHub Contents API from assets repo (root + githubPath)
    - Fetch DECLARED asset paths ONLY — never mockup source (src/, package.json, vite config, etc.)
+   - If landingPage.sections[screenshots].enabled === false: omit screenshots from app-config and do not fetch screenshot binaries
 5. Code → transform App Package into app-data/app-config.json equivalent
    - Port logic from landing-template/scripts/generate-app-config.js
    - Field mapping per landing-template/scripts/APP_PACKAGE_TRANSFORM.md

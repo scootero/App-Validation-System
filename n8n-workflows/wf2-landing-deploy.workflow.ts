@@ -222,6 +222,8 @@ const pricingSection = getSection(pkg, 'pricing');
 const ctaSection = getSection(pkg, 'cta');
 const faqSection = getSection(pkg, 'faq');
 const socialSection = getSection(pkg, 'socialProof');
+const screenshotsSection = getSection(pkg, 'screenshots');
+const screenshotsEnabled = screenshotsSection?.enabled !== false;
 const hero = heroSection?.source === 'inline' && heroSection.inline
   ? {
       headline: heroSection.inline.headline || '',
@@ -255,18 +257,20 @@ const testimonials = Array.isArray(pkg.landingPage?.content?.testimonials)
       role: t.role || '',
     }))
   : [];
-const screenshots = (pkg.media?.screenshots || []).map((shot) => {
-  const resolved = resolvePublicImageRef(shot);
-  return {
-    title: shot.title || '',
-    description: shot.description || '',
-    image: resolved.image,
-    sourcePath: assetLocator(shot)?.value || '',
-    missing: resolved.missing,
-    fetchUrl: resolved.fetchUrl,
-    publicName: resolved.publicName,
-  };
-});
+const screenshots = screenshotsEnabled
+  ? (pkg.media?.screenshots || []).map((shot) => {
+      const resolved = resolvePublicImageRef(shot);
+      return {
+        title: shot.title || '',
+        description: shot.description || '',
+        image: resolved.image,
+        sourcePath: assetLocator(shot)?.value || '',
+        missing: resolved.missing,
+        fetchUrl: resolved.fetchUrl,
+        publicName: resolved.publicName,
+      };
+    })
+  : [];
 const logoResolved = resolvePublicImageRef(pkg.media?.logo, 'logo.png');
 const iconResolved = resolvePublicImageRef(pkg.media?.icon, 'icon.png');
 const ogResolved = resolvePublicImageRef(pkg.media?.ogImage, 'og-image.png');

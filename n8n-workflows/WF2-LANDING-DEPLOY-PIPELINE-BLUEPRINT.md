@@ -256,7 +256,7 @@ flowchart TD
 | `appId` | Present; warn if folder name mismatch |
 | `app.json` | Valid JSON; `identity`, `landingPage`, `commerce`, `branding` present |
 | Drive hygiene | Folder contains **only** `app.json` (warn/error on extra files) |
-| Landing copy | Enabled sections use `source: "inline"` (or `media` for screenshots); `landingPage.content` for benefits/features/FAQ/testimonials |
+| Landing copy | Enabled sections use `source: "inline"` (or `media` for screenshots); `landingPage.content` for benefits/features/FAQ/testimonials. `screenshots.enabled: false` omits the gallery and skips screenshot binary copy into the landing repo. |
 | Media | Each used asset has `url` or `githubPath` (not Drive `path`); fetch declared assets only |
 
 **Optional checks:**
