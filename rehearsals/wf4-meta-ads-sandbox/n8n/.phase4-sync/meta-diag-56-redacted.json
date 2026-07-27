@@ -1,0 +1,246 @@
+{
+  "GET me": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "id": "122103688311393524",
+      "name": "Orro n8n"
+    }
+  },
+  "GET me permissions": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "data": [
+        {
+          "permission": "read_insights",
+          "status": "granted"
+        },
+        {
+          "permission": "catalog_management",
+          "status": "granted"
+        },
+        {
+          "permission": "threads_business_basic",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_show_list",
+          "status": "granted"
+        },
+        {
+          "permission": "ads_management",
+          "status": "granted"
+        },
+        {
+          "permission": "ads_read",
+          "status": "granted"
+        },
+        {
+          "permission": "business_management",
+          "status": "granted"
+        },
+        {
+          "permission": "instagram_basic",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_read_engagement",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_manage_metadata",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_read_user_content",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_manage_ads",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_manage_posts",
+          "status": "granted"
+        },
+        {
+          "permission": "pages_manage_engagement",
+          "status": "granted"
+        },
+        {
+          "permission": "facebook_branded_content_ads_brand",
+          "status": "granted"
+        },
+        {
+          "permission": "public_profile",
+          "status": "granted"
+        }
+      ]
+    }
+  },
+  "GET me businesses": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "data": []
+    }
+  },
+  "GET me adaccounts": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "data": [
+        {
+          "id": "act_979257825150251",
+          "account_id": "979257825150251",
+          "name": "App Validation Platform",
+          "account_status": 1,
+          "disable_reason": 0,
+          "currency": "USD",
+          "timezone_name": "America/Chicago",
+          "business": {
+            "id": "1074341285117707",
+            "name": "Orro"
+          },
+          "user_tasks": [
+            "DRAFT",
+            "ANALYZE",
+            "ADVERTISE",
+            "MANAGE"
+          ]
+        }
+      ],
+      "paging": {
+        "cursors": {
+          "before": "MTIwMjUwMzg5NjI4ODYwMTk5",
+          "after": "MTIwMjUwMzg5NjI4ODYwMTk5"
+        }
+      }
+    }
+  },
+  "GET ad account": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "id": "act_979257825150251",
+      "account_id": "979257825150251",
+      "name": "App Validation Platform",
+      "account_status": 1,
+      "disable_reason": 0,
+      "currency": "USD",
+      "timezone_name": "America/Chicago",
+      "business": {
+        "id": "1074341285117707",
+        "name": "Orro"
+      },
+      "user_tasks": [
+        "DRAFT",
+        "ANALYZE",
+        "ADVERTISE",
+        "MANAGE"
+      ],
+      "funding_source_details": {
+        "id": "27828953313461140",
+        "display_string": "Mastercard *2173",
+        "type": 1
+      },
+      "spend_cap": "0",
+      "amount_spent": "0",
+      "balance": "0",
+      "min_daily_budget": 100,
+      "age": 0
+    }
+  },
+  "GET ad account users": {
+    "executionStatus": "success",
+    "httpStatus": 400,
+    "body": {
+      "error": {
+        "message": "(#100) For field 'assigned_users': The parameter business is required",
+        "type": "OAuthException",
+        "code": 100,
+        "fbtrace_id": "AsH376x4mP5Ew_CP-NT-ETL"
+      }
+    }
+  },
+  "GET business": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "id": "1074341285117707",
+      "name": "Orro",
+      "verification_status": "not_verified",
+      "created_time": "2026-07-16T19:17:27+0000"
+    }
+  },
+  "GET business owned ad accounts": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "data": [
+        {
+          "id": "act_979257825150251",
+          "account_id": "979257825150251",
+          "name": "App Validation Platform",
+          "account_status": 1,
+          "disable_reason": 0
+        }
+      ],
+      "paging": {
+        "cursors": {
+          "before": "QVFIU3dJZAUR1TGVJRm56UmFUVlZAOdUViSXR2RjgtMi1LVmNITjFzbGphdG1aUGp1dmFhaUxfWEE1ZAV85SkE3SDNpYXM3M2dDcGV2a3ZAFUm9sUDJSOXNld25R",
+          "after": "QVFIU3dJZAUR1TGVJRm56UmFUVlZAOdUViSXR2RjgtMi1LVmNITjFzbGphdG1aUGp1dmFhaUxfWEE1ZAV85SkE3SDNpYXM3M2dDcGV2a3ZAFUm9sUDJSOXNld25R"
+        }
+      }
+    }
+  },
+  "GET page": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "id": "1237104852815793",
+      "name": "Orro",
+      "is_published": true,
+      "instagram_business_account": {
+        "id": "17841440875992246",
+        "username": "useorro"
+      }
+    }
+  },
+  "GET page roles": {
+    "executionStatus": "success",
+    "httpStatus": 400,
+    "body": {
+      "error": {
+        "message": "Invalid OAuth 2.0 Access Token",
+        "type": "OAuthException",
+        "code": 190,
+        "error_subcode": 2069032,
+        "is_transient": false,
+        "error_user_title": "User Access Token Is Not Supported",
+        "error_user_msg": "A Page access token is required for this call for the new Pages experience.",
+        "fbtrace_id": "AWPEcfjBbNmdg-BhnuPMnMw"
+      }
+    }
+  },
+  "GET instagram": {
+    "executionStatus": "success",
+    "httpStatus": 400,
+    "body": {
+      "error": {
+        "message": "(#100) Tried accessing nonexisting field (account_type)",
+        "type": "OAuthException",
+        "code": 100,
+        "fbtrace_id": "AUH5B5mLfehrx644ntjxOSY"
+      }
+    }
+  },
+  "GET ad account campaigns sample": {
+    "executionStatus": "success",
+    "httpStatus": 200,
+    "body": {
+      "data": []
+    }
+  }
+}

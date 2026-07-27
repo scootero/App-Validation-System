@@ -312,28 +312,19 @@ if (typeof globalThis !== "undefined") {
   }
 
   /**
-   * Approval + safety gates for create_paused. Never logs token values.
+   * Approval + safety gates for create_paused (mode + approval + hard gate + caps).
+   * No approval-token / Header Auth compare — those were removed from V1.
    */
   function evaluateCreatePausedGates(input) {
     input = input || {};
     var mode = input.mode || "dry_run";
     var approval = Boolean(input.approval);
-    var approvalToken = input.approvalToken || "";
-    var configToken = input.configToken || input.wf4CreatePausedApprovalToken || "";
     var createPausedAllowed = input.createPausedAllowed === true;
-    var tokenPresent = Boolean(approvalToken);
-    var configTokenPresent = Boolean(configToken);
-    var tokenMatch =
-      tokenPresent && configTokenPresent && approvalToken === configToken;
-    var tripleApproved =
-      mode === "create_paused" && approval === true && tokenMatch;
+    var tripleApproved = mode === "create_paused" && approval === true;
     var failures = [];
 
     if (mode !== "create_paused") failures.push("mode_not_create_paused");
     if (!approval) failures.push("approval_false");
-    if (!tokenPresent) failures.push("missing_approval_token");
-    if (!configTokenPresent) failures.push("missing_config_token");
-    if (tokenPresent && configTokenPresent && !tokenMatch) failures.push("wrong_approval_token");
     if (!createPausedAllowed) failures.push("create_paused_hard_gate_false");
     if (input.budgetCapPassed === false) failures.push("over_budget");
     if (input.ledgerDecisionAction === "lock_held") failures.push("ledger_lock_held");
@@ -346,9 +337,6 @@ if (typeof globalThis !== "undefined") {
     return {
       mode: mode,
       approval: approval,
-      tokenPresent: tokenPresent,
-      configTokenPresent: configTokenPresent,
-      tokenMatch: tokenMatch,
       tripleApproved: tripleApproved,
       createPausedAllowed: createPausedAllowed,
       createPathOpen: tripleApproved && createPausedAllowed && failures.length === 0,
@@ -798,6 +786,8 @@ if (typeof globalThis !== "undefined") {
       publisher_platforms: adPlan.platforms,
       facebook_positions: V1_FACEBOOK_POSITIONS.slice(),
       instagram_positions: V1_INSTAGRAM_POSITIONS.slice(),
+      // Required by current Marketing API (subcode 1870227). 0 = keep explicit ages.
+      targeting_automation: { advantage_audience: 0 },
     };
     if (adPlan.targeting.interests && adPlan.targeting.interests.length) {
       adSetTargeting.interests = adPlan.targeting.interests.map(function () {
@@ -855,6 +845,8 @@ if (typeof globalThis !== "undefined") {
           objective: metaObjective,
           status: "PAUSED",
           special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),
+          // Required when using ad-set budgets (not CBO). Probe-proven 2026-07-26.
+          is_adset_budget_sharing_enabled: false,
         },
         adSet: {
           name: adPlan.campaignName + "-adset-v1",
@@ -862,7 +854,10 @@ if (typeof globalThis !== "undefined") {
           daily_budget: dailyBudgetMinor,
           billing_event: V1_BILLING_EVENT,
           optimization_goal: V1_OPTIMIZATION_GOAL,
+          // Account requires explicit strategy; omitting triggers subcode 2490487.
+          bid_strategy: "LOWEST_COST_WITHOUT_CAP",
           targeting: adSetTargeting,
+          promoted_object: { page_id: pageId },
         },
         imageUpload: {
           endpoint: "POST /" + adAccountId + "/adimages",
@@ -944,6 +939,79 @@ if (typeof globalThis !== "undefined") {
       rootStatusUnchanged: true,
       rootStatusNote:
         "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+      writeBackTiming:
+        "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger",
+    };
+  }
+
+  /**
+   * Merge verified-complete ads.meta into an existing app.json without touching
+   * root status or author fields. Partial-step IDs must not call this — ledger only.
+   */
+  function mergeAdsMetaWriteBack(appJson, writeBackMeta, options) {
+    options = options || {};
+    if (!appJson || typeof appJson !== "object") {
+      return { ok: false, error: "WRITEBACK_APPJSON_REQUIRED" };
+    }
+    var metaIn = writeBackMeta || {};
+    if (metaIn.ads && metaIn.ads.meta) {
+      metaIn = metaIn.ads.meta;
+    }
+    var requiredIds = ["campaignId", "adSetId", "creativeId", "adId"];
+    var missing = requiredIds.filter(function (k) {
+      return metaIn[k] == null || String(metaIn[k]).trim() === "" || String(metaIn[k]).indexOf("<") === 0;
+    });
+    if (options.requireCompleteIds !== false && missing.length) {
+      return {
+        ok: false,
+        error: "WRITEBACK_INCOMPLETE_IDS: " + missing.join(","),
+        missingIds: missing,
+      };
+    }
+    if (options.requireVerifiedStatus !== false && metaIn.status !== "created_paused") {
+      return {
+        ok: false,
+        error: "WRITEBACK_STATUS_REQUIRED: status must be created_paused before Drive merge",
+      };
+    }
+
+    var clone = JSON.parse(JSON.stringify(appJson));
+    var rootBefore = clone.status;
+    if (!clone.ads || typeof clone.ads !== "object") clone.ads = {};
+    if (!clone.ads.meta || typeof clone.ads.meta !== "object") clone.ads.meta = {};
+
+    var keys = [
+      "status",
+      "campaignId",
+      "adSetId",
+      "creativeId",
+      "adId",
+      "landingUrl",
+      "dailyBudget",
+      "createdAt",
+      "lastSyncedAt",
+    ];
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (Object.prototype.hasOwnProperty.call(metaIn, key)) {
+        clone.ads.meta[key] = metaIn[key];
+      }
+    }
+    // Preserve creativeRevision if already present and not supplied
+    if (
+      metaIn.creativeRevision != null &&
+      String(metaIn.creativeRevision).trim() !== ""
+    ) {
+      clone.ads.meta.creativeRevision = metaIn.creativeRevision;
+    }
+
+    clone.status = rootBefore;
+    return {
+      ok: true,
+      appJson: clone,
+      rootStatusUnchanged: clone.status === rootBefore,
+      rootStatus: clone.status,
+      adsMeta: clone.ads.meta,
     };
   }
 
@@ -1034,7 +1102,7 @@ if (typeof globalThis !== "undefined") {
           tripleApprovalRequired: {
             mode: "create_paused",
             approval: true,
-            approvalToken: "[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]",
+            createPausedAllowed: true,
           },
           feedFirstPlacements: true,
           storiesReelsOutOfV1: true,
@@ -1062,6 +1130,7 @@ if (typeof globalThis !== "undefined") {
   exports.buildMetaRequests = buildMetaRequests;
   exports.buildLedgerPlan = buildLedgerPlan;
   exports.buildWriteBackPreview = buildWriteBackPreview;
+  exports.mergeAdsMetaWriteBack = mergeAdsMetaWriteBack;
   exports.buildDryRunBundle = buildDryRunBundle;
   exports.buildOperationKey = buildOperationKey;
   exports.buildContentFingerprint = buildContentFingerprint;
@@ -1082,8 +1151,6 @@ if (typeof globalThis !== "undefined") {
 const input = $input.first().json;
 const mode = input.mode || 'dry_run';
 const approval = Boolean(input.approval);
-const approvalToken = input.approvalToken || '';
-const configToken = input.wf4CreatePausedApprovalToken || '';
 let app = null;
 if (input.appJson && typeof input.appJson === 'object') {
   app = input.appJson;
@@ -1116,8 +1183,6 @@ if (!result.ok) {
 const gate = WF4MetaAdapter.evaluateCreatePausedGates({
   mode: mode,
   approval: approval,
-  approvalToken: approvalToken,
-  configToken: configToken,
   createPausedAllowed: false,
   budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,
   requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),

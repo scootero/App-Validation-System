@@ -99,8 +99,6 @@ _createPausedAllowed: false
 | `ok` | `true` |
 | `mode` | `dry_run` |
 | `approval` | `false` |
-| `approvalToken` | empty |
-| `wf4CreatePausedApprovalToken` | empty |
 | `_createPausedAllowed` | `false` |
 | `metaHttpCalls` | `0` |
 | `driveWrites` | `0` |
@@ -111,6 +109,8 @@ _createPausedAllowed: false
 | Last node | **Respond Dry Run** |
 | Create / download / upload / ledger nodes | Remained **disabled**; not executed |
 | Workflow active after run | `false` |
+| Token gates | **Removed 2026-07-21** — no `approvalToken` / Header Auth runtime compare |
+| Post-token-removal dry_run | **PASS** execution `53` (`failures`: mode / approval / hard-gate only) |
 
 ## Done
 
@@ -135,12 +135,11 @@ _createPausedAllowed: false
 
 | Item | Owner |
 |------|-------|
-| Create approval-token Credential vault | Operator — **manual** (see CONFIG-DRIVEN doc) |
-| Paste token into Config + run `approvalToken` | Operator — **only at create enablement** |
-| Flip `_createPausedAllowed` + enable create nodes | Explicit operator approval — **not yet** |
-| Explicit create-paused approval phrase | Operator — **not yet** |
-| Meta credential validity/permissions (live write) | Validate in Prompt 2 — not proven by dry_run |
-| Billing readiness / Page / Instagram permissions | Validate in Prompt 2 — not proven by dry_run |
+| Exact phrase `APPROVE WF4 IMAGE CREATE-PAUSED V1` | Operator — **received** |
+| Flip `_createPausedAllowed` + enable create nodes | Explicit operator enablement — **not yet** |
+| Attach Meta Graph credential on create HTTP nodes | Agent/operator at enablement (`Meta Marketing API - Orro`) |
+| Meta credential validity/permissions (live write) | **FAIL** exec 54 — `API access blocked` (OAuthException 200) on Campaign POST |
+| Billing readiness / Page / Instagram permissions | Still unproven — blocked before create |
 | Operation ledger write path | Nodes exist but disabled — not exercised |
 | Image-upload / create chain | Disabled — local binary proof only |
 | Idempotency / repeated-trigger protection | Validate in Prompt 2 |
@@ -148,10 +147,11 @@ _createPausedAllowed: false
 | Spec 1.5.0 root-status ownership note | Spec pass |
 | Human Lab Drive `500/14` vs `$2` cap | Do not use that package for create-paused without budget change |
 
-## Approval-token vault (operator)
+## Approval gates (updated 2026-07-21)
 
-1. n8n → Credentials → Add → **Header Auth**
-2. Name: `WF4 Create-Paused Approval Token`
-3. Header: `X-WF4-Approval-Token`
-4. Value: long random secret
-5. Keep Workflow Config `wf4CreatePausedApprovalToken` **empty** until create-paused is approved
+Header Auth vault + Config dual-token compare **removed**. Create-paused requires:
+
+1. Exact phrase
+2. `mode=create_paused` + `approval=true`
+3. `_createPausedAllowed=true` + create path enabled for one run
+4. Budget / Meta IDs / creative / ledger gates

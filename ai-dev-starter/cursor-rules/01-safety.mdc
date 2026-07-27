@@ -1,0 +1,22 @@
+---
+description: Stop and request approval for high-risk actions
+alwaysApply: true
+---
+
+# Safety
+
+Stop and ask the human before:
+
+- Using or requesting credentials / secrets
+- Any action with spend or financial consequences
+- Production writes, publishes, or deploys marked production
+- Destructive deletes or irreversible account/infra changes
+- External side effects that create persistent paid or public state
+
+Defaults:
+
+- Prefer sandbox / dry-run / paused / inactive modes
+- Never commit secrets
+- Prefer fail-closed gates in code for budget, approval, and environment
+
+When blocked on human setup, return a checklist of ≤10 concrete steps — do not invent a new handoff document.

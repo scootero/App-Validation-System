@@ -48,7 +48,7 @@ All required:
 
 1. `mode === "create_paused"`
 2. `approval === true`
-3. `approvalToken` matches n8n secret `WF4_CREATE_PAUSED_APPROVAL_TOKEN`
+3. `_createPausedAllowed === true` (Process hard-gate; Triple Approval Gate IF)
 
 ### Idempotency
 
@@ -178,7 +178,6 @@ Meta runtime: `ads.meta.*` only (written by WF4 after successful paused create).
 | Objective / billing / optimization mappings | n8n Config Set (non-secret) | Operator |
 | `MAX_DAILY_BUDGET_USD` | n8n Config Set (non-secret) | Operator |
 | Meta access token | n8n Credentials (secret) | Operator |
-| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` | n8n Credentials (secret) | Operator |
 
 **Never store secrets or Meta account IDs in app.json.**
 

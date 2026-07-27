@@ -1,8 +1,9 @@
 # WF4 Operation Ledger (n8n Data Table)
 
-**Status:** Table created 2026-07-16 — dry-run does **not** write rows. Create-path ledger nodes exist but stay **disabled** until create-paused is approved.  
-**Design SSOT (Prompt 2 Phases 2+3):** [`CREATE-PAUSED-V1-CONTRACT.md`](CREATE-PAUSED-V1-CONTRACT.md) — implement in Phase 4.  
-**Live table:** `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) in personal project `3H7cB0ckKR59RwsE`
+**Status:** Live columns (incl. Phase 4 schema) added **2026-07-20**. Dry-run does **not** write rows. Create-path ledger nodes stay **disabled** until create-paused is approved.  
+**Design SSOT:** [`CREATE-PAUSED-V1-CONTRACT.md`](CREATE-PAUSED-V1-CONTRACT.md).  
+**Live table:** `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) in personal project `3H7cB0ckKR59RwsE`  
+**Store:** n8n Data Table only — **not** Google Sheets (WF3 landing events stay separate).
 
 ## Keys
 
@@ -28,20 +29,20 @@ Persist each successfully created external Meta ID **immediately** after each AP
 | `appId` | string | |
 | `experimentRunId` | string | Audit only (not part of unique key after Phase 4) |
 | `provider` | string | `meta` |
-| `environment` | string | **add Phase 4** — `sandbox` |
-| `creativeRevision` | string | **add Phase 4** — default `image-v1` |
-| `contentFingerprint` | string | **add Phase 4** |
-| `creativeSha256` | string | **add Phase 4** |
+| `environment` | string | **live 2026-07-20** — `sandbox` |
+| `creativeRevision` | string | **live 2026-07-20** — default `image-v1` |
+| `contentFingerprint` | string | **live 2026-07-20** |
+| `creativeSha256` | string | **live 2026-07-20** |
 | `phase` | string | see phases |
 | `campaignId` | string \| null | |
 | `adSetId` | string \| null | |
 | `imageHash` | string \| null | |
 | `creativeId` | string \| null | |
 | `adId` | string \| null | |
-| `lockOwner` | string \| null | **add Phase 4** — n8n execution id |
-| `lockExpiresAt` | string \| null | **add Phase 4** — ISO-8601, ~5m TTL |
-| `resumeFrom` | string \| null | **add Phase 4** |
-| `outcome` | string \| null | **add Phase 4** — e.g. `already_complete` |
+| `lockOwner` | string \| null | **live 2026-07-20** — n8n execution id |
+| `lockExpiresAt` | string \| null | **live 2026-07-20** — ISO-8601, ~5m TTL |
+| `resumeFrom` | string \| null | **live 2026-07-20** |
+| `outcome` | string \| null | **live 2026-07-20** — e.g. `already_complete` |
 | `lastError` | string \| null | |
 | `updatedAt` | string (built-in) | Data Table system column — do not redefine |
 
@@ -50,7 +51,7 @@ Persist each successfully created external Meta ID **immediately** after each AP
 `planned` → `campaign` → `adset` → `image` → `creative` → `ad` → `verified` → `writeback_done`  
 Failure terminals: `manual_review_required` | `failed`
 
-Upsert **after every successful Meta stage** (Phase 4). Current disabled graph only planned → verified — insufficient for resume.
+Upsert **after every successful Meta stage**. Local `workflow.ts` now wires disabled mid-phase upserts (`campaign`→`ad`→`verified`→`writeback_done`). **Live canvas** still needs those mid-phase + Drive write-back nodes synced from `workflow.ts` before Phase 6 (planned/verified column maps already updated live).
 
 ## V1 reconciliation (per contract)
 

@@ -11,7 +11,10 @@ import {
 const WF4_OPERATION_LEDGER_TABLE_ID = 'Yys4vVmQGk8fTxag';
 const META_AD_ACCOUNT_ID = 'act_979257825150251';
 const META_GRAPH_BASE = `https://graph.facebook.com/v25.0/${META_AD_ACCOUNT_ID}`;
+/** Proof-only sandbox Drive app.json for Image V1 write-back rehearsal — not long-term production lookup. */
+const SANDBOX_DRIVE_APP_JSON_FILE_ID = '1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn';
 const metaCredential = newCredential('Meta Marketing API - Orro');
+const googleDriveCredential = newCredential('Google Service Account account');
 
 const ledgerTableRl = {
   __rl: true as const,
@@ -335,28 +338,19 @@ const processWf4Code =
   "  }\n" +
   "\n" +
   "  /**\n" +
-  "   * Approval + safety gates for create_paused. Never logs token values.\n" +
+  "   * Approval + safety gates for create_paused (mode + approval + hard gate + caps).\n" +
+  "   * No approval-token / Header Auth compare — those were removed from V1.\n" +
   "   */\n" +
   "  function evaluateCreatePausedGates(input) {\n" +
   "    input = input || {};\n" +
   "    var mode = input.mode || \"dry_run\";\n" +
   "    var approval = Boolean(input.approval);\n" +
-  "    var approvalToken = input.approvalToken || \"\";\n" +
-  "    var configToken = input.configToken || input.wf4CreatePausedApprovalToken || \"\";\n" +
   "    var createPausedAllowed = input.createPausedAllowed === true;\n" +
-  "    var tokenPresent = Boolean(approvalToken);\n" +
-  "    var configTokenPresent = Boolean(configToken);\n" +
-  "    var tokenMatch =\n" +
-  "      tokenPresent && configTokenPresent && approvalToken === configToken;\n" +
-  "    var tripleApproved =\n" +
-  "      mode === \"create_paused\" && approval === true && tokenMatch;\n" +
+  "    var tripleApproved = mode === \"create_paused\" && approval === true;\n" +
   "    var failures = [];\n" +
   "\n" +
   "    if (mode !== \"create_paused\") failures.push(\"mode_not_create_paused\");\n" +
   "    if (!approval) failures.push(\"approval_false\");\n" +
-  "    if (!tokenPresent) failures.push(\"missing_approval_token\");\n" +
-  "    if (!configTokenPresent) failures.push(\"missing_config_token\");\n" +
-  "    if (tokenPresent && configTokenPresent && !tokenMatch) failures.push(\"wrong_approval_token\");\n" +
   "    if (!createPausedAllowed) failures.push(\"create_paused_hard_gate_false\");\n" +
   "    if (input.budgetCapPassed === false) failures.push(\"over_budget\");\n" +
   "    if (input.ledgerDecisionAction === \"lock_held\") failures.push(\"ledger_lock_held\");\n" +
@@ -369,9 +363,6 @@ const processWf4Code =
   "    return {\n" +
   "      mode: mode,\n" +
   "      approval: approval,\n" +
-  "      tokenPresent: tokenPresent,\n" +
-  "      configTokenPresent: configTokenPresent,\n" +
-  "      tokenMatch: tokenMatch,\n" +
   "      tripleApproved: tripleApproved,\n" +
   "      createPausedAllowed: createPausedAllowed,\n" +
   "      createPathOpen: tripleApproved && createPausedAllowed && failures.length === 0,\n" +
@@ -821,6 +812,8 @@ const processWf4Code =
   "      publisher_platforms: adPlan.platforms,\n" +
   "      facebook_positions: V1_FACEBOOK_POSITIONS.slice(),\n" +
   "      instagram_positions: V1_INSTAGRAM_POSITIONS.slice(),\n" +
+  "      // Required by current Marketing API (subcode 1870227). 0 = keep explicit ages.\n" +
+  "      targeting_automation: { advantage_audience: 0 },\n" +
   "    };\n" +
   "    if (adPlan.targeting.interests && adPlan.targeting.interests.length) {\n" +
   "      adSetTargeting.interests = adPlan.targeting.interests.map(function () {\n" +
@@ -878,6 +871,8 @@ const processWf4Code =
   "          objective: metaObjective,\n" +
   "          status: \"PAUSED\",\n" +
   "          special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),\n" +
+  "          // Required when using ad-set budgets (not CBO). Probe-proven 2026-07-26.\n" +
+  "          is_adset_budget_sharing_enabled: false,\n" +
   "        },\n" +
   "        adSet: {\n" +
   "          name: adPlan.campaignName + \"-adset-v1\",\n" +
@@ -885,7 +880,10 @@ const processWf4Code =
   "          daily_budget: dailyBudgetMinor,\n" +
   "          billing_event: V1_BILLING_EVENT,\n" +
   "          optimization_goal: V1_OPTIMIZATION_GOAL,\n" +
+  "          // Account requires explicit strategy; omitting triggers subcode 2490487.\n" +
+  "          bid_strategy: \"LOWEST_COST_WITHOUT_CAP\",\n" +
   "          targeting: adSetTargeting,\n" +
+  "          promoted_object: { page_id: pageId },\n" +
   "        },\n" +
   "        imageUpload: {\n" +
   "          endpoint: \"POST /\" + adAccountId + \"/adimages\",\n" +
@@ -967,6 +965,79 @@ const processWf4Code =
   "      rootStatusUnchanged: true,\n" +
   "      rootStatusNote:\n" +
   "        \"Preserve existing root status (e.g. ready). Set validating only after human-approved activation.\",\n" +
+  "      writeBackTiming:\n" +
+  "        \"verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger\",\n" +
+  "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Merge verified-complete ads.meta into an existing app.json without touching\n" +
+  "   * root status or author fields. Partial-step IDs must not call this — ledger only.\n" +
+  "   */\n" +
+  "  function mergeAdsMetaWriteBack(appJson, writeBackMeta, options) {\n" +
+  "    options = options || {};\n" +
+  "    if (!appJson || typeof appJson !== \"object\") {\n" +
+  "      return { ok: false, error: \"WRITEBACK_APPJSON_REQUIRED\" };\n" +
+  "    }\n" +
+  "    var metaIn = writeBackMeta || {};\n" +
+  "    if (metaIn.ads && metaIn.ads.meta) {\n" +
+  "      metaIn = metaIn.ads.meta;\n" +
+  "    }\n" +
+  "    var requiredIds = [\"campaignId\", \"adSetId\", \"creativeId\", \"adId\"];\n" +
+  "    var missing = requiredIds.filter(function (k) {\n" +
+  "      return metaIn[k] == null || String(metaIn[k]).trim() === \"\" || String(metaIn[k]).indexOf(\"<\") === 0;\n" +
+  "    });\n" +
+  "    if (options.requireCompleteIds !== false && missing.length) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error: \"WRITEBACK_INCOMPLETE_IDS: \" + missing.join(\",\"),\n" +
+  "        missingIds: missing,\n" +
+  "      };\n" +
+  "    }\n" +
+  "    if (options.requireVerifiedStatus !== false && metaIn.status !== \"created_paused\") {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error: \"WRITEBACK_STATUS_REQUIRED: status must be created_paused before Drive merge\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var clone = JSON.parse(JSON.stringify(appJson));\n" +
+  "    var rootBefore = clone.status;\n" +
+  "    if (!clone.ads || typeof clone.ads !== \"object\") clone.ads = {};\n" +
+  "    if (!clone.ads.meta || typeof clone.ads.meta !== \"object\") clone.ads.meta = {};\n" +
+  "\n" +
+  "    var keys = [\n" +
+  "      \"status\",\n" +
+  "      \"campaignId\",\n" +
+  "      \"adSetId\",\n" +
+  "      \"creativeId\",\n" +
+  "      \"adId\",\n" +
+  "      \"landingUrl\",\n" +
+  "      \"dailyBudget\",\n" +
+  "      \"createdAt\",\n" +
+  "      \"lastSyncedAt\",\n" +
+  "    ];\n" +
+  "    for (var i = 0; i < keys.length; i++) {\n" +
+  "      var key = keys[i];\n" +
+  "      if (Object.prototype.hasOwnProperty.call(metaIn, key)) {\n" +
+  "        clone.ads.meta[key] = metaIn[key];\n" +
+  "      }\n" +
+  "    }\n" +
+  "    // Preserve creativeRevision if already present and not supplied\n" +
+  "    if (\n" +
+  "      metaIn.creativeRevision != null &&\n" +
+  "      String(metaIn.creativeRevision).trim() !== \"\"\n" +
+  "    ) {\n" +
+  "      clone.ads.meta.creativeRevision = metaIn.creativeRevision;\n" +
+  "    }\n" +
+  "\n" +
+  "    clone.status = rootBefore;\n" +
+  "    return {\n" +
+  "      ok: true,\n" +
+  "      appJson: clone,\n" +
+  "      rootStatusUnchanged: clone.status === rootBefore,\n" +
+  "      rootStatus: clone.status,\n" +
+  "      adsMeta: clone.ads.meta,\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
@@ -1057,7 +1128,7 @@ const processWf4Code =
   "          tripleApprovalRequired: {\n" +
   "            mode: \"create_paused\",\n" +
   "            approval: true,\n" +
-  "            approvalToken: \"[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]\",\n" +
+  "            createPausedAllowed: true,\n" +
   "          },\n" +
   "          feedFirstPlacements: true,\n" +
   "          storiesReelsOutOfV1: true,\n" +
@@ -1085,6 +1156,7 @@ const processWf4Code =
   "  exports.buildMetaRequests = buildMetaRequests;\n" +
   "  exports.buildLedgerPlan = buildLedgerPlan;\n" +
   "  exports.buildWriteBackPreview = buildWriteBackPreview;\n" +
+  "  exports.mergeAdsMetaWriteBack = mergeAdsMetaWriteBack;\n" +
   "  exports.buildDryRunBundle = buildDryRunBundle;\n" +
   "  exports.buildOperationKey = buildOperationKey;\n" +
   "  exports.buildContentFingerprint = buildContentFingerprint;\n" +
@@ -1105,8 +1177,6 @@ const processWf4Code =
   "const input = $input.first().json;\n" +
   "const mode = input.mode || 'dry_run';\n" +
   "const approval = Boolean(input.approval);\n" +
-  "const approvalToken = input.approvalToken || '';\n" +
-  "const configToken = input.wf4CreatePausedApprovalToken || '';\n" +
   "let app = null;\n" +
   "if (input.appJson && typeof input.appJson === 'object') {\n" +
   "  app = input.appJson;\n" +
@@ -1139,8 +1209,6 @@ const processWf4Code =
   "const gate = WF4MetaAdapter.evaluateCreatePausedGates({\n" +
   "  mode: mode,\n" +
   "  approval: approval,\n" +
-  "  approvalToken: approvalToken,\n" +
-  "  configToken: configToken,\n" +
   "  createPausedAllowed: false,\n" +
   "  budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,\n" +
   "  requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),\n" +
@@ -1266,8 +1334,15 @@ const ledgerIdempotencyCode =
 const mergeAfterCampaignCode =
   "const prev = $('Ledger Idempotency Check').first().json;\n" +
   "const created = $input.first().json;\n" +
-  "const campaignId = created.id || created.campaign_id;\n" +
+  "// Prefer resume/ledger campaignId first — skipped Create Campaign passes Data Table row {id:N}.\n" +
+  "const campaignId =\n" +
+  "  (prev.metaCreate && prev.metaCreate.campaignId) ||\n" +
+  "  created.id ||\n" +
+  "  created.campaign_id;\n" +
   "if (!campaignId) throw new Error('Create Campaign PAUSED returned no id');\n" +
+  "if (String(campaignId).length < 10) {\n" +
+  "  throw new Error('Create Campaign PAUSED returned non-Meta id: ' + campaignId);\n" +
+  "}\n" +
   "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { campaignId: String(campaignId) }) }) }];";
 
 const mergeAfterAdSetCode =
@@ -1375,6 +1450,7 @@ const prepareLedgerVerifiedCode =
   "if (!adId) throw new Error('Create Ad PAUSED returned no id');\n" +
   "const mc = Object.assign({}, prev.metaCreate || {}, { adId: String(adId) });\n" +
   "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
+  "const claim = prev.ledgerClaim || {};\n" +
   "return [{ json: Object.assign({}, prev, {\n" +
   "  metaCreate: mc,\n" +
   "  ledgerUpsert: {\n" +
@@ -1382,35 +1458,200 @@ const prepareLedgerVerifiedCode =
   "    appId: plan.appId,\n" +
   "    experimentRunId: plan.experimentRunId || '',\n" +
   "    provider: plan.provider || 'meta',\n" +
+  "    environment: plan.environment || 'sandbox',\n" +
+  "    creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+  "    contentFingerprint: plan.contentFingerprint || '',\n" +
+  "    creativeSha256: plan.creativeSha256 || '',\n" +
   "    phase: 'verified',\n" +
   "    campaignId: mc.campaignId || '',\n" +
   "    adSetId: mc.adSetId || '',\n" +
   "    imageHash: mc.imageHash || '',\n" +
   "    creativeId: mc.creativeId || '',\n" +
   "    adId: mc.adId || '',\n" +
+  "    lockOwner: claim.lockOwner || '',\n" +
+  "    lockExpiresAt: claim.lockExpiresAt || '',\n" +
+  "    resumeFrom: '',\n" +
+  "    outcome: 'in_progress',\n" +
   "    lastError: '',\n" +
   "  }\n" +
   "}) }];";
+
+function buildPrepareLedgerStageCode(prevNodeName: string, phase: string): string {
+  return (
+    "const prev = $('" +
+    prevNodeName +
+    "').first().json;\n" +
+    "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
+    "const mc = prev.metaCreate || {};\n" +
+    "const claim = prev.ledgerClaim || {};\n" +
+    "return [{ json: Object.assign({}, prev, {\n" +
+    "  ledgerUpsert: {\n" +
+    "    operationKey: plan.operationKey,\n" +
+    "    appId: plan.appId,\n" +
+    "    experimentRunId: plan.experimentRunId || '',\n" +
+    "    provider: plan.provider || 'meta',\n" +
+    "    environment: plan.environment || 'sandbox',\n" +
+    "    creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+    "    contentFingerprint: plan.contentFingerprint || '',\n" +
+    "    creativeSha256: plan.creativeSha256 || '',\n" +
+    "    phase: '" +
+    phase +
+    "',\n" +
+    "    campaignId: mc.campaignId || '',\n" +
+    "    adSetId: mc.adSetId || '',\n" +
+    "    imageHash: mc.imageHash || '',\n" +
+    "    creativeId: mc.creativeId || '',\n" +
+    "    adId: mc.adId || '',\n" +
+    "    lockOwner: claim.lockOwner || '',\n" +
+    "    lockExpiresAt: claim.lockExpiresAt || '',\n" +
+    "    resumeFrom: '',\n" +
+    "    outcome: 'in_progress',\n" +
+    "    lastError: '',\n" +
+    "  }\n" +
+    "}) }];"
+  );
+}
+
+const prepareLedgerCampaignCode = buildPrepareLedgerStageCode('Merge Campaign Id', 'campaign');
+const prepareLedgerAdSetCode = buildPrepareLedgerStageCode('Merge AdSet Id', 'adset');
+const prepareLedgerImageCode = buildPrepareLedgerStageCode('Merge Image Hash', 'image');
+const prepareLedgerCreativeCode = buildPrepareLedgerStageCode('Merge Creative Id', 'creative');
+
+const prepareWriteBackCode =
+  "const prev = $('Prepare Ledger Verified').first().json;\n" +
+  "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
+  "const mc = prev.metaCreate || {};\n" +
+  "const preview = (prev.bundle && prev.bundle.writeBackAfterCreatePausedOnly && prev.bundle.writeBackAfterCreatePausedOnly.ads && prev.bundle.writeBackAfterCreatePausedOnly.ads.meta) || {};\n" +
+  "const writeBackMeta = {\n" +
+  "  status: 'created_paused',\n" +
+  "  campaignId: mc.campaignId,\n" +
+  "  adSetId: mc.adSetId,\n" +
+  "  creativeId: mc.creativeId,\n" +
+  "  adId: mc.adId,\n" +
+  "  landingUrl: preview.landingUrl || (prev.bundle && prev.bundle.computed && prev.bundle.computed.destinationUrl) || null,\n" +
+  "  dailyBudget: preview.dailyBudget != null ? preview.dailyBudget : (prev.bundle && prev.bundle.computed && prev.bundle.computed.dailyBudget),\n" +
+  "  createdAt: new Date().toISOString(),\n" +
+  "  lastSyncedAt: null,\n" +
+  "  creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+  "};\n" +
+  "const required = ['campaignId','adSetId','creativeId','adId'];\n" +
+  "const missing = required.filter(function (k) { return !writeBackMeta[k]; });\n" +
+  "if (missing.length) throw new Error('WRITEBACK_INCOMPLETE_IDS: ' + missing.join(','));\n" +
+  "return [{ json: Object.assign({}, prev, {\n" +
+  "  sandboxDriveAppJsonFileId: '" +
+  SANDBOX_DRIVE_APP_JSON_FILE_ID +
+  "',\n" +
+  "  writeBackMeta: writeBackMeta,\n" +
+  "  writeBackProofOnly: true,\n" +
+  "}) }];";
+
+const mergeAdsMetaWriteBackCode =
+  "const prev = $('Prepare Write-Back').first().json;\n" +
+  "const item = $input.first();\n" +
+  "let appJson = null;\n" +
+  "if (item.json && item.json.ads) appJson = item.json;\n" +
+  "else if (item.binary && item.binary.data) {\n" +
+  "  const bin = item.binary.data;\n" +
+  "  const raw = bin.data;\n" +
+  "  if (typeof raw === 'string') {\n" +
+  "    const text = Buffer.from(raw, bin.encoding === 'base64' || !bin.encoding ? 'base64' : bin.encoding).toString('utf8');\n" +
+  "    appJson = JSON.parse(text);\n" +
+  "  }\n" +
+  "}\n" +
+  "if (!appJson || typeof appJson !== 'object') throw new Error('WRITEBACK_APPJSON_REQUIRED: Drive download did not yield app.json');\n" +
+  "const rootBefore = appJson.status;\n" +
+  "const metaIn = prev.writeBackMeta || {};\n" +
+  "const clone = JSON.parse(JSON.stringify(appJson));\n" +
+  "if (!clone.ads) clone.ads = {};\n" +
+  "if (!clone.ads.meta) clone.ads.meta = {};\n" +
+  "['status','campaignId','adSetId','creativeId','adId','landingUrl','dailyBudget','createdAt','lastSyncedAt','creativeRevision'].forEach(function (k) {\n" +
+  "  if (Object.prototype.hasOwnProperty.call(metaIn, k) && metaIn[k] != null) clone.ads.meta[k] = metaIn[k];\n" +
+  "});\n" +
+  "clone.status = rootBefore;\n" +
+  "const outBin = Buffer.from(JSON.stringify(clone, null, 2), 'utf8').toString('base64');\n" +
+  "const claim = prev.ledgerClaim || {};\n" +
+  "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
+  "const mc = prev.metaCreate || {};\n" +
+  "return [{\n" +
+  "  json: Object.assign({}, prev, {\n" +
+  "    mergedAppJson: clone,\n" +
+  "    rootStatusUnchanged: clone.status === rootBefore,\n" +
+  "    fileId: prev.sandboxDriveAppJsonFileId,\n" +
+  "    ledgerUpsert: {\n" +
+  "      operationKey: plan.operationKey,\n" +
+  "      appId: plan.appId,\n" +
+  "      experimentRunId: plan.experimentRunId || '',\n" +
+  "      provider: plan.provider || 'meta',\n" +
+  "      environment: plan.environment || 'sandbox',\n" +
+  "      creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+  "      contentFingerprint: plan.contentFingerprint || '',\n" +
+  "      creativeSha256: plan.creativeSha256 || '',\n" +
+  "      phase: 'writeback_done',\n" +
+  "      campaignId: mc.campaignId || '',\n" +
+  "      adSetId: mc.adSetId || '',\n" +
+  "      imageHash: mc.imageHash || '',\n" +
+  "      creativeId: mc.creativeId || '',\n" +
+  "      adId: mc.adId || '',\n" +
+  "      lockOwner: '',\n" +
+  "      lockExpiresAt: '',\n" +
+  "      resumeFrom: '',\n" +
+  "      outcome: 'already_complete',\n" +
+  "      lastError: '',\n" +
+  "    },\n" +
+  "  }),\n" +
+  "  binary: { data: { data: outBin, mimeType: 'application/json', fileName: 'app.json', encoding: 'base64' } },\n" +
+  "}];";
 
 const fixtureAppJson = JSON.stringify({
   specVersion: '1.5.0',
   appId: 'human-lab-wf1-sandbox',
   status: 'ready',
+  identity: { appName: 'Human Lab' },
   ads: {
     campaignName: 'human-lab-validation',
     objective: 'traffic',
     platforms: ['facebook', 'instagram'],
-    headlines: ['Stop guessing. Start testing.'],
+    headlines: [
+      'Stop guessing. Start testing.',
+      'Run science-backed experiments on yourself',
+    ],
     primaryTexts: ['Discover what actually works for your stress, sleep, and habits.'],
     descriptions: ['Human Lab turns self-improvement into structured experiments.'],
     callToAction: 'SIGN_UP',
     utmTemplate: { source: 'facebook', medium: 'paid_social', campaign: 'human-lab-validation' },
     targeting: { locations: ['United States'], ageMin: 25, ageMax: 55 },
-    meta: { status: null, campaignId: null, adSetId: null, creativeId: null, adId: null, landingUrl: null, dailyBudget: null, createdAt: null, lastSyncedAt: null, creativeRevision: 'image-v1' },
-    media: [{ githubPath: 'media/og-image.png', role: 'primary' }],
+    meta: {
+      status: null,
+      campaignId: null,
+      adSetId: null,
+      creativeId: null,
+      adId: null,
+      landingUrl: null,
+      dailyBudget: null,
+      createdAt: null,
+      lastSyncedAt: null,
+      creativeRevision: 'image-v1',
+    },
+    media: [
+      {
+        githubPath: 'media/og-image.png',
+        alt: 'Human Lab — Stop guessing. Start testing.',
+        role: 'primary',
+      },
+    ],
   },
-  media: { ogImage: { githubPath: 'media/og-image.png' } },
-  analytics: { experimentRunId: 'run_human-lab_2026q2_001' },
+  media: {
+    ogImage: {
+      alt: 'Human Lab — Stop guessing. Start testing.',
+      width: 1734,
+      height: 907,
+      githubPath: 'media/og-image.png',
+    },
+  },
+  analytics: {
+    experimentId: 'exp_human-lab_2026q2_001',
+    experimentRunId: 'run_human-lab_2026q2_001',
+  },
   experiment: { testBudget: { currency: 'USD', amount: 14, durationDays: 14 } },
   source: {
     mockupGithubRepo: 'scootero/Human-Lab-WF1-Sandbox',
@@ -1437,7 +1678,6 @@ const workflowConfig = node({
         assignments: [
           { id: 'mode', name: 'mode', value: 'dry_run', type: 'string' },
           { id: 'approval', name: 'approval', value: false, type: 'boolean' },
-          { id: 'approvalToken', name: 'approvalToken', value: '', type: 'string' },
           { id: 'provider', name: 'provider', value: 'meta', type: 'string' },
           { id: 'metaApiVersion', name: 'metaApiVersion', value: 'v25.0', type: 'string' },
           { id: 'META_API_VERSION', name: 'META_API_VERSION', value: 'v25.0', type: 'string' },
@@ -1449,7 +1689,6 @@ const workflowConfig = node({
           { id: 'wf3GateStatus', name: 'wf3GateStatus', value: 'proven', type: 'string' },
           { id: 'useFixtureAppJson', name: 'useFixtureAppJson', value: true, type: 'boolean' },
           { id: 'fixtureAppJson', name: 'fixtureAppJson', value: fixtureAppJson, type: 'string' },
-          { id: 'wf4CreatePausedApprovalToken', name: 'wf4CreatePausedApprovalToken', value: '', type: 'string' },
           { id: 'environment', name: 'environment', value: 'sandbox', type: 'string' },
           { id: 'workflowVersion', name: 'workflowVersion', value: 'wf4-image-v1', type: 'string' },
           { id: 'WF4_CREATIVE_SHA256', name: 'WF4_CREATIVE_SHA256', value: 'ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d', type: 'string' },
@@ -1590,18 +1829,97 @@ const ledgerUpsertPlanned = node({
           appId: expr('{{ $json.bundle.ledgerPlan.appId }}'),
           experimentRunId: expr('{{ $json.bundle.ledgerPlan.experimentRunId }}'),
           provider: expr('{{ $json.bundle.ledgerPlan.provider }}'),
+          environment: expr("{{ $json.bundle.ledgerPlan.environment || 'sandbox' }}"),
+          creativeRevision: expr("{{ $json.bundle.ledgerPlan.creativeRevision || 'image-v1' }}"),
+          contentFingerprint: expr("{{ $json.bundle.ledgerPlan.contentFingerprint || '' }}"),
+          creativeSha256: expr("{{ $json.bundle.ledgerPlan.creativeSha256 || '' }}"),
           phase: 'planned',
           campaignId: expr("{{ ($json.metaCreate && $json.metaCreate.campaignId) || '' }}"),
           adSetId: expr("{{ ($json.metaCreate && $json.metaCreate.adSetId) || '' }}"),
           imageHash: expr("{{ ($json.metaCreate && $json.metaCreate.imageHash) || '' }}"),
           creativeId: expr("{{ ($json.metaCreate && $json.metaCreate.creativeId) || '' }}"),
           adId: expr("{{ ($json.metaCreate && $json.metaCreate.adId) || '' }}"),
+          lockOwner: expr("{{ ($json.ledgerClaim && $json.ledgerClaim.lockOwner) || '' }}"),
+          lockExpiresAt: expr("{{ ($json.ledgerClaim && $json.ledgerClaim.lockExpiresAt) || '' }}"),
+          resumeFrom: expr("{{ $json.resumeFrom || 'campaign' }}"),
+          outcome: expr("{{ ($json.ledgerClaim && $json.ledgerClaim.outcome) || 'in_progress' }}"),
           lastError: '',
         },
       },
     },
   },
 });
+
+function ledgerUpsertColumnsFromLedgerUpsert() {
+  return {
+    mappingMode: 'defineBelow' as const,
+    matchingColumns: ['operationKey'],
+    value: {
+      operationKey: expr('{{ $json.ledgerUpsert.operationKey }}'),
+      appId: expr('{{ $json.ledgerUpsert.appId }}'),
+      experimentRunId: expr('{{ $json.ledgerUpsert.experimentRunId }}'),
+      provider: expr('{{ $json.ledgerUpsert.provider }}'),
+      environment: expr('{{ $json.ledgerUpsert.environment }}'),
+      creativeRevision: expr('{{ $json.ledgerUpsert.creativeRevision }}'),
+      contentFingerprint: expr('{{ $json.ledgerUpsert.contentFingerprint }}'),
+      creativeSha256: expr('{{ $json.ledgerUpsert.creativeSha256 }}'),
+      phase: expr('{{ $json.ledgerUpsert.phase }}'),
+      campaignId: expr('{{ $json.ledgerUpsert.campaignId }}'),
+      adSetId: expr('{{ $json.ledgerUpsert.adSetId }}'),
+      imageHash: expr('{{ $json.ledgerUpsert.imageHash }}'),
+      creativeId: expr('{{ $json.ledgerUpsert.creativeId }}'),
+      adId: expr('{{ $json.ledgerUpsert.adId }}'),
+      lockOwner: expr('{{ $json.ledgerUpsert.lockOwner }}'),
+      lockExpiresAt: expr('{{ $json.ledgerUpsert.lockExpiresAt }}'),
+      resumeFrom: expr('{{ $json.ledgerUpsert.resumeFrom }}'),
+      outcome: expr('{{ $json.ledgerUpsert.outcome }}'),
+      lastError: expr('{{ $json.ledgerUpsert.lastError }}'),
+    },
+  };
+}
+
+function makeLedgerUpsertNode(name: string) {
+  return node({
+    type: 'n8n-nodes-base.dataTable',
+    version: 1.1,
+    config: {
+      name,
+      disabled: true,
+      parameters: {
+        resource: 'row',
+        operation: 'upsert',
+        dataTableId: ledgerTableRl,
+        matchType: 'allConditions',
+        filters: {
+          conditions: [
+            {
+              keyName: 'operationKey',
+              condition: 'eq',
+              keyValue: expr('{{ $json.ledgerUpsert.operationKey }}'),
+            },
+          ],
+        },
+        columns: ledgerUpsertColumnsFromLedgerUpsert(),
+      },
+    },
+  });
+}
+
+function makePrepareLedgerNode(name: string, jsCode: string) {
+  return node({
+    type: 'n8n-nodes-base.code',
+    version: 2,
+    config: {
+      name,
+      disabled: true,
+      parameters: {
+        mode: 'runOnceForAllItems',
+        language: 'javaScript',
+        jsCode,
+      },
+    },
+  });
+}
 
 const createCampaignPaused = node({
   type: 'n8n-nodes-base.httpRequest',
@@ -1637,6 +1955,12 @@ const mergeCampaignId = node({
     },
   },
 });
+
+const prepareLedgerCampaign = makePrepareLedgerNode(
+  'Prepare Ledger Campaign',
+  prepareLedgerCampaignCode
+);
+const ledgerUpsertCampaign = makeLedgerUpsertNode('Ledger Upsert Campaign');
 
 const createAdSetPaused = node({
   type: 'n8n-nodes-base.httpRequest',
@@ -1674,6 +1998,9 @@ const mergeAdSetId = node({
     },
   },
 });
+
+const prepareLedgerAdSet = makePrepareLedgerNode('Prepare Ledger AdSet', prepareLedgerAdSetCode);
+const ledgerUpsertAdSet = makeLedgerUpsertNode('Ledger Upsert AdSet');
 
 const resolveCreativeDownloadPlan = node({
   type: 'n8n-nodes-base.code',
@@ -1771,6 +2098,9 @@ const mergeImageHash = node({
   },
 });
 
+const prepareLedgerImage = makePrepareLedgerNode('Prepare Ledger Image', prepareLedgerImageCode);
+const ledgerUpsertImage = makeLedgerUpsertNode('Ledger Upsert Image');
+
 const createCreative = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.3,
@@ -1807,6 +2137,12 @@ const mergeCreativeId = node({
     },
   },
 });
+
+const prepareLedgerCreative = makePrepareLedgerNode(
+  'Prepare Ledger Creative',
+  prepareLedgerCreativeCode
+);
+const ledgerUpsertCreative = makeLedgerUpsertNode('Ledger Upsert Creative');
 
 const createAdPaused = node({
   type: 'n8n-nodes-base.httpRequest',
@@ -1865,26 +2201,83 @@ const ledgerMarkVerified = node({
           },
         ],
       },
-      columns: {
-        mappingMode: 'defineBelow',
-        matchingColumns: ['operationKey'],
-        value: {
-          operationKey: expr('{{ $json.ledgerUpsert.operationKey }}'),
-          appId: expr('{{ $json.ledgerUpsert.appId }}'),
-          experimentRunId: expr('{{ $json.ledgerUpsert.experimentRunId }}'),
-          provider: expr('{{ $json.ledgerUpsert.provider }}'),
-          phase: expr('{{ $json.ledgerUpsert.phase }}'),
-          campaignId: expr('{{ $json.ledgerUpsert.campaignId }}'),
-          adSetId: expr('{{ $json.ledgerUpsert.adSetId }}'),
-          imageHash: expr('{{ $json.ledgerUpsert.imageHash }}'),
-          creativeId: expr('{{ $json.ledgerUpsert.creativeId }}'),
-          adId: expr('{{ $json.ledgerUpsert.adId }}'),
-          lastError: expr('{{ $json.ledgerUpsert.lastError }}'),
-        },
-      },
+      columns: ledgerUpsertColumnsFromLedgerUpsert(),
     },
   },
 });
+
+const prepareWriteBack = makePrepareLedgerNode('Prepare Write-Back', prepareWriteBackCode);
+
+const downloadSandboxAppJson = node({
+  type: 'n8n-nodes-base.googleDrive',
+  version: 3,
+  config: {
+    name: 'Download Sandbox app.json',
+    disabled: true,
+    parameters: {
+      resource: 'file',
+      operation: 'download',
+      authentication: 'serviceAccount',
+      fileId: {
+        __rl: true,
+        mode: 'id',
+        value: expr('{{ $json.sandboxDriveAppJsonFileId }}'),
+      },
+      options: {
+        binaryPropertyName: 'data',
+      },
+    },
+    credentials: {
+      googleApi: googleDriveCredential,
+    },
+  },
+});
+
+const mergeAdsMetaWriteBackNode = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Merge ads.meta Write-Back',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: mergeAdsMetaWriteBackCode,
+    },
+  },
+});
+
+const updateSandboxAppJson = node({
+  type: 'n8n-nodes-base.googleDrive',
+  version: 3,
+  config: {
+    name: 'Update Sandbox app.json',
+    disabled: true,
+    parameters: {
+      resource: 'file',
+      operation: 'update',
+      authentication: 'serviceAccount',
+      fileId: {
+        __rl: true,
+        mode: 'id',
+        value: expr('{{ $json.fileId }}'),
+      },
+      changeFileContent: true,
+      inputDataFieldName: 'data',
+    },
+    credentials: {
+      googleApi: googleDriveCredential,
+    },
+  },
+});
+
+const prepareLedgerWritebackDone = makePrepareLedgerNode(
+  'Prepare Ledger Writeback Done',
+  "const prev = $('Merge ads.meta Write-Back').first().json;\n" +
+    "if (!prev.ledgerUpsert) throw new Error('WRITEBACK_LEDGER_UPSERT_MISSING');\n" +
+    "return [{ json: prev }];"
+);
+const ledgerUpsertWritebackDone = makeLedgerUpsertNode('Ledger Upsert Writeback Done');
 
 const createPausedChain = createPausedBlocked
   .to(ledgerLookup)
@@ -1892,18 +2285,32 @@ const createPausedChain = createPausedBlocked
   .to(ledgerUpsertPlanned)
   .to(createCampaignPaused)
   .to(mergeCampaignId)
+  .to(prepareLedgerCampaign)
+  .to(ledgerUpsertCampaign)
   .to(createAdSetPaused)
   .to(mergeAdSetId)
+  .to(prepareLedgerAdSet)
+  .to(ledgerUpsertAdSet)
   .to(resolveCreativeDownloadPlan)
   .to(downloadCreativeBinary)
   .to(validateCreativeBinary)
   .to(uploadAdImage)
   .to(mergeImageHash)
+  .to(prepareLedgerImage)
+  .to(ledgerUpsertImage)
   .to(createCreative)
   .to(mergeCreativeId)
+  .to(prepareLedgerCreative)
+  .to(ledgerUpsertCreative)
   .to(createAdPaused)
   .to(prepareLedgerVerified)
-  .to(ledgerMarkVerified);
+  .to(ledgerMarkVerified)
+  .to(prepareWriteBack)
+  .to(downloadSandboxAppJson)
+  .to(mergeAdsMetaWriteBackNode)
+  .to(updateSandboxAppJson)
+  .to(prepareLedgerWritebackDone)
+  .to(ledgerUpsertWritebackDone);
 
 export default workflow('wf4-meta-ads-sandbox', 'WF4 - Meta Ads Sandbox')
   .add(manualRun)

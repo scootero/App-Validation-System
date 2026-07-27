@@ -6,8 +6,9 @@
 - Node id: `5392da6c-0590-432b-b497-414bbc77bfcd`
 - Create-path nodes: all remain **disabled**
 - Local source: `n8n/.phase4-sync/process-jsCode.js`
-- Expected size: **39269** bytes
-- Expected SHA-256: `9f10544340c80f3e2c240f640bb200efb65bd9801ae482a1e809d152c1604a96`
+- Expected size: **41123** bytes
+- Expected SHA-256: `c774f000cc471fdafbdf8eca2fcd214155646285ed1bc9fa5ac348fd45c83bb3`
+- Includes: `is_adset_budget_sharing_enabled: false` on campaign payload (Phase 6 PREP 2026-07-26)
 
 ## Steps
 1. Open https://scottyo.app.n8n.cloud/workflow/YIc53GBq4upelYp6

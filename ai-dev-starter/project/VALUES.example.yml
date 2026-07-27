@@ -1,0 +1,11 @@
+# Copy to VALUES.yml (gitignored if it may contain sensitive-adjacent IDs).
+# Non-secret proven identifiers only. Never put tokens or passwords here.
+
+# project:
+#   name: example
+# env:
+#   sandbox:
+#     host: example.example.com
+#     account_id: "123"
+#   production:
+#     host: # fill when proven

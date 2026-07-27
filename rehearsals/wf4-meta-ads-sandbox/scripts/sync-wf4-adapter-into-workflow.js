@@ -18,8 +18,6 @@ const processBody =
   "const input = $input.first().json;\n" +
   "const mode = input.mode || 'dry_run';\n" +
   "const approval = Boolean(input.approval);\n" +
-  "const approvalToken = input.approvalToken || '';\n" +
-  "const configToken = input.wf4CreatePausedApprovalToken || '';\n" +
   "let app = null;\n" +
   "if (input.appJson && typeof input.appJson === 'object') {\n" +
   "  app = input.appJson;\n" +
@@ -52,8 +50,6 @@ const processBody =
   "const gate = WF4MetaAdapter.evaluateCreatePausedGates({\n" +
   "  mode: mode,\n" +
   "  approval: approval,\n" +
-  "  approvalToken: approvalToken,\n" +
-  "  configToken: configToken,\n" +
   "  createPausedAllowed: false,\n" +
   "  budgetCapPassed: result.bundle.budgetCapCheck && result.bundle.budgetCapCheck.passed !== false,\n" +
   "  requiredMetaIdsPresent: Boolean(input.META_AD_ACCOUNT_ID && input.META_PAGE_ID),\n" +

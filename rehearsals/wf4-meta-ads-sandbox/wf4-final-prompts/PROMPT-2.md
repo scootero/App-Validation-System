@@ -345,7 +345,7 @@ A create-paused execution must require all of:
 
 - `mode=create_paused`
 - `approval=true`
-- matching approval token
+- `_createPausedAllowed=true` (code hard-gate)
 - budget under cap
 - required Meta IDs
 - valid landing URL

@@ -1,0 +1,120 @@
+{
+  "workflowId": "YIc53GBq4upelYp6",
+  "operations": [
+    {
+      "type": "updateNodeParameters",
+      "nodeName": "Workflow Config",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mode",
+              "name": "mode",
+              "value": "dry_run",
+              "type": "string"
+            },
+            {
+              "id": "approval",
+              "name": "approval",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "provider",
+              "name": "provider",
+              "value": "meta",
+              "type": "string"
+            },
+            {
+              "id": "metaApiVersion",
+              "name": "metaApiVersion",
+              "value": "v25.0",
+              "type": "string"
+            },
+            {
+              "id": "META_API_VERSION",
+              "name": "META_API_VERSION",
+              "value": "v25.0",
+              "type": "string"
+            },
+            {
+              "id": "MAX_DAILY_BUDGET_USD",
+              "name": "MAX_DAILY_BUDGET_USD",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "META_BUSINESS_PORTFOLIO_ID",
+              "name": "META_BUSINESS_PORTFOLIO_ID",
+              "value": "1074341285117707",
+              "type": "string"
+            },
+            {
+              "id": "META_AD_ACCOUNT_ID",
+              "name": "META_AD_ACCOUNT_ID",
+              "value": "act_979257825150251",
+              "type": "string"
+            },
+            {
+              "id": "META_PAGE_ID",
+              "name": "META_PAGE_ID",
+              "value": "1237104852815793",
+              "type": "string"
+            },
+            {
+              "id": "META_INSTAGRAM_USER_ID",
+              "name": "META_INSTAGRAM_USER_ID",
+              "value": "17841440875992246",
+              "type": "string"
+            },
+            {
+              "id": "wf3GateStatus",
+              "name": "wf3GateStatus",
+              "value": "proven",
+              "type": "string"
+            },
+            {
+              "id": "useFixtureAppJson",
+              "name": "useFixtureAppJson",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "fixtureAppJson",
+              "name": "fixtureAppJson",
+              "value": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+              "type": "string"
+            },
+            {
+              "id": "environment",
+              "name": "environment",
+              "value": "sandbox",
+              "type": "string"
+            },
+            {
+              "id": "workflowVersion",
+              "name": "workflowVersion",
+              "value": "wf4-image-v1",
+              "type": "string"
+            },
+            {
+              "id": "WF4_CREATIVE_SHA256",
+              "name": "WF4_CREATIVE_SHA256",
+              "value": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+              "type": "string"
+            },
+            {
+              "id": "appId",
+              "name": "appId",
+              "value": "human-lab-wf1-sandbox",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "mode": "manual"
+      },
+      "replace": true
+    }
+  ]
+}

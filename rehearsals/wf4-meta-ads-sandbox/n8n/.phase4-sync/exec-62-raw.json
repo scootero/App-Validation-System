@@ -1,0 +1,2581 @@
+{
+  "execution": {
+    "id": "62",
+    "workflowId": "YIc53GBq4upelYp6",
+    "mode": "manual",
+    "status": "error",
+    "startedAt": "2026-07-26T05:41:18.606Z",
+    "stoppedAt": "2026-07-26T05:41:20.638Z",
+    "retryOf": null,
+    "retrySuccessId": null,
+    "waitTill": null
+  },
+  "data": {
+    "version": 1,
+    "startData": {},
+    "resultData": {
+      "error": {
+        "level": "warning",
+        "shouldReport": true,
+        "description": "(#100) Parameter campaign_id: Invalid id: 2",
+        "tags": {},
+        "timestamp": 1785044480634,
+        "context": {
+          "itemIndex": 0,
+          "request": {
+            "body": {
+              "name": "human-lab-validation-adset-v1",
+              "status": "PAUSED",
+              "daily_budget": 100,
+              "billing_event": "IMPRESSIONS",
+              "optimization_goal": "LINK_CLICKS",
+              "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+              "targeting": {
+                "geo_locations": {
+                  "countries": [
+                    "US"
+                  ]
+                },
+                "age_min": 25,
+                "age_max": 55,
+                "publisher_platforms": [
+                  "facebook",
+                  "instagram"
+                ],
+                "facebook_positions": [
+                  "feed"
+                ],
+                "instagram_positions": [
+                  "stream"
+                ]
+              },
+              "promoted_object": {
+                "page_id": "1237104852815793"
+              },
+              "campaign_id": "2"
+            },
+            "headers": {
+              "accept": "application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7"
+            },
+            "method": "POST",
+            "uri": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+            "gzip": true,
+            "rejectUnauthorized": true,
+            "followRedirect": true,
+            "resolveWithFullResponse": true,
+            "sendCredentialsOnCrossOriginRedirect": true,
+            "followAllRedirects": true,
+            "timeout": 300000,
+            "encoding": null,
+            "json": false,
+            "useStream": true,
+            "qs": {
+              "access_token": "**hidden**"
+            }
+          }
+        },
+        "functionality": "regular",
+        "name": "NodeApiError",
+        "node": {
+          "parameters": {
+            "curlImport": "",
+            "method": "POST",
+            "url": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+            "authentication": "predefinedCredentialType",
+            "nodeCredentialType": "facebookGraphApi",
+            "provideSslCertificates": false,
+            "sendQuery": false,
+            "sendHeaders": false,
+            "sendBody": true,
+            "contentType": "json",
+            "specifyBody": "json",
+            "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Merge Campaign Id').item.json.bundle.requests.adSet, { campaign_id: $('Merge Campaign Id').item.json.metaCreate.campaignId })) }}",
+            "options": {},
+            "infoMessage": ""
+          },
+          "id": "63a69fb8-98cd-4f4c-91d6-77ea9bbc6da7",
+          "name": "Create Ad Set PAUSED",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 4.3,
+          "position": [
+            896,
+            0
+          ],
+          "credentials": {
+            "facebookGraphApi": {
+              "id": "pphgFAkucBMaBs8A",
+              "name": "Meta Marketing API - Orro"
+            }
+          },
+          "disabled": false
+        },
+        "messages": [
+          "400 - \"{\\\"error\\\":{\\\"message\\\":\\\"(#100) Parameter campaign_id: Invalid id: 2\\\",\\\"type\\\":\\\"OAuthException\\\",\\\"code\\\":100,\\\"fbtrace_id\\\":\\\"AdC_CCk1t0ODAK39ebFpvA2\\\"}}\""
+        ],
+        "httpCode": "400",
+        "message": "Bad request - please check your parameters",
+        "stack": "NodeApiError: Bad request - please check your parameters\n    at ExecuteContext.requestWithAuthentication (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_56f5a5be5f9a76dfbcdc404d6ec4dea5/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helpers/authentication.ts:263:10)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at ExecuteContext.requestWithAuthentication (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_56f5a5be5f9a76dfbcdc404d6ec4dea5/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helpers/factory.ts:177:11)"
+      },
+      "runData": {
+        "Manual Run": [
+          {
+            "startTime": 1785044478691,
+            "executionIndex": 0,
+            "source": [],
+            "hints": [],
+            "executionTime": 0,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {},
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Workflow Config": [
+          {
+            "startTime": 1785044478691,
+            "executionIndex": 1,
+            "source": [
+              {
+                "previousNode": "Manual Run",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 1,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox"
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Process WF4 Dry Run": [
+          {
+            "startTime": 1785044478692,
+            "executionIndex": 2,
+            "source": [
+              {
+                "previousNode": "Workflow Config",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 1485,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Triple Approval Gate": [
+          {
+            "startTime": 1785044480177,
+            "executionIndex": 3,
+            "source": [
+              {
+                "previousNode": "Process WF4 Dry Run",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 5,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ],
+                []
+              ]
+            }
+          }
+        ],
+        "Create Paused Blocked": [
+          {
+            "startTime": 1785044480182,
+            "executionIndex": 4,
+            "source": [
+              {
+                "previousNode": "Triple Approval Gate",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 9,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Ledger Lookup": [
+          {
+            "startTime": 1785044480191,
+            "executionIndex": 5,
+            "source": [
+              {
+                "previousNode": "Create Paused Blocked",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 7,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                      "appId": "human-lab-wf1-sandbox",
+                      "experimentRunId": "run_human-lab_2026q2_001",
+                      "provider": "meta",
+                      "phase": "campaign",
+                      "campaignId": "120250607331460199",
+                      "adSetId": "",
+                      "imageHash": "",
+                      "creativeId": "",
+                      "adId": "",
+                      "lastError": "",
+                      "environment": "sandbox",
+                      "creativeRevision": "image-v1",
+                      "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                      "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "lockOwner": "61",
+                      "lockExpiresAt": "2026-07-26T05:38:17.206Z",
+                      "resumeFrom": "",
+                      "outcome": "in_progress",
+                      "id": 2,
+                      "createdAt": "2026-07-26T05:33:17.284Z",
+                      "updatedAt": "2026-07-26T05:33:18.796Z"
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Ledger Idempotency Check": [
+          {
+            "startTime": 1785044480198,
+            "executionIndex": 6,
+            "source": [
+              {
+                "previousNode": "Ledger Lookup",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 10,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true,
+                      "ledgerExisting": {
+                        "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                        "appId": "human-lab-wf1-sandbox",
+                        "experimentRunId": "run_human-lab_2026q2_001",
+                        "provider": "meta",
+                        "phase": "campaign",
+                        "campaignId": "120250607331460199",
+                        "adSetId": "",
+                        "imageHash": "",
+                        "creativeId": "",
+                        "adId": "",
+                        "lastError": "",
+                        "environment": "sandbox",
+                        "creativeRevision": "image-v1",
+                        "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                        "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                        "lockOwner": "61",
+                        "lockExpiresAt": "2026-07-26T05:38:17.206Z",
+                        "resumeFrom": "",
+                        "outcome": "in_progress",
+                        "id": 2,
+                        "createdAt": "2026-07-26T05:33:17.284Z",
+                        "updatedAt": "2026-07-26T05:33:18.796Z"
+                      },
+                      "ledgerAction": "resume",
+                      "ledgerDecision": {
+                        "action": "resume",
+                        "outcome": "resumed",
+                        "resumeFrom": "adset",
+                        "metaCreate": {
+                          "campaignId": "120250607331460199",
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null
+                        },
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z"
+                      },
+                      "metaCreate": {
+                        "campaignId": "120250607331460199",
+                        "adSetId": null,
+                        "imageHash": null,
+                        "creativeId": null,
+                        "adId": null
+                      },
+                      "resumeFrom": "adset",
+                      "ledgerClaim": {
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                        "outcome": "resumed"
+                      }
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Ledger Upsert Planned": [
+          {
+            "startTime": 1785044480208,
+            "executionIndex": 7,
+            "source": [
+              {
+                "previousNode": "Ledger Idempotency Check",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 92,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                      "appId": "human-lab-wf1-sandbox",
+                      "experimentRunId": "run_human-lab_2026q2_001",
+                      "provider": "meta",
+                      "phase": "planned",
+                      "campaignId": "120250607331460199",
+                      "adSetId": "",
+                      "imageHash": "",
+                      "creativeId": "",
+                      "adId": "",
+                      "lastError": "",
+                      "environment": "sandbox",
+                      "creativeRevision": "image-v1",
+                      "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                      "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "lockOwner": "62",
+                      "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                      "resumeFrom": "adset",
+                      "outcome": "resumed",
+                      "id": 2,
+                      "createdAt": "2026-07-26T05:33:17.284Z",
+                      "updatedAt": "2026-07-26T05:41:20.231Z"
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Create Campaign PAUSED": [
+          {
+            "startTime": 1785044480300,
+            "executionIndex": 8,
+            "source": [
+              {
+                "previousNode": "Ledger Upsert Planned",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 0,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                      "appId": "human-lab-wf1-sandbox",
+                      "experimentRunId": "run_human-lab_2026q2_001",
+                      "provider": "meta",
+                      "phase": "planned",
+                      "campaignId": "120250607331460199",
+                      "adSetId": "",
+                      "imageHash": "",
+                      "creativeId": "",
+                      "adId": "",
+                      "lastError": "",
+                      "environment": "sandbox",
+                      "creativeRevision": "image-v1",
+                      "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                      "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "lockOwner": "62",
+                      "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                      "resumeFrom": "adset",
+                      "outcome": "resumed",
+                      "id": 2,
+                      "createdAt": "2026-07-26T05:33:17.284Z",
+                      "updatedAt": "2026-07-26T05:41:20.231Z"
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Merge Campaign Id": [
+          {
+            "startTime": 1785044480300,
+            "executionIndex": 9,
+            "source": [
+              {
+                "previousNode": "Create Campaign PAUSED",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 9,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true,
+                      "ledgerExisting": {
+                        "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                        "appId": "human-lab-wf1-sandbox",
+                        "experimentRunId": "run_human-lab_2026q2_001",
+                        "provider": "meta",
+                        "phase": "campaign",
+                        "campaignId": "120250607331460199",
+                        "adSetId": "",
+                        "imageHash": "",
+                        "creativeId": "",
+                        "adId": "",
+                        "lastError": "",
+                        "environment": "sandbox",
+                        "creativeRevision": "image-v1",
+                        "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                        "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                        "lockOwner": "61",
+                        "lockExpiresAt": "2026-07-26T05:38:17.206Z",
+                        "resumeFrom": "",
+                        "outcome": "in_progress",
+                        "id": 2,
+                        "createdAt": "2026-07-26T05:33:17.284Z",
+                        "updatedAt": "2026-07-26T05:33:18.796Z"
+                      },
+                      "ledgerAction": "resume",
+                      "ledgerDecision": {
+                        "action": "resume",
+                        "outcome": "resumed",
+                        "resumeFrom": "adset",
+                        "metaCreate": {
+                          "campaignId": "120250607331460199",
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null
+                        },
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z"
+                      },
+                      "metaCreate": {
+                        "campaignId": "2",
+                        "adSetId": null,
+                        "imageHash": null,
+                        "creativeId": null,
+                        "adId": null
+                      },
+                      "resumeFrom": "adset",
+                      "ledgerClaim": {
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                        "outcome": "resumed"
+                      }
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Prepare Ledger Campaign": [
+          {
+            "startTime": 1785044480309,
+            "executionIndex": 10,
+            "source": [
+              {
+                "previousNode": "Merge Campaign Id",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 7,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "mode": "create_paused",
+                      "approval": true,
+                      "provider": "meta",
+                      "metaApiVersion": "v25.0",
+                      "META_API_VERSION": "v25.0",
+                      "MAX_DAILY_BUDGET_USD": 2,
+                      "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                      "META_AD_ACCOUNT_ID": "act_979257825150251",
+                      "META_PAGE_ID": "1237104852815793",
+                      "META_INSTAGRAM_USER_ID": "17841440875992246",
+                      "wf3GateStatus": "proven",
+                      "useFixtureAppJson": true,
+                      "fixtureAppJson": "{\"specVersion\":\"1.5.0\",\"appId\":\"human-lab-wf1-sandbox\",\"status\":\"ready\",\"identity\":{\"appName\":\"Human Lab\"},\"ads\":{\"campaignName\":\"human-lab-validation\",\"objective\":\"traffic\",\"platforms\":[\"facebook\",\"instagram\"],\"headlines\":[\"Stop guessing. Start testing.\",\"Run science-backed experiments on yourself\"],\"primaryTexts\":[\"Discover what actually works for your stress, sleep, and habits.\"],\"descriptions\":[\"Human Lab turns self-improvement into structured experiments.\"],\"callToAction\":\"SIGN_UP\",\"utmTemplate\":{\"source\":\"facebook\",\"medium\":\"paid_social\",\"campaign\":\"human-lab-validation\"},\"targeting\":{\"locations\":[\"United States\"],\"ageMin\":25,\"ageMax\":55},\"meta\":{\"status\":null,\"campaignId\":null,\"adSetId\":null,\"creativeId\":null,\"adId\":null,\"landingUrl\":null,\"dailyBudget\":null,\"createdAt\":null,\"lastSyncedAt\":null,\"creativeRevision\":\"image-v1\"},\"media\":[{\"githubPath\":\"media/og-image.png\",\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"role\":\"primary\"}]},\"media\":{\"ogImage\":{\"alt\":\"Human Lab \\u2014 Stop guessing. Start testing.\",\"width\":1734,\"height\":907,\"githubPath\":\"media/og-image.png\"}},\"analytics\":{\"experimentId\":\"exp_human-lab_2026q2_001\",\"experimentRunId\":\"run_human-lab_2026q2_001\"},\"experiment\":{\"testBudget\":{\"currency\":\"USD\",\"amount\":14,\"durationDays\":14}},\"source\":{\"mockupGithubRepo\":\"scootero/Human-Lab-WF1-Sandbox\",\"mockupBranch\":\"main\"},\"deployment\":{\"landing\":{\"url\":\"https://human-lab-wf2-sandbox.vercel.app\"}}}",
+                      "environment": "sandbox",
+                      "workflowVersion": "wf4-image-v1",
+                      "WF4_CREATIVE_SHA256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "appId": "human-lab-wf1-sandbox",
+                      "bundle": {
+                        "mode": "create_paused",
+                        "appId": "human-lab-wf1-sandbox",
+                        "provider": "meta",
+                        "runKey": {
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta"
+                        },
+                        "metaApiVersion": "v25.0",
+                        "adAccountIdRef": "n8n.config.META_AD_ACCOUNT_ID",
+                        "pageIdRef": "n8n.config.META_PAGE_ID",
+                        "metaAccountConfig": {
+                          "META_BUSINESS_PORTFOLIO_ID": "1074341285117707",
+                          "META_AD_ACCOUNT_ID": "act_979257825150251",
+                          "META_PAGE_ID": "1237104852815793",
+                          "META_INSTAGRAM_USER_ID": "17841440875992246"
+                        },
+                        "wf3Gate": {
+                          "required": true,
+                          "status": "proven",
+                          "requiredEvents": [
+                            "page_view",
+                            "email_captured",
+                            "buy_now_clicked",
+                            "mockup_interacted"
+                          ]
+                        },
+                        "adPlan": {
+                          "authorObjective": "traffic",
+                          "campaignName": "human-lab-validation",
+                          "platforms": [
+                            "facebook",
+                            "instagram"
+                          ],
+                          "targeting": {
+                            "locations": [
+                              "United States"
+                            ],
+                            "ageMin": 25,
+                            "ageMax": 55,
+                            "interests": null
+                          },
+                          "budget": {
+                            "currency": "USD",
+                            "totalAmount": 14,
+                            "durationDays": 14,
+                            "dailyBudgetUsd": 1
+                          },
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "rootStatusPreserved": "ready"
+                        },
+                        "source": {
+                          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+                          "creative": {
+                            "kind": "githubPath",
+                            "value": "media/og-image.png",
+                            "role": "primary",
+                            "resolvedFrom": "ads.media",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "url": null,
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image",
+                            "resolutionMethod": "github_raw"
+                          }
+                        },
+                        "computed": {
+                          "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                          "dailyBudget": 1,
+                          "currency": "USD",
+                          "totalBudget": 14,
+                          "durationDays": 14,
+                          "pausedStatuses": {
+                            "campaign": "PAUSED",
+                            "adSet": "PAUSED",
+                            "creative": "N/A_ASSET",
+                            "ad": "PAUSED"
+                          },
+                          "statusForDeliveryEntities": "PAUSED"
+                        },
+                        "budgetCapCheck": {
+                          "maxDailyBudgetUsd": 2,
+                          "passed": true
+                        },
+                        "v1Pairing": {
+                          "objective": "OUTCOME_TRAFFIC",
+                          "optimization_goal": "LINK_CLICKS",
+                          "billing_event": "IMPRESSIONS",
+                          "note": "LANDING_PAGE_VIEWS is an alternative pending account validation; not V1 default.",
+                          "alternativeOptimizationGoal": "LANDING_PAGE_VIEWS"
+                        },
+                        "requests": {
+                          "campaign": {
+                            "name": "human-lab-validation",
+                            "objective": "OUTCOME_TRAFFIC",
+                            "status": "PAUSED",
+                            "special_ad_categories": [],
+                            "is_adset_budget_sharing_enabled": false
+                          },
+                          "adSet": {
+                            "name": "human-lab-validation-adset-v1",
+                            "status": "PAUSED",
+                            "daily_budget": 100,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": "LINK_CLICKS",
+                            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                            "targeting": {
+                              "geo_locations": {
+                                "countries": [
+                                  "US"
+                                ]
+                              },
+                              "age_min": 25,
+                              "age_max": 55,
+                              "publisher_platforms": [
+                                "facebook",
+                                "instagram"
+                              ],
+                              "facebook_positions": [
+                                "feed"
+                              ],
+                              "instagram_positions": [
+                                "stream"
+                              ]
+                            },
+                            "promoted_object": {
+                              "page_id": "1237104852815793"
+                            }
+                          },
+                          "imageUpload": {
+                            "endpoint": "POST /act_979257825150251/adimages",
+                            "source": "ads.media githubPath or media.ogImage",
+                            "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+                            "resolutionMethod": "github_raw",
+                            "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+                            "filename": "og-image.png",
+                            "repo": "scootero/Human-Lab-WF1-Sandbox",
+                            "branch": "main",
+                            "githubPath": "media/og-image.png",
+                            "expectedMime": "image/png",
+                            "expectedMimeFamily": "image"
+                          },
+                          "creative": {
+                            "name": "human-lab-validation-creative-a",
+                            "object_story_spec": {
+                              "page_id": "1237104852815793",
+                              "link_data": {
+                                "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                                "message": "Discover what actually works for your stress, sleep, and habits.",
+                                "name": "Stop guessing. Start testing.",
+                                "description": "Human Lab turns self-improvement into structured experiments.",
+                                "call_to_action": {
+                                  "type": "SIGN_UP",
+                                  "value": {
+                                    "link": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation"
+                                  }
+                                },
+                                "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD"
+                              },
+                              "instagram_user_id": "17841440875992246"
+                            }
+                          },
+                          "ad": {
+                            "name": "human-lab-validation-ad-a",
+                            "status": "PAUSED",
+                            "creative": {
+                              "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
+                            }
+                          }
+                        },
+                        "ledgerPlan": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "appId": "human-lab-wf1-sandbox",
+                          "experimentRunId": "run_human-lab_2026q2_001",
+                          "provider": "meta",
+                          "environment": "sandbox",
+                          "creativeRevision": "image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "phase": "planned",
+                          "campaignId": null,
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null,
+                          "lockOwner": null,
+                          "lockExpiresAt": null,
+                          "resumeFrom": null,
+                          "outcome": null,
+                          "lastError": null,
+                          "reconciliation": "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete"
+                        },
+                        "operationIdentity": {
+                          "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                          "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                          "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                          "creativeRevision": "image-v1",
+                          "environment": "sandbox",
+                          "placementSet": "facebook:feed|instagram:stream",
+                          "workflowVersion": "wf4-image-v1"
+                        },
+                        "writeBackAfterCreatePausedOnly": {
+                          "ads": {
+                            "meta": {
+                              "status": "created_paused",
+                              "campaignId": "<campaign-id>",
+                              "adSetId": "<ad-set-id>",
+                              "creativeId": "<creative-id>",
+                              "adId": "<ad-id>",
+                              "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+                              "dailyBudget": 1,
+                              "createdAt": "<iso8601>",
+                              "lastSyncedAt": null
+                            }
+                          },
+                          "rootStatusUnchanged": true,
+                          "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+                          "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+                        },
+                        "safety": {
+                          "externalWritePerformed": false,
+                          "liveAdsCreated": false,
+                          "spendPossible": false,
+                          "requiresExplicitApprovalBeforeCreatePaused": true,
+                          "neverSendActive": true,
+                          "tripleApprovalRequired": {
+                            "mode": "create_paused",
+                            "approval": true,
+                            "createPausedAllowed": true
+                          },
+                          "feedFirstPlacements": true,
+                          "storiesReelsOutOfV1": true
+                        }
+                      },
+                      "tripleApproved": true,
+                      "approvalGate": {
+                        "mode": "create_paused",
+                        "approval": true,
+                        "tripleApproved": true,
+                        "createPausedAllowed": true,
+                        "createPathOpen": true,
+                        "failures": [],
+                        "redacted": true
+                      },
+                      "_createPausedAllowed": true,
+                      "ledgerExisting": {
+                        "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                        "appId": "human-lab-wf1-sandbox",
+                        "experimentRunId": "run_human-lab_2026q2_001",
+                        "provider": "meta",
+                        "phase": "campaign",
+                        "campaignId": "120250607331460199",
+                        "adSetId": "",
+                        "imageHash": "",
+                        "creativeId": "",
+                        "adId": "",
+                        "lastError": "",
+                        "environment": "sandbox",
+                        "creativeRevision": "image-v1",
+                        "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                        "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                        "lockOwner": "61",
+                        "lockExpiresAt": "2026-07-26T05:38:17.206Z",
+                        "resumeFrom": "",
+                        "outcome": "in_progress",
+                        "id": 2,
+                        "createdAt": "2026-07-26T05:33:17.284Z",
+                        "updatedAt": "2026-07-26T05:33:18.796Z"
+                      },
+                      "ledgerAction": "resume",
+                      "ledgerDecision": {
+                        "action": "resume",
+                        "outcome": "resumed",
+                        "resumeFrom": "adset",
+                        "metaCreate": {
+                          "campaignId": "120250607331460199",
+                          "adSetId": null,
+                          "imageHash": null,
+                          "creativeId": null,
+                          "adId": null
+                        },
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z"
+                      },
+                      "metaCreate": {
+                        "campaignId": "2",
+                        "adSetId": null,
+                        "imageHash": null,
+                        "creativeId": null,
+                        "adId": null
+                      },
+                      "resumeFrom": "adset",
+                      "ledgerClaim": {
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                        "outcome": "resumed"
+                      },
+                      "ledgerUpsert": {
+                        "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                        "appId": "human-lab-wf1-sandbox",
+                        "experimentRunId": "run_human-lab_2026q2_001",
+                        "provider": "meta",
+                        "environment": "sandbox",
+                        "creativeRevision": "image-v1",
+                        "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                        "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                        "phase": "campaign",
+                        "campaignId": "2",
+                        "adSetId": "",
+                        "imageHash": "",
+                        "creativeId": "",
+                        "adId": "",
+                        "lockOwner": "62",
+                        "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                        "resumeFrom": "",
+                        "outcome": "in_progress",
+                        "lastError": ""
+                      }
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Ledger Upsert Campaign": [
+          {
+            "startTime": 1785044480317,
+            "executionIndex": 11,
+            "source": [
+              {
+                "previousNode": "Prepare Ledger Campaign",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 87,
+            "executionStatus": "success",
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                      "appId": "human-lab-wf1-sandbox",
+                      "experimentRunId": "run_human-lab_2026q2_001",
+                      "provider": "meta",
+                      "phase": "campaign",
+                      "campaignId": "2",
+                      "adSetId": "",
+                      "imageHash": "",
+                      "creativeId": "",
+                      "adId": "",
+                      "lastError": "",
+                      "environment": "sandbox",
+                      "creativeRevision": "image-v1",
+                      "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                      "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                      "lockOwner": "62",
+                      "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                      "resumeFrom": "",
+                      "outcome": "in_progress",
+                      "id": 2,
+                      "createdAt": "2026-07-26T05:33:17.284Z",
+                      "updatedAt": "2026-07-26T05:41:20.340Z"
+                    },
+                    "pairedItem": {
+                      "item": 0
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ],
+        "Create Ad Set PAUSED": [
+          {
+            "startTime": 1785044480405,
+            "executionIndex": 12,
+            "source": [
+              {
+                "previousNode": "Ledger Upsert Campaign",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ],
+            "hints": [],
+            "executionTime": 233,
+            "executionStatus": "error",
+            "error": {
+              "level": "warning",
+              "shouldReport": true,
+              "description": "(#100) Parameter campaign_id: Invalid id: 2",
+              "tags": {},
+              "timestamp": 1785044480634,
+              "context": {
+                "itemIndex": 0,
+                "request": {
+                  "body": {
+                    "name": "human-lab-validation-adset-v1",
+                    "status": "PAUSED",
+                    "daily_budget": 100,
+                    "billing_event": "IMPRESSIONS",
+                    "optimization_goal": "LINK_CLICKS",
+                    "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+                    "targeting": {
+                      "geo_locations": {
+                        "countries": [
+                          "US"
+                        ]
+                      },
+                      "age_min": 25,
+                      "age_max": 55,
+                      "publisher_platforms": [
+                        "facebook",
+                        "instagram"
+                      ],
+                      "facebook_positions": [
+                        "feed"
+                      ],
+                      "instagram_positions": [
+                        "stream"
+                      ]
+                    },
+                    "promoted_object": {
+                      "page_id": "1237104852815793"
+                    },
+                    "campaign_id": "2"
+                  },
+                  "headers": {
+                    "accept": "application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7"
+                  },
+                  "method": "POST",
+                  "uri": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+                  "gzip": true,
+                  "rejectUnauthorized": true,
+                  "followRedirect": true,
+                  "resolveWithFullResponse": true,
+                  "sendCredentialsOnCrossOriginRedirect": true,
+                  "followAllRedirects": true,
+                  "timeout": 300000,
+                  "encoding": null,
+                  "json": false,
+                  "useStream": true,
+                  "qs": {
+                    "access_token": "**hidden**"
+                  }
+                }
+              },
+              "functionality": "regular",
+              "name": "NodeApiError",
+              "node": {
+                "parameters": {
+                  "curlImport": "",
+                  "method": "POST",
+                  "url": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+                  "authentication": "predefinedCredentialType",
+                  "nodeCredentialType": "facebookGraphApi",
+                  "provideSslCertificates": false,
+                  "sendQuery": false,
+                  "sendHeaders": false,
+                  "sendBody": true,
+                  "contentType": "json",
+                  "specifyBody": "json",
+                  "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Merge Campaign Id').item.json.bundle.requests.adSet, { campaign_id: $('Merge Campaign Id').item.json.metaCreate.campaignId })) }}",
+                  "options": {},
+                  "infoMessage": ""
+                },
+                "id": "63a69fb8-98cd-4f4c-91d6-77ea9bbc6da7",
+                "name": "Create Ad Set PAUSED",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.3,
+                "position": [
+                  896,
+                  0
+                ],
+                "credentials": {
+                  "facebookGraphApi": {
+                    "id": "pphgFAkucBMaBs8A",
+                    "name": "Meta Marketing API - Orro"
+                  }
+                },
+                "disabled": false
+              },
+              "messages": [
+                "400 - \"{\\\"error\\\":{\\\"message\\\":\\\"(#100) Parameter campaign_id: Invalid id: 2\\\",\\\"type\\\":\\\"OAuthException\\\",\\\"code\\\":100,\\\"fbtrace_id\\\":\\\"AdC_CCk1t0ODAK39ebFpvA2\\\"}}\""
+              ],
+              "httpCode": "400",
+              "message": "Bad request - please check your parameters",
+              "stack": "NodeApiError: Bad request - please check your parameters\n    at ExecuteContext.requestWithAuthentication (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_56f5a5be5f9a76dfbcdc404d6ec4dea5/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helpers/authentication.ts:263:10)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at ExecuteContext.requestWithAuthentication (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_56f5a5be5f9a76dfbcdc404d6ec4dea5/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helpers/factory.ts:177:11)"
+            }
+          }
+        ]
+      },
+      "pinData": {
+        "Manual Run": [
+          {
+            "json": {},
+            "pairedItem": {
+              "item": 0
+            }
+          }
+        ]
+      },
+      "lastNodeExecuted": "Create Ad Set PAUSED"
+    },
+    "executionData": {
+      "contextData": {},
+      "nodeExecutionStack": [
+        {
+          "node": {
+            "parameters": {
+              "curlImport": "",
+              "method": "POST",
+              "url": "https://graph.facebook.com/v25.0/act_979257825150251/adsets",
+              "authentication": "predefinedCredentialType",
+              "nodeCredentialType": "facebookGraphApi",
+              "provideSslCertificates": false,
+              "sendQuery": false,
+              "sendHeaders": false,
+              "sendBody": true,
+              "contentType": "json",
+              "specifyBody": "json",
+              "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Merge Campaign Id').item.json.bundle.requests.adSet, { campaign_id: $('Merge Campaign Id').item.json.metaCreate.campaignId })) }}",
+              "options": {},
+              "infoMessage": ""
+            },
+            "id": "63a69fb8-98cd-4f4c-91d6-77ea9bbc6da7",
+            "name": "Create Ad Set PAUSED",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [
+              896,
+              0
+            ],
+            "credentials": {
+              "facebookGraphApi": {
+                "id": "pphgFAkucBMaBs8A",
+                "name": "Meta Marketing API - Orro"
+              }
+            },
+            "disabled": false
+          },
+          "data": {
+            "main": [
+              [
+                {
+                  "json": {
+                    "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
+                    "appId": "human-lab-wf1-sandbox",
+                    "experimentRunId": "run_human-lab_2026q2_001",
+                    "provider": "meta",
+                    "phase": "campaign",
+                    "campaignId": "2",
+                    "adSetId": "",
+                    "imageHash": "",
+                    "creativeId": "",
+                    "adId": "",
+                    "lastError": "",
+                    "environment": "sandbox",
+                    "creativeRevision": "image-v1",
+                    "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
+                    "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+                    "lockOwner": "62",
+                    "lockExpiresAt": "2026-07-26T05:46:20.207Z",
+                    "resumeFrom": "",
+                    "outcome": "in_progress",
+                    "id": 2,
+                    "createdAt": "2026-07-26T05:33:17.284Z",
+                    "updatedAt": "2026-07-26T05:41:20.340Z"
+                  },
+                  "pairedItem": {
+                    "item": 0
+                  }
+                }
+              ]
+            ]
+          },
+          "source": {
+            "main": [
+              {
+                "previousNode": "Ledger Upsert Campaign",
+                "previousNodeOutput": 0,
+                "previousNodeRun": 0
+              }
+            ]
+          }
+        }
+      ],
+      "metadata": {},
+      "waitingExecution": {},
+      "waitingExecutionSource": {},
+      "runtimeData": {
+        "version": 1,
+        "establishedAt": 1785044478569,
+        "source": "manual",
+        "triggerNode": {
+          "name": "Manual Run",
+          "type": "n8n-nodes-base.manualTrigger"
+        },
+        "redaction": {
+          "version": 2,
+          "production": false,
+          "manual": false,
+          "source": "workflow"
+        }
+      }
+    },
+    "resumeToken": "dc0858dfa5b47ff5411679088785d9f27745c7c6af8f09cd66381b74cc06a598"
+  }
+}

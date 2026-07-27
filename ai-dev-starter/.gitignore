@@ -1,0 +1,6 @@
+project/VALUES.yml
+.env
+.env.*
+!.env.example
+**/secrets/**
+*.pem

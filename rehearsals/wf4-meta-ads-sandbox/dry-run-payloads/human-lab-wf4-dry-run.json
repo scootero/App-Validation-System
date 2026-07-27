@@ -98,7 +98,8 @@
       "name": "human-lab-validation",
       "objective": "OUTCOME_TRAFFIC",
       "status": "PAUSED",
-      "special_ad_categories": []
+      "special_ad_categories": [],
+      "is_adset_budget_sharing_enabled": false
     },
     "adSet": {
       "name": "human-lab-validation-adset-v1",
@@ -106,6 +107,7 @@
       "daily_budget": 100,
       "billing_event": "IMPRESSIONS",
       "optimization_goal": "LINK_CLICKS",
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
       "targeting": {
         "geo_locations": {
           "countries": [
@@ -123,7 +125,13 @@
         ],
         "instagram_positions": [
           "stream"
-        ]
+        ],
+        "targeting_automation": {
+          "advantage_audience": 0
+        }
+      },
+      "promoted_object": {
+        "page_id": "1237104852815793"
       }
     },
     "imageUpload": {
@@ -214,7 +222,8 @@
       }
     },
     "rootStatusUnchanged": true,
-    "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation."
+    "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
+    "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
   },
   "safety": {
     "externalWritePerformed": false,
@@ -225,7 +234,7 @@
     "tripleApprovalRequired": {
       "mode": "create_paused",
       "approval": true,
-      "approvalToken": "[REDACTED_REF:WF4_CREATE_PAUSED_APPROVAL_TOKEN]"
+      "createPausedAllowed": true
     },
     "feedFirstPlacements": true,
     "storiesReelsOutOfV1": true

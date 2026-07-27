@@ -1,0 +1,30 @@
+---
+description: Minimal docs and drift / overengineering warnings
+alwaysApply: true
+---
+
+# Docs and drift
+
+## When to write or update docs
+
+- **STATUS.md** — every meaningful session (proven / blocked / next)
+- **SYSTEM.md** — when supported architecture or ownership actually changed
+- **DECISIONS.md** — when a choice is expensive to reverse or easy to forget
+- **PROOFS.md** — when promoting a slice to “supported”
+- **PROJECT.md** — only when product goal / non-goals change
+- **tech/** — only for durable stack-specific build/test rules
+
+Do not create: progress twins, handoff packs, drift ledgers, canonical-vs-current duplicates, or prompt archives.
+
+## Warn the human (do not silently continue) when
+
+- Work expands past the active milestone in STATUS.md
+- New infrastructure or abstraction lacks a demonstrated need (use rule of three)
+- A proven component is being redesigned without a failing proof
+- Discussion is replacing a small reversible experiment
+- A new doc would duplicate STATUS, SYSTEM, DECISIONS, PROOFS, or code/schemas
+
+## Experiment vs discuss
+
+- **Experiment now** if the unknown is empirical and reversible
+- **Discuss / approve first** if money, production mutation, secrets, or irreversible changes

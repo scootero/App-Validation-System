@@ -24,23 +24,13 @@
 
 | Key | Notes |
 |-----|-------|
-| Meta access token | Credential name: `Meta Marketing API - Orro` (`facebookGraphApi`, id `pphgFAkucBMaBs8A`) — attached to disabled create HTTP nodes |
-| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` | Vault as n8n Credential (see below). Keep Workflow Config field empty until create-paused enablement |
+| Meta access token | Credential name: `Meta Marketing API - Orro` (`facebookGraphApi`, id `pphgFAkucBMaBs8A`) — attach to create HTTP nodes before Phase 6 |
 
-### Approval-token vault (operator manual)
+**Removed (2026-07-21):** Header Auth approval vault + Config dual-token fields (`approvalToken`, `wf4CreatePausedApprovalToken`).
 
-1. n8n → **Credentials** → **Add credential**
-2. Type: **Header Auth**
-3. Name: `WF4 Create-Paused Approval Token`
-4. Header Name: `X-WF4-Approval-Token` (vault only; unused for Meta HTTP)
-5. Value: long random secret from a password manager
-6. Save. Do **not** paste into Workflow Config, git, or chat yet.
-
-**Runtime compare (create-paused only, later):** Process requires  
-`mode=create_paused` AND `approval=true` AND `approvalToken === wf4CreatePausedApprovalToken` (both non-empty)  
-AND `_createPausedAllowed===true` (code hard-gate; still `false` in pre-create).
-
-When enabling create-paused: copy Credential value into Config `wf4CreatePausedApprovalToken` and the same value into run `approvalToken` for that one manual execution.
+**Runtime create-paused gates:**  
+`mode=create_paused` AND `approval=true` AND `_createPausedAllowed===true`  
+(plus budget / Meta IDs / creative / ledger gates). Exact phrase still required before Phase 6 enablement.
 
 ## Adapter SSOT
 

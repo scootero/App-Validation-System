@@ -69,12 +69,30 @@ function assertReconciledMetaFields(bundle) {
       bundle.requests.campaign.special_ad_categories.length === 0,
     "special_ad_categories must be []"
   );
+  assert(
+    bundle.requests.campaign.is_adset_budget_sharing_enabled === false,
+    "is_adset_budget_sharing_enabled must be false for ad-set budgets"
+  );
   assert(bundle.requests.adSet.daily_budget === 100, "daily_budget must be 100 cents");
   assert(bundle.budgetCapCheck.maxDailyBudgetUsd === 2, "MAX_DAILY_BUDGET_USD must be 2");
   assert(bundle.requests.adSet.billing_event === "IMPRESSIONS", "billing_event must be IMPRESSIONS");
   assert(
+    bundle.requests.adSet.bid_strategy === "LOWEST_COST_WITHOUT_CAP",
+    "bid_strategy must be LOWEST_COST_WITHOUT_CAP"
+  );
+  assert(
+    bundle.requests.adSet.promoted_object &&
+      Boolean(bundle.requests.adSet.promoted_object.page_id),
+    "adSet promoted_object.page_id required"
+  );
+  assert(
     bundle.requests.adSet.optimization_goal === "LINK_CLICKS",
     "optimization_goal must be LINK_CLICKS"
+  );
+  assert(
+    bundle.requests.adSet.targeting.targeting_automation &&
+      bundle.requests.adSet.targeting.targeting_automation.advantage_audience === 0,
+    "targeting_automation.advantage_audience must be 0"
   );
   assert(
     JSON.stringify(bundle.requests.adSet.targeting.facebook_positions) === JSON.stringify(["feed"]),
@@ -211,6 +229,62 @@ function testWritebackFixtureShape() {
   assert(expected.rootStatusUnchanged === true, "fixture must mark rootStatusUnchanged");
 }
 
+function testMergeAdsMetaWriteBack() {
+  const app = readJson(appJsonPath);
+  const marker = { authorOnly: true, keepMe: "untouched" };
+  app._testMarker = marker;
+  app.ads.headlines = app.ads.headlines.slice();
+  const originalHeadline = app.ads.headlines[0];
+  const originalRoot = app.status;
+  const originalRevision = app.ads.meta.creativeRevision;
+
+  const incomplete = adapter.mergeAdsMetaWriteBack(app, {
+    status: "created_paused",
+    campaignId: "c1",
+    adSetId: "a1",
+  });
+  assert(!incomplete.ok, "incomplete IDs must refuse Drive merge");
+  assert(String(incomplete.error).indexOf("WRITEBACK_INCOMPLETE_IDS") !== -1, "incomplete error");
+
+  const wrongStatus = adapter.mergeAdsMetaWriteBack(app, {
+    status: "ACTIVE",
+    campaignId: "c1",
+    adSetId: "a1",
+    creativeId: "cr1",
+    adId: "ad1",
+    landingUrl: "https://example.com",
+    dailyBudget: 1,
+    createdAt: "2026-07-20T00:00:00.000Z",
+    lastSyncedAt: null,
+  });
+  assert(!wrongStatus.ok, "non-created_paused must refuse");
+
+  const merged = adapter.mergeAdsMetaWriteBack(app, {
+    status: "created_paused",
+    campaignId: "c1",
+    adSetId: "a1",
+    creativeId: "cr1",
+    adId: "ad1",
+    landingUrl: "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook",
+    dailyBudget: 1,
+    createdAt: "2026-07-20T00:00:00.000Z",
+    lastSyncedAt: null,
+  });
+  assert(merged.ok, merged.error || "merge must succeed");
+  assert(merged.rootStatusUnchanged === true, "rootStatusUnchanged");
+  assert(merged.appJson.status === originalRoot, "root status preserved");
+  assert(merged.appJson.ads.headlines[0] === originalHeadline, "author headlines preserved");
+  assert(merged.appJson._testMarker.keepMe === "untouched", "unrelated fields preserved");
+  assert(merged.appJson.ads.meta.status === "created_paused", "meta status written");
+  assert(merged.appJson.ads.meta.campaignId === "c1", "campaignId written");
+  assert(merged.appJson.ads.meta.adId === "ad1", "adId written");
+  assert(
+    merged.appJson.ads.meta.creativeRevision === originalRevision,
+    "creativeRevision preserved when not supplied"
+  );
+  assert(app.ads.meta.campaignId == null, "original appJson not mutated");
+}
+
 function testMissingCreativeSha() {
   const app = readJson(appJsonPath);
   const cfg = baseConfig();
@@ -221,42 +295,27 @@ function testMissingCreativeSha() {
 }
 
 function testApprovalGatesNegative() {
-  const missing = adapter.evaluateCreatePausedGates({
-    mode: "create_paused",
+  const wrongMode = adapter.evaluateCreatePausedGates({
+    mode: "dry_run",
     approval: true,
-    approvalToken: "",
-    configToken: "secret",
     createPausedAllowed: true,
   });
-  assert(missing.failures.indexOf("missing_approval_token") !== -1, "missing token");
-  assert(missing.createPathOpen === false, "missing token → closed");
-
-  const wrong = adapter.evaluateCreatePausedGates({
-    mode: "create_paused",
-    approval: true,
-    approvalToken: "nope",
-    configToken: "secret",
-    createPausedAllowed: true,
-  });
-  assert(wrong.failures.indexOf("wrong_approval_token") !== -1, "wrong token");
-  assert(wrong.tokenMatch === false, "tokenMatch false");
-  assert(wrong.createPathOpen === false, "wrong token → closed");
+  assert(wrongMode.failures.indexOf("mode_not_create_paused") !== -1, "mode not create_paused");
+  assert(wrongMode.tripleApproved === false, "dry_run → not tripleApproved");
+  assert(wrongMode.createPathOpen === false, "wrong mode → closed");
 
   const noApproval = adapter.evaluateCreatePausedGates({
     mode: "create_paused",
     approval: false,
-    approvalToken: "secret",
-    configToken: "secret",
     createPausedAllowed: true,
   });
   assert(noApproval.failures.indexOf("approval_false") !== -1, "approval false");
+  assert(noApproval.tripleApproved === false, "approval false → not tripleApproved");
   assert(noApproval.createPathOpen === false, "approval false → closed");
 
   const hardGate = adapter.evaluateCreatePausedGates({
     mode: "create_paused",
     approval: true,
-    approvalToken: "secret",
-    configToken: "secret",
     createPausedAllowed: false,
   });
   assert(hardGate.tripleApproved === true, "triple can be true while hard gate false");
@@ -266,13 +325,20 @@ function testApprovalGatesNegative() {
   const overBudget = adapter.evaluateCreatePausedGates({
     mode: "create_paused",
     approval: true,
-    approvalToken: "secret",
-    configToken: "secret",
     createPausedAllowed: true,
     budgetCapPassed: false,
   });
   assert(overBudget.failures.indexOf("over_budget") !== -1, "over budget");
   assert(overBudget.createPathOpen === false, "over budget → closed");
+
+  const open = adapter.evaluateCreatePausedGates({
+    mode: "create_paused",
+    approval: true,
+    createPausedAllowed: true,
+  });
+  assert(open.tripleApproved === true, "mode+approval → tripleApproved");
+  assert(open.createPathOpen === true, "all gates pass → open");
+  assert(open.failures.length === 0, "no failures when open");
 }
 
 function testLedgerDecisions() {
@@ -360,14 +426,12 @@ function testLedgerDecisions() {
 
 function testRedaction() {
   const redacted = adapter.redactSensitiveFields({
-    approvalToken: "super-secret",
-    wf4CreatePausedApprovalToken: "also-secret",
-    nested: { approvalToken: "x" },
+    accessToken: "super-secret",
+    nested: { accessToken: "x" },
     ok: true,
   });
-  assert(redacted.approvalToken === "[REDACTED]", "token redacted");
-  assert(redacted.wf4CreatePausedApprovalToken === "[REDACTED]", "config token redacted");
-  assert(redacted.nested.approvalToken === "[REDACTED]", "nested redacted");
+  assert(redacted.accessToken === "[REDACTED]", "accessToken redacted");
+  assert(redacted.nested.accessToken === "[REDACTED]", "nested accessToken redacted");
   assert(redacted.ok === true, "non-secret preserved");
 }
 
@@ -396,6 +460,8 @@ function main() {
   const app = readJson(appJsonPath);
   assert(app.ads.objective === "traffic", "sandbox fixture objective must be traffic");
   assert(app.ads.meta.creativeRevision === "image-v1", "creativeRevision default");
+  assert(app.media.ogImage.width === 1734, "fixture ogImage width must be measured 1734");
+  assert(app.media.ogImage.height === 907, "fixture ogImage height must be measured 907");
 
   const expectedDryRun = readJson(expectedDryRunPath);
   const result = adapter.buildDryRunBundle(app, baseConfig());
@@ -411,6 +477,7 @@ function main() {
   testIdempotencyRefusal();
   testBudgetCapExceeded();
   testWritebackFixtureShape();
+  testMergeAdsMetaWriteBack();
   testCreativeResolutionFailureMissingRepo();
   testCreativeResolutionFailureBadType();
   testMissingCreativeSha();

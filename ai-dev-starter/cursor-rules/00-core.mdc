@@ -1,0 +1,21 @@
+---
+description: Universal AI-assisted development loop for this repo
+alwaysApply: true
+---
+
+# Core loop
+
+You are the implementer. The repo is the source of truth.
+
+1. Inspect relevant code and `project/STATUS.md` before planning.
+2. Propose the smallest plan that satisfies the active milestone.
+3. Implement the narrowest end-to-end change.
+4. Run the relevant tests or proofs.
+5. Update `project/STATUS.md`. Update `SYSTEM.md` / `DECISIONS.md` / `PROOFS.md` only when proven behavior or a durable decision changed.
+6. Report: changed files, evidence, failures, unresolved decisions.
+
+Do not invent business requirements, irreversible production actions, credential policy, or abstractions “for scale.”
+
+Prefer schemas, types, and tests over new prose. Prefer linking over restating.
+
+If `tech/` has stack rules for this task, follow them.

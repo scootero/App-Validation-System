@@ -24,8 +24,7 @@
 | Meta API version | n8n Config | Operator | `v25.0` |
 | `MAX_DAILY_BUDGET_USD` | n8n Config | Operator | **`2`** safety ceiling (not default ad budget) |
 | Meta access token | n8n Credentials | Operator | Credential name: `Meta Marketing API - Orro` (`facebookGraphApi`) |
-| `WF4_CREATE_PAUSED_APPROVAL_TOKEN` | n8n Credentials (Header Auth vault) | Operator | Credential name: `WF4 Create-Paused Approval Token`. Copy into Config `wf4CreatePausedApprovalToken` only at create-paused enablement; keep Config empty otherwise |
-| Operation ledger row | n8n Data Table `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) | WF4 | Key: `appId|experimentRunId|provider`. No dry-run writes |
+| Operation ledger row | n8n Data Table `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) | WF4 | Key: `appId|environment|provider|creativeRevision`. No dry-run writes |
 
 ---
 

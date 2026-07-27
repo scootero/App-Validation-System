@@ -1,6 +1,6 @@
 # Prompt 3 Progress — Platform Completion After Image V1
 
-**Status:** Not started
+**Status:** Waiting for Prompt 2 Image V1 PASS/PARTIAL. Image V1 write-back + ledger mid-phase upserts are **Prompt 2 Phase 6 hard-blockers** (not deferred to Prompt 3 Track B). Do not start Prompt 3 tracks until Image V1 completes.
 
 **On resume:** Read this file first, then [`PROMPT-3.md`](PROMPT-3.md). Continue only the selected track’s next unchecked phase after Scott approves.
 

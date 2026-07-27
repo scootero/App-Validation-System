@@ -18,10 +18,12 @@
 | Page | Orro — `1237104852815793` |
 | Instagram | @useorro — `17841440875992246` |
 | System User | Orro n8n — `61591805738163` |
+| Developer App | Orro Marketing API — `917652350641212` |
 | n8n credential | `Meta Marketing API - Orro` (token in n8n only) |
 | API version | `v25.0` |
 | Safety ceiling | `MAX_DAILY_BUDGET_USD = 2` (not default ad budget) |
 | V1 pairing (adapter) | `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS` |
+| Campaign create field | `is_adset_budget_sharing_enabled: false` (required for ad-set budgets) |
 
 ---
 
@@ -61,7 +63,7 @@ Do **not** put Meta token in Config.
 ## G. n8n Credentials (secrets)
 
 - [x] Meta token in credential `Meta Marketing API - Orro` (never in git)
-- [ ] `WF4_CREATE_PAUSED_APPROVAL_TOKEN` — **later**, before create-paused only
+- [x] ~~Header Auth approval vault~~ **removed 2026-07-21** — not required for WF4 runtime (gates = mode + approval + `_createPausedAllowed`)
 
 ## H. Explicitly do NOT do yet
 

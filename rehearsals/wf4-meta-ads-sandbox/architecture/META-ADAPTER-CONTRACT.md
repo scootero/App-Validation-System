@@ -20,6 +20,7 @@ Author `ads.objective` is mapped in the adapter (`traffic` → `OUTCOME_TRAFFIC`
 
 - Budget minor units (USD cents)
 - `special_ad_categories: []`
+- `is_adset_budget_sharing_enabled: false` (required when using ad-set budgets / not CBO; probe-proven 2026-07-26)
 - Payload builders: campaign / ad set / image upload / creative / ad
 - **Creative binary resolution plan** via `resolveCreativeSource` (repo/branch/path → `downloadUrl` / `filename`; V1 image extensions only)
 - Create order: Campaign → Ad Set → **download binary** → image upload (`adimages`) → Creative → Ad

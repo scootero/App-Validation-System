@@ -1,8 +1,8 @@
 # Prompt 2 Progress — Image Create-Paused V1
 
-**Status:** Phase 4 complete — live Process verified + Respond/Ledger patched + dry_run `49` PASS. Waiting for Scott to approve Phase 5.
+**Status:** Phase 6 PREP complete (2026-07-26). Safer probe proved new app write path (`campaignId=120250604736240199` with `is_adset_budget_sharing_enabled:false`). Adapter + live Process updated; local rehearse PASS; live dry_run exec **60** PASS (`metaHttpCalls=0`, `driveWrites=0`). Create path still disabled. **Do not run full Phase 6 until Scott sends exact approval phrase.**
 
-**On resume:** Read this file first, then [`PROMPT-2.md`](PROMPT-2.md). Continue only the next unchecked phase after Scott approves.
+**On resume:** Read this file first, then [`PROMPT-2.md`](PROMPT-2.md). Full Phase 6 only after Scott sends `APPROVE WF4 IMAGE CREATE-PAUSED V1`.
 
 **Related:**
 
@@ -76,34 +76,56 @@ Prompt 1 handoff summary: PASS — live WF4 `YIc53GBq4upelYp6` inactive; dry_run
 - [x] Duplicate-operation dry test PASS
 - [x] Partial-failure simulation documented/proven
 - [x] Concurrent-lock: **simulation-proven**
-- [ ] Scott approved moving to Phase 5
+- [x] Scott approved moving to Phase 5
 
 ### Phase 5 — Create-paused preflight
 
-- [ ] Full preflight table presented
-- [ ] Waiting for exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
-- [ ] Exact phrase received from Scott
+- [x] Full preflight table presented
+- [x] Waiting for exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
+- [x] Exact phrase received from Scott
+
+### Phase 5.5 — Blocker clearance (no Meta writes) — 2026-07-20
+
+- [x] `mergeAdsMetaWriteBack` + local rehearse PASS
+- [x] Fixture dims 1734×907
+- [x] Local `workflow.ts`: disabled mid-phase ledger upserts + verified-only Drive write-back chain
+- [x] Live Data Table: 8 Phase-4 columns added
+- [x] Live Config `fixtureAppJson` aligned to repo fixture SSOT
+- [x] Live Ledger Upsert Planned / Mark Verified column maps expanded
+- [x] Fingerprint reconcile: live exec **50** = repo SSOT `114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d`
+- [x] Local rehearse PASS; live dry_run exec **50** PASS (`metaHttpCalls=0`, `driveWrites=0`)
+- [x] Live canvas: mid-phase upsert + Drive write-back nodes synced (**37** nodes; all create/ledger/Drive disabled)
+- [x] Import-ready JSON regenerated / drift PASS vs live (`workflow.ts` ↔ import-ready ↔ live)
+- [x] Final dry_run after live sync — exec **51** PASS (`metaHttpCalls=0`, `driveWrites=0`)
+- [x] Header Auth / dual-token gates **removed** (2026-07-21); dry_run exec **53** PASS (tokenless failures only)
 
 ### Phase 6 — One PAUSED image-ad proof
 
-- [ ] Operation lock claimed
+- [x] Operation lock claimed *(ledger planned upsert on exec 54; no Meta IDs)*
 - [ ] Image uploaded; `image_hash` captured
 - [ ] Campaign PAUSED
 - [ ] Ad Set PAUSED
 - [ ] Creative created
 - [ ] Ad PAUSED
-- [ ] Zero delivery / zero spend
+- [x] Zero delivery / zero spend *(no Meta objects created)*
 - [ ] Ledger complete
 - [ ] ID write-back complete
-- [ ] No ACTIVE incident (or incident paused + reported)
+- [x] No ACTIVE incident (or incident paused + reported) *(none created)*
 
 Meta IDs:
 
-- Campaign: `_pending_`
-- Ad Set: `_pending_`
-- Creative: `_pending_`
-- Ad: `_pending_`
-- Image hash: `_pending_`
+- Campaign: `_none_ — Create Campaign failed`
+- Ad Set: `_none_`
+- Creative: `_none_`
+- Ad: `_none_`
+- Image hash: `_none_`
+
+**Phase 6 execution:** `54` — **FAIL**  
+**Blocker:** Meta Graph `POST /act_979257825150251/campaigns` → HTTP 400 OAuthException code **200** `"API access blocked."` fbtrace `AlDDQr1uZSKx6XygxOyZKxT`  
+**Credential used:** `Meta Marketing API - Orro` (`pphgFAkucBMaBs8A`) — attached correctly on the node  
+**Gates:** `createPathOpen=true` (mode/approval/hard-gate all passed)  
+**Drive write-back:** not reached  
+**Safety restore:** applied — create path disabled; `_createPausedAllowed=false`; `mode=dry_run`; `approval=false`; workflow inactive
 
 ### Phase 7 — Feed previews
 
@@ -140,28 +162,67 @@ Meta IDs:
 
 ## Open blockers / wait for Scott
 
-1. **Approve Phase 5** (create-paused preflight only — no Meta writes yet).
-2. Before create-paused: add ledger Data Table columns (`environment`, `creativeRevision`, `contentFingerprint`, `creativeSha256`, `lockOwner`, `lockExpiresAt`, `resumeFrom`, `outcome`) + mid-phase upsert nodes on create enablement.
-3. Create Header Auth vault when ready (keep Config token empty until enablement).
-4. Do **not** create Meta objects until exact phrase: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
+1. **Meta Campaign POST blocked** (exec 54) — `API access blocked` OAuthException 200 / fbtrace `AlDDQr1uZSKx6XygxOyZKxT`. Read-only GETs (exec 56) show `ads_management`+`ads_read` **granted**, ad account ACTIVE+MANAGE, campaign list GET OK — **do not assume a missing scope**; use manual checklist (app mode / Access Tier / BM restriction / Meta support).
+2. Do **not** activate WF4; do **not** spend; create path stays disabled until Scott re-approves Phase 6 retry.
+3. Ledger reconcile for exec 54: **done** (exec 55).
+
+### 2026-07-22 — Meta read-only diagnosis + ledger reconcile (no Phase 6 retry)
+
+**Ledger (exec 55, workflow `ooM24nOGKfuefHVM`):**
+- Preserved failed attempt as `operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1|failed-exec-54`
+- `phase=failed`, `outcome=failed`, lock cleared, `resumeFrom` cleared
+- `lastError` records exec54 OAuthException 200 + fbtrace
+- Original `operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1` has **no** row (clean claim on retry)
+
+**Meta GETs (exec 56, workflow `c445mYtMEfsQsJoA`) — confirmed only:**
+| Check | Result |
+|-------|--------|
+| Token identity `/me` | id `122103688311393524`, name `Orro n8n` (≠ checklist id `61591805738163`) |
+| Granted scopes `/me/permissions` | includes **`ads_management`**, **`ads_read`**, `business_management`, page/IG-related scopes (all `granted`) |
+| `/me/businesses` | empty `data` |
+| Ad accounts `/me/adaccounts` | `act_979257825150251` present; `account_status=1`; `disable_reason=0`; `user_tasks` DRAFT/ANALYZE/ADVERTISE/**MANAGE**; business Orro `1074341285117707` |
+| Ad account detail | funding Mastercard present; `amount_spent=0`; `min_daily_budget=100`; ACTIVE |
+| Business `1074341285117707` | name Orro; **`verification_status=not_verified`** |
+| Business owned ad accounts | includes `act_979257825150251` ACTIVE |
+| Page `1237104852815793` | published; IG `17841440875992246` / `@useorro` linked |
+| Campaigns GET `limit=1` | HTTP 200, empty list (read path works) |
+| Page `/roles` | needs Page token (190) — not used to infer campaign-create cause |
+| App mode / Access Tier / debug_token app_id+type+expiry | **not** confirmed via these GETs |
+
+**Not claimed:** which single permission is missing for the POST (`ads_management` is present on the token).
+
+**WF4 safety (re-checked):** inactive; `mode=dry_run`; `approval=false`; `_createPausedAllowed: false`; create/ledger nodes disabled. No Meta POSTs this session.
 
 ---
 
 ## Latest compact handoff
 
 ```text
-Status: Phase 4 COMPLETE — waiting Scott approve Phase 5
-Last completed: Live Process verified (39269 / 9f105443…); Respond+Ledger patched from .phase4-sync; dry_run execution 49 PASS
-Proof: metaHttpCalls=0, driveWrites=0, externalWritePerformed=false
-Phase4 signals: operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1; creativeSha256=ae73b936…; contentFingerprint=2c5c0a2b…; approvalGate.createPathOpen=false; Feed facebook_positions=[feed] instagram_positions=[stream]
-Live WF4 ID: YIc53GBq4upelYp6 (inactive; create-path disabled; Ledger Idempotency still disabled)
-Process node: 5392da6c-0590-432b-b497-414bbc77bfcd (evaluateCreatePausedGates + WF4_CREATIVE_SHA256 present)
-Config: WF4_CREATIVE_SHA256 + environment=sandbox + workflowVersion=wf4-image-v1; approval token empty
-Dry-run: Prompt 1 = 48; Phase 4 live = 49 PASS
-Create-paused: NOT enabled (_createPausedAllowed=false)
-Meta objects: none
-Exact next action: Scott approve Phase 5 preflight only — do NOT combine Phase 5+6; no Meta creates without exact phrase
+Status: Phase 6 PREP complete; create path still DISABLED
+Probe: new app write OK — campaign 120250604736240199 PAUSED (needs is_adset_budget_sharing_enabled:false)
+Adapter+live Process: field added; Process sha c774f000…; fingerprint 114e6616… unchanged
+Local rehearse PASS; live dry_run exec 60 PASS — metaHttpCalls=0 driveWrites=0
+WF4: inactive dry_run approval=false _createPausedAllowed=false create nodes disabled; Meta creds NOT on create nodes
+Exact next: Scott sends APPROVE WF4 IMAGE CREATE-PAUSED V1 for full Phase 6
 ```
+
+### 2026-07-26 — Phase 6 PREP (budget-sharing field; no create enablement)
+
+- Safer probe PASS after adding `is_adset_budget_sharing_enabled: false` (old `API access blocked` resolved by new app)
+- SSOT: `lib/meta-adapter.js` → synced `workflow.ts` + live Process + `process-jsCode.js`
+- Fixture: `dry-run-payloads/human-lab-wf4-dry-run.json` updated
+- Live dry_run exec **60** PASS — campaign payload includes new field; zero Meta/Drive writes
+- STOP — wait for exact Phase 6 approval phrase
+
+---
+
+## Enablement procedure (document only — do not execute)
+
+1. Exact phrase received + live mid-phase/Drive nodes present + drift PASS
+2. Set `mode=create_paused`, `approval=true`
+3. Flip `_createPausedAllowed=true`; enable create/ledger/**verified** write-back nodes for one run
+4. Execute once; verify PAUSED + zero spend; ledger complete; **then** Drive `ads.meta` merge
+5. Re-disable; `_createPausedAllowed=false`; leave inactive
 
 ---
 
@@ -170,45 +231,79 @@ Exact next action: Scott approve Phase 5 preflight only — do NOT combine Phase
 | Test | Result |
 |------|--------|
 | `node scripts/wf4-rehearse.js` | PASS (incl. gates, ledger decisions, redaction, Feed positions) |
-| `node scripts/wf4-resolve-creative.js` | PASS (SHA matches Phase 1) |
-| Missing / wrong token / approval=false / over-budget | PASS → `createPathOpen=false` |
-| Partial resume simulation | PASS → `resume` + reuse `campaignId` |
-| Lock held / expired | PASS (simulation-proven) |
-| already_complete | PASS |
-| revision_conflict | PASS |
-| Live Process paste | VERIFIED 39269 / `9f105443…` (markers present) |
-| Respond + Ledger MCP patch | Applied from `.phase4-sync/`; Ledger remains disabled |
 | Live n8n dry_run | **PASS** execution `49` (zero writes + Phase 4 signals) |
+
+## Blocker-clearance proof summary (2026-07-20)
+
+| Test | Result |
+|------|--------|
+| Local rehearse (incl. `mergeAdsMetaWriteBack`) | PASS |
+| Fixture dims 1734×907 | PASS |
+| Live dry_run exec **50** | PASS — fingerprint `114e6616…`; `metaHttpCalls=0`; `driveWrites=0` |
+| Live dry_run exec **51** (post mid-phase sync) | PASS — same fingerprint; `metaHttpCalls=0`; `driveWrites=0`; `_createPausedAllowed=false` |
+| Live Data Table 8 columns | PASS |
+| Live Config fixture = repo fixture | PASS |
+| Live mid-phase + Drive nodes | **PASS** — 37 nodes; create path via disabled Prepare/Upsert; write-back after Ledger Mark Verified |
+| Google SA on Drive nodes | **applied** via `setNodeCredential` (`AW9ZTTTBz7JeSKKN`); details API may redact credentials |
+| Header Auth exact name | **superseded** — token gates removed 2026-07-21 |
+| Drift workflow.ts ↔ import-ready ↔ live | **PASS** |
+
+## Token-gate removal proof summary (2026-07-21)
+
+| Test | Result |
+|------|--------|
+| Local rehearse (tokenless gates) | PASS |
+| Live Config: no `approvalToken` / `wf4CreatePausedApprovalToken` | PASS |
+| Live Process: no dual-token compare | PASS — sha `983f3c95…` |
+| Live dry_run exec **52** | FAIL — bad fixture (missing `experiment.testBudget`); fixed |
+| Live dry_run exec **53** | PASS — `metaHttpCalls=0`; `driveWrites=0`; failures = mode/approval/hard-gate only |
+| Import-ready / drift | PASS |
 
 ---
 
 ## Handoff history (append-only)
 
-### 2026-07-19 — Phase 1 complete
+### 2026-07-19 — Phase 5 preflight complete
 
-- Measured og-image; created CREATIVE-ASSET-SPECS.md; Feed-first policy
+- Full create-paused preflight table presented
+- Scott confirmed: **no ledger-only waiver**
+- STOP — wait for exact phrase
 
-### 2026-07-19 — Phases 2+3 design complete
+### 2026-07-20 — Blocker clearance PARTIAL
 
-- CREATE-PAUSED-V1-CONTRACT.md + OPERATION-LEDGER.md
+- Adapter: `mergeAdsMetaWriteBack` (verified-complete only)
+- Fixture dims fixed; Config live aligned; fingerprint SSOT `114e6616…` (exec 50)
+- Local workflow.ts: mid-phase upserts + Drive write-back (all disabled)
+- Live: 8 ledger columns; Planned/Verified maps updated; **mid-phase/Drive nodes not yet on canvas**
+- Header Auth vault not created
+- Phase 6 **not safe** until live sync + credential + drift PASS
+- STOP
 
-### 2026-07-19 — Phase 4 local implement
+### 2026-07-20 — Blocker clearance continued (live sync finish)
 
-- Adapter: operationKey, contentFingerprint, evaluateLedgerDecision, evaluateCreatePausedGates, redact, Feed positions
-- Process: WF4_CREATIVE_SHA256 config, approvalGate redacted, `_createPausedAllowed=false`
-- Ledger Idempotency Check: resume / already_complete / lock / revision_conflict
-- Local rehearse + resolve PASS
+- Live MCP patches: Campaign/AdSet/Image/Creative mid-phase Prepare+Upsert + Drive write-back chain (all `disabled: true`)
+- Live `nodeCount` **23 → 37**; create-path skip edges removed
+- Regenerated `n8n/WF4-meta-ads-sandbox.import-ready.json` from live version export
+- Drift check **PASS**
+- Dry_run exec **51** PASS — zero Meta/Drive writes
+- Header Auth exact name still **not** in vault
+- Phase 6 **still NOT SAFE** — wait for credential rename + exact phrase
+- STOP
 
-### 2026-07-19 — Live Process manually pasted
+### 2026-07-21 — Token gates removed (no Phase 6)
 
-- Scott pasted `.phase4-sync/process-jsCode.js` into live **Process WF4 Dry Run**
-- Path forward: verify hash/size + one dry_run; **no full-import**
-- Respond/Ledger may still need small `.phase4-sync` patches
+- Removed Header Auth requirement + dual-token runtime compare from adapter, Process, Config, tests, docs
+- Live Config token fields deleted; fixture restored to repo SSOT (`experiment.testBudget`)
+- Live Process synced (sha `983f3c95…`); import-ready regenerated; drift PASS
+- Dry_run exec **53** PASS — zero writes; gate failures no longer include token errors
+- Phase 6 **not started** — still need Meta cred attach + enable create path + flip hard gate
+- STOP
 
-### 2026-07-19 — Phase 4 closeout complete
+### 2026-07-21 — Phase 6 create-paused attempt FAIL
 
-- Live Process verified: 39269 bytes / SHA-256 `9f10544340c80f3e2c240f640bb200efb65bd9801ae482a1e809d152c1604a96`
-- MCP patched **Respond Dry Run** + **Ledger Idempotency Check** only (no full-import; create-path stayed disabled)
-- Live dry_run execution **49** PASS: `metaHttpCalls=0`, `driveWrites=0`, `externalWritePerformed=false`
-- `operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1`; Feed positions `feed` / `stream`; `createPathOpen=false`
-- STOP — wait for Scott to approve Phase 5
+- Enabled one-run: Meta Orro + Google SA attached; `mode=create_paused`; `approval=true`; `_createPausedAllowed=true`; create/ledger/Drive nodes enabled; workflow stayed inactive
+- Exec **54** FAIL at **Create Campaign PAUSED** — Meta `API access blocked` (OAuthException 200)
+- No campaign/ad set/creative/ad created; no Drive write-back; zero spend
+- Ledger: Planned upsert (`phase=planned`, `outcome=in_progress`) — reconcile before retry
+- Safety restored: create path disabled; dry_run; `_createPausedAllowed=false`; inactive
+- STOP — wait for Meta API access fix

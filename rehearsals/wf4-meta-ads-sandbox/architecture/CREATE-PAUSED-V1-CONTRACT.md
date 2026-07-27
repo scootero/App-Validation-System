@@ -1,9 +1,22 @@
 # WF4 Create-Paused V1 Contract (Phases 2+3 Design)
 
-**Status:** Phase 4 implementation landed in adapter/workflow (2026-07-19). Create-path remains **disabled**; `_createPausedAllowed=false`. Awaiting Scott approval before Phase 5 preflight / Meta writes.  
-**Date:** 2026-07-19  
+**Status:** Dual-token / Header Auth gates removed (2026-07-21). Create-path remains **disabled**; `_createPausedAllowed=false`. Live mid-phase + Drive write-back present (37 nodes, disabled). Runtime gates: `mode=create_paused` + `approval=true` + `_createPausedAllowed` + Triple IF + budget/ledger/creative. No ledger-only waiver.  
+**Date:** 2026-07-21  
 **Scope:** Image create-paused only.  
 **Related:** [`OPERATION-LEDGER.md`](OPERATION-LEDGER.md), [`../CONFIG-DRIVEN-VS-HARDCODED.md`](../CONFIG-DRIVEN-VS-HARDCODED.md), [`../CREATIVE-ASSET-SPECS.md`](../CREATIVE-ASSET-SPECS.md)
+
+### Write-back destination (Image V1 proof)
+
+- Merge **only** `ads.meta.*` into sandbox Drive file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` (**proof-only** file ID — not long-term production lookup strategy).
+- Write **after** full PAUSED verify only; partial IDs stay in the ledger.
+- Root `status` unchanged.
+
+### Approval / create gates (no Header Auth token)
+
+- Exact operator phrase for Phase 6: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
+- Runtime: `mode=create_paused` AND `approval=true` AND `_createPausedAllowed===true` (Process + Triple Approval Gate IF)
+- Config fields `approvalToken` / `wf4CreatePausedApprovalToken` **removed** (2026-07-21)
+- Header Auth vault is **not** a WF4 runtime dependency (optional unused credential may remain in n8n)
 
 ---
 
@@ -191,34 +204,23 @@ Document-only in Prompt 2 Phase 8; do not execute a second revision in that chat
 
 ---
 
-## Part B — Approval-token design (Phase 3)
+## Part B — Approval gates (Phase 3 design; token compare removed 2026-07-21)
 
-### B1. Secret storage (SSOT)
+### B1. Secret storage
 
 | Item | Decision |
 |------|----------|
-| Store | n8n **Credentials** only — Header Auth named `WF4 Create-Paused Approval Token` |
-| Header name (vault metadata) | `X-WF4-Approval-Token` (not sent to Meta) |
-| Git | **Never** |
-| Proof docs / chat / Respond body | **Never** paste the value |
-| Workflow Config `wf4CreatePausedApprovalToken` | Empty by default; filled **only** for an approved create-paused enablement window (compare source for Process). Clear after. |
+| Meta access token | n8n Credentials only (`Meta Marketing API - Orro`) |
+| Approval Header Auth vault | **Not required** for WF4 runtime (removed 2026-07-21) |
+| Git / proof docs | Never store Meta token values |
 
-Smallest fit for current n8n graph: Process already compares `approvalToken` (run input) to `wf4CreatePausedApprovalToken` (Config). Credential vault remains the operator’s password-manager-backed SSOT; Config is a short-lived mirror for the compare, not the long-term store.
+### B2. Operator enablement (create-paused)
 
-Do **not** commit Config exports that contain the token.
-
-### B2. Operator setup steps
-
-1. n8n → Credentials → Add → **Header Auth**.
-2. Name: `WF4 Create-Paused Approval Token`.
-3. Header: `X-WF4-Approval-Token`; Value: long random secret (password manager).
-4. Save. Leave Workflow Config `wf4CreatePausedApprovalToken` **empty**.
-5. Keep create nodes disabled; keep `_createPausedAllowed === false` until Phase 5/6 approval.
-6. At create enablement only (after Scott’s exact phrase in Phase 5/6):
-   - Paste token into Config `wf4CreatePausedApprovalToken`.
-   - Set run: `mode=create_paused`, `approval=true`, `approvalToken=<same>`.
-   - Flip `_createPausedAllowed` / enable create path per Phase 4/5 procedure.
-7. After successful proof (or abort): clear Config token; disable create path; set `_createPausedAllowed` false again.
+1. Receive exact phrase `APPROVE WF4 IMAGE CREATE-PAUSED V1`.
+2. Keep create nodes disabled until one-run enablement.
+3. Set Config: `mode=create_paused`, `approval=true`.
+4. Flip `_createPausedAllowed=true`; enable create/ledger/Drive write-back for one run.
+5. Execute once; verify PAUSED + zero spend; then re-disable and set `_createPausedAllowed=false`, `mode=dry_run`, `approval=false`.
 
 ### B3. Runtime comparison
 
@@ -226,61 +228,46 @@ Do **not** commit Config exports that contain the token.
 tripleApproved =
   mode === "create_paused"
   && approval === true
-  && approvalToken.length > 0
-  && configToken.length > 0
-  && approvalToken === configToken
 
 createPathOpen = tripleApproved && _createPausedAllowed === true && allOtherGatesPass
 ```
 
-- Compare in Process (or dedicated gate node) **before** any Meta / Drive / ledger **mutation** that is part of create (ledger claim may occur only after gates pass — prefer claim after approval gates to avoid lock spam from unauthorized runs).
+- Evaluate in Process **before** any Meta / Drive mutation.
 - On failure: Respond with structured error; **zero** external writes.
 
 ### B4. Redacted logging
 
 | May log | Must never log |
 |---------|----------------|
-| `tokenPresent` (bool) | Raw `approvalToken` |
-| `configTokenPresent` (bool) | Raw Config token |
-| `tokenMatch` (bool) | Any substring of the secret |
-| `tripleApproved`, `mode`, `approval` | Credential export payloads |
-
-Strip token fields from dry_run / create Respond payloads and from proof markdown.
+| `tripleApproved`, `mode`, `approval`, `_createPausedAllowed` | Meta access token / credential export payloads |
 
 ### B5. Full create-paused gate list (all required)
 
-Any failure → **zero new external writes** (no Meta create/upload; no Drive/app.json write-back; no ledger claim preferred — if a safety audit row is ever added later, it needs explicit Scott approval first).
+Any failure → **zero new external writes**.
 
 1. `mode=create_paused`
 2. `approval=true`
-3. Matching approval token (B3)
-4. `_createPausedAllowed === true` (code hard-gate)
-5. Daily budget ≤ `MAX_DAILY_BUDGET_USD` (fail-closed; never clamp)
-6. Required Meta IDs in Config: ad account, Page, Instagram (when IG in platforms)
-7. Valid HTTPS landing URL
-8. Valid supported **image** creative (resolve + MIME/size checks)
-9. Feed-first placement set encoded (Stories/Reels excluded) — per Phase 1
-10. Successful operation-lock claim (A4)
-11. No conflicting ledger row / fingerprint (A5)
-12. Ledger Data Table reachable
-13. Write-back destination available (Phase 4 must implement package write-back; until then treat missing write-back path as gate fail for “V1 complete,” or document temporary ledger-only with Scott approval)
+3. `_createPausedAllowed === true` (code hard-gate)
+4. Daily budget ≤ `MAX_DAILY_BUDGET_USD` (fail-closed; never clamp)
+5. Required Meta IDs in Config: ad account, Page, Instagram (when IG in platforms)
+6. Valid HTTPS landing URL
+7. Valid supported **image** creative (resolve + MIME/size checks)
+8. Feed-first placement set encoded (Stories/Reels excluded) — per Phase 1
+9. Successful operation-lock claim (A4)
+10. No conflicting ledger row / fingerprint (A5)
+11. Ledger Data Table reachable
+12. Write-back destination available (verified-only Drive merge after full PAUSED)
 
 ### B6. Rotation
 
-1. Generate new secret in password manager.
-2. Update Header Auth credential value.
-3. If Config mirror is set, update it in the same change window.
-4. Old token immediately fails `tokenMatch`.
-5. Record rotation time in operator notes (not the secret).
+N/A for approval tokens (removed). Rotate Meta Graph credential per normal n8n credential hygiene.
 
 ### B7. Rollback (kill create-paused)
 
 1. Set `_createPausedAllowed = false` (redeploy/sync workflow).
-2. Disable create / upload / ledger-write nodes (or keep disabled).
-3. Clear Config `wf4CreatePausedApprovalToken`.
-4. Clear run defaults: `mode=dry_run`, `approval=false`, `approvalToken=""`.
-5. If any Meta object is ACTIVE → pause immediately; stop; incident report.
-6. Optional: rotate token so leaked Config value is useless.
+2. Disable create / upload / ledger-write / Drive write-back nodes.
+3. Clear run defaults: `mode=dry_run`, `approval=false`.
+4. If any Meta object is ACTIVE → pause immediately; stop; incident report.
 
 ---
 
@@ -291,8 +278,8 @@ Any failure → **zero new external writes** (no Meta create/upload; no Drive/ap
 3. Ledger column adds + mid-phase upserts.
 4. Claim/lock + resume (replace partial → manual_review for matching fingerprint).
 5. Orphan reconciliation helper (name + ledger + ads.meta).
-6. Approval redaction + gate ordering.
-7. Negative tests: missing/wrong token, `approval=false`, over-budget, duplicate op, partial resume sim, lock sim.
+6. Approval redaction + gate ordering (mode + approval + hard gate; **no** dual-token).
+7. Negative tests: `approval=false`, over-budget, duplicate op, partial resume sim, lock sim.
 8. Keep dry_run default; PAUSED-only creates; no activation.
 
 ---
@@ -311,3 +298,4 @@ Any failure → **zero new external writes** (no Meta create/upload; no Drive/ap
 | Date | Change |
 |------|--------|
 | 2026-07-19 | Initial combined Phase 2+3 design for Image Create-Paused V1 |
+| 2026-07-21 | Removed Header Auth vault requirement + dual-token runtime compare; gates = mode + approval + hard gate |
