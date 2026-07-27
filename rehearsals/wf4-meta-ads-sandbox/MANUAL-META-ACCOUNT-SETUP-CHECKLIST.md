@@ -44,6 +44,29 @@
 - [x] Developer App + system user; credential in n8n (`Meta Marketing API - Orro`)
 - [x] Scopes include `ads_management`, `ads_read` (+ page/business scopes as configured)
 
+## I. Meta App Live / publish readiness (before Ad / creative create)
+
+These URLs come from the **deployed landing site** (WF2), not from n8n Config secrets.
+
+Human Lab (sandbox) targets after deploy:
+
+| Field | URL |
+|-------|-----|
+| Privacy Policy | `https://human-lab-wf2-sandbox.vercel.app/privacy` |
+| Data Deletion Instructions | `https://human-lab-wf2-sandbox.vercel.app/data-deletion` |
+
+- [ ] Landing `/privacy` and `/data-deletion` are live and publicly reachable
+- [ ] Footer links: Privacy Policy, Data Deletion, Contact (`mailto:` from `identity.contactEmail`)
+- [ ] Canonical package has `identity.contactEmail` (schema-optional; **required for Meta advertising**)
+- [ ] Canonical package has `identity.privacyEffectiveDate` (`YYYY-MM-DD`) when publishing policy pages
+- [ ] Privacy Policy URL pasted into Meta Developer App settings (when moving app to Live / Public)
+- [ ] Data Deletion Instructions URL pasted into Meta Developer App settings if Meta asks for it
+- [ ] Meta Developer App mode is **Live / Public** (not Development / Unpublished)
+
+**Blocker:** WF4 cannot complete creative / Ad creation while the Meta app remains in Development / Unpublished mode (Meta error: ads creative post created by an app in development mode). Do not resume create-paused until Live + URLs are set.
+
+**Drive note:** Local landing `app-config.json` patches are overwritten by the next WF2 run unless the live Google Drive `app.json` is updated with the same `identity` / FAQ / footer fields.
+
 ## F. n8n Workflow Config (non-secret) — sync live after repo update
 
 Add/set on workflow **WF4 - Meta Ads Sandbox** → node **Workflow Config**:

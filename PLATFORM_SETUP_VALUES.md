@@ -122,10 +122,15 @@ Production secrets live in **n8n Credentials**. Local overrides may go in `.env`
 ## WF-Ads readiness checklist
 
 - [ ] WF2 completed — `deployment.landing.url` on Drive
+- [ ] Deployed landing exposes public `/privacy` and `/data-deletion` (from landing-template)
+- [ ] Package has `identity.contactEmail` (**required for Meta advertising** even though schema-optional)
+- [ ] Package has `identity.privacyEffectiveDate` when publishing policy pages
+- [ ] Meta Developer App is Live / Public with Privacy Policy URL (and Data Deletion URL if requested) set from the deployed landing
 - [ ] Meta API credentials in n8n (access token, ad account ID)
 - [ ] Package has complete `ads` section, optional `ads.targeting`, and creative (`ads.media[]` or `media.ogImage`)
 - [ ] Build WF-Ads using [WF-ADS-META-PIPELINE-BLUEPRINT.md](n8n-workflows/WF-ADS-META-PIPELINE-BLUEPRINT.md)
 - [ ] Verify campaign created **paused** in Meta Ads Manager
+- [ ] Note: Ad / creative create fails while the Meta app is still Development / Unpublished
 
 ## WF-Decision readiness checklist
 

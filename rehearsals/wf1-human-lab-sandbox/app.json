@@ -15,7 +15,9 @@
       "habits",
       "quantified-self",
       "science-backed"
-    ]
+    ],
+    "contactEmail": "oliverscott14@gmail.com",
+    "privacyEffectiveDate": "2026-07-26"
   },
   "audience": {
     "landingPhrase": "curious self-improvers who want evidence—not guesswork",
@@ -190,7 +192,7 @@
         "enabled": true,
         "source": "inline",
         "inline": {
-          "body": "© 2026 Human Lab. Privacy · Terms · Contact"
+          "body": "© 2026 Human Lab. All rights reserved."
         }
       }
     ],
@@ -264,7 +266,7 @@
         },
         {
           "question": "Is my data private?",
-          "answer": "Your experiment data is yours. We do not sell personal health data. A full privacy policy will be published before launch."
+          "answer": "Your experiment data is yours. We do not sell personal health data. See our [Privacy Policy](/privacy) for how this validation landing page handles information."
         },
         {
           "question": "What platforms are supported?",

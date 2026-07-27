@@ -279,6 +279,14 @@ const appConfig = {
   appId: pkg.appId,
   appName: pkg.identity?.appName || pkg.appId,
   tagline: pkg.identity?.tagline || '',
+  contactEmail:
+    typeof pkg.identity?.contactEmail === 'string'
+      ? pkg.identity.contactEmail.trim()
+      : '',
+  privacyEffectiveDate:
+    typeof pkg.identity?.privacyEffectiveDate === 'string'
+      ? pkg.identity.privacyEffectiveDate.trim()
+      : '',
   heroHeadline: hero.headline || pkg.identity?.tagline || '',
   heroSubheadline,
   heroBody: hero.body || '',

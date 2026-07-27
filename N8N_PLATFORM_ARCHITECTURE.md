@@ -486,6 +486,8 @@ This section documents **where every important value originates**, who writes it
 | `identity.appName` | Human / AI authoring | Human | Transform → `appName`; tracking payloads; ads fallbacks |
 | `identity.tagline` | Human / AI authoring | Human | Transform → hero fallback; SEO; ads |
 | `identity.badgeText` | Human / AI authoring | Human | Transform → `badgeText` (or platform-based generic fallback) |
+| `identity.contactEmail` | Human / AI authoring | Human | Transform → `contactEmail`; footer mailto; privacy/data-deletion pages. Optional in schema; **required for Meta / WF4 launch readiness** when using Meta ads |
+| `identity.privacyEffectiveDate` | Human / AI authoring | Human | Transform → `privacyEffectiveDate` (`YYYY-MM-DD`); stable policy effective date (not computed at deploy) |
 | `identity.description` | Human / AI authoring | Human | Transform → `solution`; SEO description fallback |
 | `identity.category` | Human | Human | Metadata; not heavily used in landing today |
 | `identity.platform` | Human | Human | Badge fallback logic in transform |
