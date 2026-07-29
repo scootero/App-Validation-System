@@ -1,8 +1,8 @@
 # WF4 Creative Asset Specs (Living)
 
-**Status:** Living SSOT — Image V1 proven inventory + Prompt 3 prep research  
-**Last updated:** 2026-07-20  
-**Prompt 2:** Deep Stories/Reels perfection and video implementation do **not** block Image V1 PAUSED create-paused. Video and richer package media remain Prompt 3 (after Image V1 PASS/PARTIAL and Scott approval).
+**Status:** Living SSOT — Image V1 **PASS**; Track C **PASS**; Track A **A1 approved**; **A2 design drafted** — awaiting Scott A2 approval before A3 code  
+**Last updated:** 2026-07-27  
+**Prompt 2:** Complete (Image V1). **Prompt 3 Track A:** A1 approved; A2 media model design ready for approval; no upload/create code yet.
 
 This is the **only** canonical creative-asset / media-requirements document for WF4. Do not create a competing parallel spec.
 
@@ -62,21 +62,21 @@ Meta-native interactive destinations (Instant Experience, Collection, Playable) 
 
 **Important (unchanged):** Current Meta Feed *recommendations* skew vertical (4:5). Landscape **1.91:1** assets are still usable for Feed but may letterbox/crop differently than 4:5. Image V1 accepts landscape for Feed-first PAUSED proof and validates visually in Phase 7.
 
-### Prompt 3 prep expansion (verified 2026-07-20)
+### Prompt 3 prep expansion (verified 2026-07-20; **re-verified 2026-07-27 for Track A A1**)
 
-| Document | URL | Supporting note | Classification |
-|----------|-----|-----------------|----------------|
-| Awareness Image ad specs on Facebook Feed | https://www.facebook.com/business/ads-guide/update/image | “Ratio: 4:5 … Resolution: 1440 x 1800 … Maximum file size: 30 MB … Minimum width: 600 px” | Official recommendation / technical requirements |
-| Awareness Video ad specs on Facebook Feed | https://www.facebook.com/business/ads-guide/update/video | “MP4, MOV or GIF … Ratio: 4:5 … H.264 … AAC … 128kbps+ … 1440 x 1800 … Duration: 1 second to 241 minutes … Maximum File Size: 4GB” | Official recommendation / technical requirements |
-| Awareness Video ad specs on Instagram Reels | https://www.facebook.com/business/ads-guide/update/video/instagram-reels | “Ratio: 9:16 … 1440 x 2560 … ~14% top / 35% bottom / 6% sides safe zone … Duration: 0 seconds to 15 minutes … Maximum File Size: 4GB” | Official recommendation / technical requirements |
-| Awareness Video Ad Specs on Instagram Stories | https://www.facebook.com/business/ads-guide/update/video/instagram-story | “Ratio: 9:16 … 1440 x 2560 … &lt;16 s plays full; longer may split cards … Maximum File Size: 4GB” | Official recommendation / technical requirements |
-| Specifications for URL dynamic parameters | https://www.facebook.com/business/help/2360940870872492 | Dynamic params include `{{ad.id}}`, `{{adset.id}}`, `{{campaign.id}}`, `{{placement}}`, `{{site_source_name}}`; Traffic objective supported | Official capability |
-| Ad Account Advideos | https://developers.facebook.com/docs/marketing-api/reference/ad-account/advideos/ | Upload via `source` / chunked `upload_phase` (`start`, `transfer`, `finish`, `cancel`) | Official API requirement |
-| Video and Carousel Ads | https://developers.facebook.com/docs/marketing-api/guides/videoads/ | Creative uses `object_story_spec.video_data` with `video_id` + thumbnail `image_url` | Official API requirement |
-| Ad Creative Video Data | https://developers.facebook.com/docs/marketing-api/reference/ad-creative-video-data/ | Fields include `video_id`, `image_url`, `image_hash` | Official API requirement |
-| Collection Ads | https://developers.facebook.com/docs/marketing-api/guides/collection/ | Collection pairs hero with Instant Experience | Official format docs |
-| Playable Ads for Mobile Apps | https://developers.facebook.com/docs/app-ads/formats/playable-ad/ | “Playable ads are only available with the App Installs objective.” | Official requirement (excludes Traffic V1) |
-| Instant Experiences | https://developers.facebook.com/docs/marketing-api/guides/instant-experiences/ | Full-screen in-app post-click destination | Official format docs |
+| Document | URL | Supporting note (2026-07-27 re-check) | Classification |
+|----------|-----|----------------------------------------|----------------|
+| Awareness Video — Facebook Feed | https://www.facebook.com/business/ads-guide/update/video | MP4/MOV/GIF; **4:5** @ **1440×1800**; H.264 + AAC stereo **128kbps+**; duration **1 s–241 min**; max **4 GB**; min **120×120** | Official recommendation / technical requirements |
+| Awareness Video — Instagram Reels | https://www.facebook.com/business/ads-guide/update/video/instagram-reels | MP4/MOV; **9:16** @ **1440×2560**; safe zone ~**14% top / 35% bottom / 6% sides**; duration **0 s–15 min**; max **4 GB**; min width **250** (&lt;30 s) / **500** (≥30 s); sound strongly recommended; no licensed music / face effects / GIF / product tags | Official recommendation / technical requirements |
+| Awareness Video — Instagram Stories | https://www.facebook.com/business/ads-guide/update/video/instagram-story | MP4/MOV/GIF; **9:16** @ **1440×2560**; duration **1 s–60 min**; **&lt;16 s** plays full; longer may split cards; max **4 GB**; min width **250**; aspect tolerance **1%**; same safe-zone family | Official recommendation / technical requirements |
+| Ad Account Advideos | https://developers.facebook.com/docs/marketing-api/reference/ad-account/advideos/ | `POST /act_{ad-account-id}/advideos`; chunked `upload_phase` ∈ `{start, transfer, finish, cancel}` + `upload_session_id` / `start_offset` / `video_file_chunk`; also `source` for non-chunked | Official API requirement (doc updated Feb 24, 2026) |
+| Video and Carousel Ads | https://developers.facebook.com/docs/marketing-api/guides/videoads/ | Creative example uses Graph **`v25.0`**; `object_story_spec.video_data` with `video_id` + `image_url` thumb | Official API requirement |
+| Ad Creative Video Data | https://developers.facebook.com/docs/marketing-api/reference/ad-creative-video-data/ | Thumb via `image_url` (host on own servers — not FB CDN) or `image_hash` | Official API requirement |
+| Video Status | https://developers.facebook.com/docs/graph-api/reference/video-status/ | `video_status`: `ready` \| `processing` \| `error`; `processing_progress` 0–100 | Official API requirement |
+| URL dynamic parameters | https://www.facebook.com/business/help/2360940870872492 | `{{ad.id}}`, `{{adset.id}}`, `{{campaign.id}}`, `{{placement}}`, `{{site_source_name}}`; Traffic supported | Official capability |
+| Collection / Playable / Instant Experience | (prior URLs) | Unchanged — not Video V1 default | Official (out of default path) |
+
+**Sandbox Marketing API version SSOT:** `v25.0` ([`CANONICAL-WF4.md`](CANONICAL-WF4.md)) — matches videoads guide examples as of A1 re-check.
 
 ---
 
@@ -205,11 +205,11 @@ Do not enable Stories/Reels on image ads until a vertical asset exists and Scott
 
 ## Video requirements
 
-**Label: Official Meta (placement guides) + proposed future design for Prompt 3 Track A**
+**Label: Official Meta (re-verified 2026-07-27) + Track A A1 proposed architecture (not implemented)**
 
-Video is **out of Prompt 2 scope**. Reusable Meta video support is required for Prompt 3 “full creative” DoD — **not implemented yet**.
+Reusable Meta video support is required for Prompt 3 Def B — **not implemented yet**. Wait for Scott A1/A2 approval before A3 code.
 
-### Feed video (Facebook Feed Ads Guide)
+### Feed video (Facebook Feed Ads Guide — re-verified 2026-07-27)
 
 | Item | Value | Classification |
 |------|-------|----------------|
@@ -223,8 +223,9 @@ Video is **out of Prompt 2 scope**. Reusable Meta video support is required for 
 | Max file size | **4 GB** | Official requirement |
 | Min width / height | **120 × 120** | Official requirement |
 | Container note | No edit lists or special boxes in file containers | Official recommendation |
+| Primary text / headline | ~50–150 chars / ~27 chars (Feed guide) | Official recommendation |
 
-### Vertical video (Instagram Reels / Stories Ads Guide)
+### Vertical video (IG Reels / IG Stories — re-verified 2026-07-27)
 
 | Item | Instagram Reels | Instagram Stories | Classification |
 |------|-----------------|-------------------|----------------|
@@ -233,50 +234,88 @@ Video is **out of Prompt 2 scope**. Reusable Meta video support is required for 
 | Resolution | **1440 × 2560** | **1440 × 2560** | Official recommendation |
 | Video settings | H.264; square pixels; fixed FPS; progressive; AAC stereo 128 kbps+ | Same family | Official recommendation |
 | Captions | Optional, recommended | Optional, recommended | Official recommendation |
-| Sound | Optional, **strongly** recommended (Reels) | Optional, recommended | Official recommendation |
-| Duration | **0 seconds – 15 minutes** | **1 second – 60 minutes**; &lt;16 s plays full; longer may split into Stories cards | Official requirement / behavior |
+| Sound | Optional, **strongly** recommended | Optional, recommended | Official recommendation |
+| Duration | **0 seconds – 15 minutes** | **1 second – 60 minutes**; **&lt;16 s** plays full; longer may split cards | Official requirement / behavior |
 | Max file size | **4 GB** | **4 GB** | Official requirement |
-| Safe zone | ~**14% top, 35% bottom, 6% each side** free of critical text/logos | Same family | Official recommendation |
+| Min width | **250** (&lt;30 s) / **500** (≥30 s) | **250** | Official requirement |
+| Safe zone | ~**14% top, 35% bottom, 6% each side** | Same family | Official recommendation |
+| Reels exclusions | No licensed music; no face/camera effects; no GIF; no product tags; no pre-2021-10-15 Reels | — | Official recommendation |
 
-Facebook Stories / Facebook Reels follow the same **9:16** vertical family; re-verify the specific Ads Guide page before enabling each placement.
+Facebook Stories / Facebook Reels: treat as same **9:16** vertical family; re-verify the specific Ads Guide page immediately before enabling those placements in create-paused.
 
-### Upload and creative attachment (Marketing API)
+### Upload, processing, and creative attachment (Marketing API — A1 design)
 
 | Item | Guidance | Classification |
 |------|----------|----------------|
+| API version | **`v25.0`** (sandbox SSOT + videoads examples) | Official / current sandbox |
 | Upload edge | `POST /act_{ad-account-id}/advideos` | Official API requirement |
-| Large files | Chunked upload phases: `start`, `transfer`, `finish`, `cancel` | Official API requirement |
-| Processing | Poll until video is usable **before** creating the ad creative | Official behavior + our recommendation |
-| Creative | `object_story_spec.video_data` with `video_id` + thumbnail via `image_url` or `image_hash` | Official API requirement |
+| Host | Prefer **`graph-video.facebook.com`** for video binary upload (Meta upload docs); Graph for status/creative | Official API requirement |
+| Small files | Non-chunked `source` upload acceptable for modest binaries | Official API capability |
+| Large files | Chunked: `upload_phase=start` → `transfer` (offsets + `video_file_chunk`) → `finish` (or `cancel`) | Official API requirement |
+| Processing poll | `GET /{video-id}?fields=status` until `status.video_status === "ready"`; fail on `error`; retry/backoff while `processing` | Official API requirement + our recommendation |
+| Timeout | Proposed default: poll ≤ **10 min** with exponential backoff (5s→30s); then fail closed — no creative create | Our recommendation (needs Scott OK) |
+| Creative | `object_story_spec.video_data`: required `video_id`; thumb via package `image_hash` (preferred) or hosted `image_url` (not FB CDN) | Official API requirement |
+| Gate | **Never** create creative/ad until `video_status=ready` and thumb resolved | Our recommendation / A3 hard rule |
+
+---
+
+## Video V1 placement matrix (A1 proposed architecture)
+
+**Label: Proposed future design — awaiting Scott approval (not enabled)**
+
+| Placement | Video V1 enable? | Required asset | Official ratio / res (rec) | Preview required if enabled |
+|-----------|------------------|----------------|----------------------------|-------------------------------|
+| Facebook desktop Feed | **Yes (V1 target)** | Feed video + feed thumb | 4:5 / 1440×1800 | Yes |
+| Facebook mobile Feed | **Yes (V1 target)** | Same | Same | Yes |
+| Instagram Feed | **Yes (V1 target)** | Same | Feed family (prefer 4:5) | Yes |
+| Facebook Stories | **No until vertical asset** | Vertical video + vertical thumb | 9:16 / 1440×2560 | Yes if enabled |
+| Instagram Stories | **No until vertical asset** | Same | 9:16 / 1440×2560; prefer **&lt;16 s** | Yes if enabled |
+| Facebook Reels / Ads on FB Reels | **No until vertical asset** | Same | 9:16 family | Yes if enabled |
+| Instagram Reels | **No until vertical asset** | Same | 9:16 / 1440×2560; sound-on | Yes if enabled |
+| Other (Marketplace, Explore, AN, …) | **No** | — | — | N/A |
+
+**Proposed Video V1 create-paused proof (A7):** Feed-only positions (mirror Image V1) — one PAUSED video ad using `ad-hero-feed.mp4` + `ad-thumb-feed.png`. Stories/Reels stay disabled until Scott supplies/approves vertical binaries and explicitly expands placements.
+
+**Proposed full Def B (before A9):** Feed variant **and** vertical variant + matching thumbs; then enable Stories/Reels positions and preview them (A8).
+
+**Practical export targets (our recommendation — under official maxima):**
+
+| Variant | Export | Duration | Size target |
+|---------|--------|----------|-------------|
+| Feed | **1080×1350 (4:5)** MP4 H.264 + AAC ≥128 kbps; captions burned or sidecar policy TBD | **15–30 s** | Prefer **&lt;100 MB** (chunk if larger) |
+| Vertical | **1080×1920 (9:16)**; safe-zone aware; sound-on + captions | **15–30 s** (Stories prefer **&lt;16 s** for single-card) | Prefer **&lt;100 MB** |
+| Thumbs | PNG/JPG matching aspect; readable under chrome | n/a | Under image 30 MB |
+
+Critical message visible in first **3 s**; readable with sound off; CTA visible near end.
 
 ---
 
 ## Feed versus vertical video variants
 
-**Label: Proposed future design**
+**Label: Proposed future design (A1)**
 
-Do **not** assume one video file is ideal for every placement.
+Do **not** assume one video file is ideal for every placement. Package **separate** Feed and vertical binaries with eligibility flags.
 
-| Variant | Typical use | Practical export (our recommendation; re-verify) |
-|---------|-------------|--------------------------------------------------|
-| Feed video | FB/IG Feed | ~**1080×1350 (4:5)** or square; **15–30 s** sweet spot; MP4 H.264 + AAC; prefer **&lt;500 MB** even though max is 4 GB |
-| Vertical video | Stories / Reels | **1080×1920 (9:16)**; **15–30 s** preferred; respect safe zones; sound-on + captions |
-| Full Feed + Stories/Reels coverage | Both variants + matching posters | Separate binaries; placement eligibility flags; optional image fallback |
+| Variant | Typical use | Practical export (our recommendation) |
+|---------|-------------|----------------------------------------|
+| Feed video | FB/IG Feed | **1080×1350 (4:5)**; 15–30 s; MP4 H.264 + AAC; prefer **&lt;100 MB** |
+| Vertical video | Stories / Reels | **1080×1920 (9:16)**; 15–30 s (&lt;16 s preferred for Stories); safe zones; sound-on + captions |
+| Full coverage | Both + matching posters | Separate binaries; optional image fallback |
 
-Whether Prompt 3 uses one multi-placement ad with asset customization vs separate creative revisions is an **open Scott decision**.
+**A1 proposed decision (default unless Scott overrides):** separate creative revisions / placement eligibility — **not** Advantage+ asset customization in Video V1. One operation fingerprint per selected variant set (`video-feed-v1`, later `video-vertical-v1` or combined when both enabled).
 
 ---
 
 ## Thumbnails / posters
 
-**Label: Official API capability + proposed future design**
+**Label: Official API capability + A1 proposed policy**
 
 | Item | Guidance | Classification |
 |------|----------|----------------|
-| API | Attach poster with `video_data.image_url` or `image_hash` | Official API requirement for custom thumb |
-| Package | Prefer an explicit package poster per video variant | Our recommendation / proposed design |
-| Auto-thumb | Meta may generate thumbnails; relying on auto-thumb only is an open policy decision | Proposed future design (needs Scott approval) |
-| Framing | Poster should match video aspect and remain readable under Feed chrome | Our recommendation |
+| API | Attach poster with `video_data.image_hash` (preferred) or `image_url` (own host, not FB CDN) | Official API requirement for custom thumb |
+| Package | **Required** explicit package poster per video variant for Video V1 | Our recommendation / proposed design |
+| Auto-thumb | Meta may generate thumbs — **reject for Video V1** (fail if thumb missing/invalid) | Proposed policy (needs Scott OK) |
+| Framing | Poster matches video aspect; readable under Feed/Stories chrome | Our recommendation |
 
 ---
 
@@ -344,7 +383,7 @@ Scott supplies or approves real binaries. Do not invent fake final creative.
 
 ## Backward-compatible future `ads.media[]` considerations
 
-**Label: Proposed future design — NOT implemented**
+**Label: A2 proposed design (A1 defaults Scott-approved 2026-07-27) — NOT implemented in schema/code yet**
 
 ### Current schema (do not treat as video-ready)
 
@@ -352,31 +391,159 @@ Today `mediaAsset` supports `url` | `githubPath` | `path`, optional dimensions/a
 
 Selection priority remains: `ads.media[]` → `media.ogImage` → fail.
 
-### Additive model (illustrative only — requires Scott + schema approval)
+### A2 additive model (design freeze candidate)
+
+New fields are **additive** and optional for existing image packages. Human Lab is **not** hardcoded — any app package can use the same shape.
+
+| Field | Required when | Notes |
+|-------|---------------|-------|
+| `githubPath` / `url` / `path` | Always (one of) | Existing |
+| `type` | Recommended for new assets | `image` \| `video` — authoritative when set |
+| `role` | Optional | `primary` \| `carousel` \| `video` \| `thumbnail` \| `fallback` — legacy `role: video` alone is **not** enough |
+| `mimeType` | Video V1 | e.g. `video/mp4`, `image/png` |
+| `width` / `height` | Recommended | Validated against placement matrix |
+| `durationSeconds` | Video | Validated vs placement limits |
+| `placementRoles` | Recommended | e.g. `facebook_feed`, `instagram_stream`, `facebook_stories`, `instagram_stories`, `facebook_reels`, `instagram_reels` |
+| `eligibility` | Optional shorthand | `{ feed, stories, reels }` booleans |
+| `thumbnailRef` | **Required for video** (A1 policy) | Path/ref to a separate **image** asset in `ads.media[]` or same-repo path |
+| `fallbackRef` | Optional | Image used if video path fails / policy allows |
+| `creativeRevision` | Operation ledger | e.g. `image-v1`, `video-feed-v1` — usually on `ads` / operation key, not every media row |
+| `branch` / repo | Via `source.*` | Existing package source fields |
+
+**Compatibility rules (A2):**
+
+1. `{ "githubPath": "media/og-image.png", "role": "primary" }` remains valid → infer `type: "image"`.
+2. When present, `type` wins over `role: "video"`.
+3. Thumbnails are separate image entries (or path refs); Video V1 **rejects** missing/invalid thumb.
+4. Fingerprints: image ops keep current image-hash fingerprint; video ops add **video binary hash + thumb hash**.
+5. Image `image-v1` and video `video-feed-v1` are **different** operation keys — no collision with existing PAUSED image ads.
+
+### A2 examples (illustrative — not live fixtures yet)
+
+**1. One image (today’s Image V1 — still valid)**
 
 ```json
 {
-  "githubPath": "media/ad-hero-feed.mp4",
-  "type": "video",
-  "role": "primary",
-  "placementRoles": ["facebook_feed", "instagram_stream"],
-  "mimeType": "video/mp4",
-  "width": 1080,
-  "height": 1350,
-  "durationSeconds": 20,
-  "thumbnailRef": "media/ad-thumb-feed.png",
-  "fallbackRef": "media/og-image.png",
-  "eligibility": { "feed": true, "stories": false, "reels": false }
+  "githubPath": "media/og-image.png",
+  "role": "primary"
 }
 ```
 
-**Compatibility rules (proposed):**
+**2. One feed video + thumbnail**
 
-- Existing `{ "githubPath": "media/og-image.png", "role": "primary" }` remains valid → infer `type: "image"`.
-- When present, `type` is authoritative over `role: "video"`.
-- Thumbnails are separate image assets linked by reference fields.
-- Creative revision strings (e.g. `image-v1`, later `video-feed-v1`) continue to gate new Meta object sets.
-- Fingerprints for video ops must include **video binary hash + thumbnail hash** without breaking existing `image-v1` image-only fingerprints.
+```json
+[
+  {
+    "githubPath": "media/ad-hero-feed.mp4",
+    "type": "video",
+    "role": "primary",
+    "mimeType": "video/mp4",
+    "width": 1080,
+    "height": 1350,
+    "durationSeconds": 20,
+    "placementRoles": ["facebook_feed", "instagram_stream"],
+    "eligibility": { "feed": true, "stories": false, "reels": false },
+    "thumbnailRef": "media/ad-thumb-feed.png"
+  },
+  {
+    "githubPath": "media/ad-thumb-feed.png",
+    "type": "image",
+    "role": "thumbnail",
+    "mimeType": "image/png",
+    "width": 1080,
+    "height": 1350
+  }
+]
+```
+
+**3. One vertical video + thumbnail**
+
+```json
+[
+  {
+    "githubPath": "media/ad-hero-vertical.mp4",
+    "type": "video",
+    "role": "primary",
+    "mimeType": "video/mp4",
+    "width": 1080,
+    "height": 1920,
+    "durationSeconds": 15,
+    "placementRoles": ["facebook_stories", "instagram_stories", "facebook_reels", "instagram_reels"],
+    "eligibility": { "feed": false, "stories": true, "reels": true },
+    "thumbnailRef": "media/ad-thumb-vertical.png"
+  },
+  {
+    "githubPath": "media/ad-thumb-vertical.png",
+    "type": "image",
+    "role": "thumbnail",
+    "mimeType": "image/png",
+    "width": 1080,
+    "height": 1920
+  }
+]
+```
+
+**4. Feed + vertical variants (full Def B package)**
+
+```json
+[
+  {
+    "githubPath": "media/ad-hero-feed.mp4",
+    "type": "video",
+    "role": "primary",
+    "mimeType": "video/mp4",
+    "placementRoles": ["facebook_feed", "instagram_stream"],
+    "eligibility": { "feed": true, "stories": false, "reels": false },
+    "thumbnailRef": "media/ad-thumb-feed.png"
+  },
+  {
+    "githubPath": "media/ad-thumb-feed.png",
+    "type": "image",
+    "role": "thumbnail"
+  },
+  {
+    "githubPath": "media/ad-hero-vertical.mp4",
+    "type": "video",
+    "role": "primary",
+    "mimeType": "video/mp4",
+    "placementRoles": ["facebook_stories", "instagram_stories", "facebook_reels", "instagram_reels"],
+    "eligibility": { "feed": false, "stories": true, "reels": true },
+    "thumbnailRef": "media/ad-thumb-vertical.png"
+  },
+  {
+    "githubPath": "media/ad-thumb-vertical.png",
+    "type": "image",
+    "role": "thumbnail"
+  }
+]
+```
+
+WF4 selects which variant(s) via operation revision / config (Video V1 create = feed variant only).
+
+**5. Image fallback + video**
+
+```json
+[
+  {
+    "githubPath": "media/ad-hero-feed.mp4",
+    "type": "video",
+    "role": "primary",
+    "thumbnailRef": "media/ad-thumb-feed.png",
+    "fallbackRef": "media/og-image.png",
+    "eligibility": { "feed": true, "stories": false, "reels": false }
+  },
+  { "githubPath": "media/ad-thumb-feed.png", "type": "image", "role": "thumbnail" },
+  { "githubPath": "media/og-image.png", "type": "image", "role": "fallback" }
+]
+```
+
+Video V1 still requires a valid video+thumb; fallback is for later recovery/policy — not a substitute for missing video on the video create path.
+
+### A2 open items before code
+
+- Confirm field names above (or prefer shorter aliases).
+- Sandbox fixture may use additive fields in rehearsal only until Spec 1.5.0 coordinated pass (Track D) updates production schema.
+- No workflow/adapter code until Scott says **approve A2**.
 
 These fields are **not** in production schema until Prompt 3 Track A2/D is approved and implemented.
 
@@ -402,14 +569,15 @@ Meta supports static and dynamic URL parameters such as `ad_id={{ad.id}}`, `camp
 
 | Concern | Current state | Classification |
 |---------|---------------|----------------|
-| Sandbox landing persists `utm_*` + `fbclid` | Yes (sandbox landing session helpers) | Current / proven (sandbox) |
-| Production `landing-template` attribution/`eventId` parity | Backlog — not assumed done | Open gap |
-| WF3 Sheet columns for `metaCampaignId`, `metaAdSetId`, `metaAdId`, `placement` | Reserved; values blank until populated | Current schema readiness; **not** live join |
-| WF2 capture of `campaign_id` / `ad_id` / `placement` query keys | Not in sandbox attribution capture today | **Open Track C gap** |
-| WF4 emission of Meta dynamic URL parameters | Not implemented | **Open Track C / Track B gap** |
-| Paid-click-to-event end-to-end proof | Not claimed complete by this document | **Open** |
+| Sandbox landing persists `utm_*` + `fbclid` | Yes — browser E2E proven 2026-07-27 (Track C) | Current / proven (sandbox) |
+| Production `landing-template` attribution/`eventId` parity | Backlog — not assumed done | Open gap (Spec pass) |
+| WF3 Sheet columns for `metaCampaignId`, `metaAdSetId`, `metaAdId`, `placement` | Reserved; values still blank on live rows | Schema ready; join **not** live |
+| WF2 capture of Meta dynamic URL keys | Not in sandbox attribution capture today | Open (Track B / Decision) |
+| WF4 emission of Meta dynamic URL parameters | Not implemented | Open (Track B; design in TRACK-C-PROOF) |
+| Paid-click-to-event (UTM/`fbclid`) | Proven 2026-07-27 (Track C) | Current / proven |
+| Paid-click Meta ID columns | Still blank | Open design → implement later |
 
-Do **not** present attribution joins or Track C work as finished. Image V1 create-paused does not require closing these gaps.
+Track C measurement loop is **PASS**. Meta ID column population remains a later join/implement item.
 
 ---
 
@@ -428,14 +596,34 @@ Do **not** present attribution joins or Track C work as finished. Image V1 creat
 
 ---
 
-## Prompt 2 scope and smallest next creative steps
+## Prompt 2 / Prompt 3 next steps
 
-**Prompt 2 scope is unchanged:** Image V1 create-paused, Feed-first, no video schema/upload implementation in Prompt 2.
+**Prompt 2:** Complete — Image V1 PASS.
 
-1. Complete remaining Prompt 2 create-path / write-back / ledger / approval gates as already planned.
-2. After one PAUSED image ad: Phase 7 Feed previews (may be PARTIAL with Stories/Reels disabled).
-3. Optionally align fixture `media.ogImage` width/height to **1734×907** (narrow docs/fixture fix — ask Scott).
-4. **After** Image V1 PASS/PARTIAL and Scott track selection: expand implementation via Prompt 3 (Track C if attribution P0, else Track A video) using this document as the media SSOT — re-verify Meta sources first.
+**Prompt 3 Track A — current:**
+
+1. ~~Scott approves A1 defaults~~ **Done** 2026-07-27.
+2. **A2 design drafted** — Scott approves media model before A3 code.
+3. A3+: implement resolver/upload/poll/creative **disabled** until dry_run proofs; Already Complete IF before any create re-enable.
+4. A6: Scott supplies `ad-hero-feed.mp4` (+ thumb); vertical optional until Stories/Reels expansion.
+5. A7: exact phrase `APPROVE WF4 VIDEO CREATE-PAUSED V1` only — Feed-first PAUSED video ad.
+6. No auto-activate; Image V1 objects remain PAUSED / untouched unless deliberate new revision.
+
+---
+
+## A1 decisions (approved)
+
+| # | Default | Status |
+|---|---------|--------|
+| 1 | Video V1 create proof = Feed-only | **Approved** 2026-07-27 |
+| 2 | Required package thumbnail | **Approved** 2026-07-27 |
+| 3 | Separate Feed vs vertical binaries | **Approved** 2026-07-27 |
+| 4 | `source` if &lt;100 MB else chunked; poll `ready` | **Approved** 2026-07-27 |
+| 5 | Poll timeout 10 min fail-closed | **Approved** 2026-07-27 |
+| 6 | Paths `ad-hero-feed.mp4` + `ad-thumb-feed.png` | **Approved** 2026-07-27 |
+| 7 | Revision `video-feed-v1` | **Approved** 2026-07-27 |
+
+**STOP for A2:** reply **approve A2** (or field-name overrides) before any adapter/workflow implementation.
 
 ---
 
@@ -445,4 +633,7 @@ Do **not** present attribution joins or Track C work as finished. Image V1 creat
 |------|--------|
 | 2026-07-19 | Initial living stub: measured og-image, Feed-first policy, Stories/Reels out of V1, official Ads Guide provenance |
 | 2026-07-20 | Feed positions confirmed implemented in adapter; fixture dims aligned to 1734×907 |
-| 2026-07-20 | Expanded to living SSOT from Prompt 3 prep research: reading labels, re-verification, default click architecture, image/video matrices, bundles, canonical filenames, proposed `ads.media[]` (not implemented), attribution expectations/gaps, interactive-format stance, expanded official source list. Image V1 proven inventory preserved. No code/schema changes. |
+| 2026-07-20 | Expanded to living SSOT from Prompt 3 prep research |
+| 2026-07-27 | Image V1 PASS notes; Track C attribution status updated |
+| 2026-07-27 | **Track A A1:** Official video re-verify + Video V1 matrix/upload design |
+| 2026-07-27 | **A1 approved**; **A2** additive `ads.media[]` model + 5 examples (design only) |

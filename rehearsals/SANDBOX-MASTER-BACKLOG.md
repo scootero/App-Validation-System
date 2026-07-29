@@ -55,8 +55,8 @@ NODE_FLOW: "Webhook → Config → Validate Auth → Validate Payload → Map To
 | BL-002 | P0 | WF3-PROOF | `rehearsals/wf3-human-lab-sandbox/scripts/wf3-rehearse.js` | ~~Local payload and Sheet-row validation needed.~~ **Done** — `wf3-rehearse.js` passes. | BL-001 | No (local) | Code update |
 | BL-003 | P0 | EXTERNAL-SETUP | Sandbox Google Sheet | ~~WF3 external proof requires sandbox Sheet.~~ **Done** — Sheet `1KWB1EL79vwZ6YUiolXDoCXWb2bWw5fiZp1fGPNC7px0`, 33 cols, SA Editor. | Google SA Editor access | No (sandbox proven) | Manual setup |
 | BL-004 | P0 | N8N-BUILD | Future `n8n-workflows/WF3-tracking.json` | ~~No executable n8n receiver.~~ **Sandbox done** — live `7G2fJmqKsr8CGVID`; export in `rehearsals/wf3-human-lab-sandbox/n8n/`. Production export still pending Spec 1.5.0. | BL-003 | No for sandbox; Yes for prod export | Workflow blueprint/update |
-| BL-005 | P0 | N8N-BUILD | WF0 sandbox provisioning workflow | Sandbox `tracking.webhookUrl` is currently null; WF3 browser E2E depends on a provisioned webhook. | n8n webhook path decision | Yes | Workflow blueprint/update |
-| BL-006 | P0 | WF3-PROOF | WF2 sandbox landing config/deploy | Browser E2E requires `tracking.webhookUrl` embedded in `app-config.json`. | BL-005, WF2 re-transform/redeploy approval | Yes | Implementation task |
+| BL-005 | P0 | N8N-BUILD | WF0 sandbox provisioning workflow | ~~Sandbox `tracking.webhookUrl` null.~~ **Done** — WF0 exec 27 wrote shared `…/app-validation/events`; live landing still embeds it (Prompt 3 Track C 2026-07-27). Local fixtures synced. | n8n webhook path decision | No (sandbox proven) | Workflow blueprint/update |
+| BL-006 | P0 | WF3-PROOF | WF2 sandbox landing config/deploy | ~~Browser E2E needs embed.~~ **Done** — GH + live `app-config` embed shared webhook; browser `page_view` → Sheet proven (WF3 execs 81–91). | BL-005 | No (sandbox proven) | Implementation task |
 | BL-007 | P0 | SHARED-LIB | n8n shared validation/map snippets | WF3 row mapping must stay in lockstep with landing `TrackingPayload`. | BL-002 | Yes | Reusable component |
 | BL-008 | P1 | DOC-SYNC | `n8n-workflows/WF3-N8N-AI-PROMPT.md` | WF1/WF2 have n8n AI prompts; WF3 does not. | BL-004 design | No | n8n prompt update |
 | BL-009 | P1 | DOC-SYNC | `PLATFORM_SETUP_VALUES.md` | Sync proven values: `scottyo` base URL, credential label `Google Service Account account`, Sheet ID, webhook URL, WF3 proof status. | BL-003, BL-004 | No | Documentation update |
@@ -206,7 +206,7 @@ Do not return access tokens or secrets in files.
 
 - ~~Create sandbox Google Sheet…~~ **Done** — Sheet ID above; 33 headers; SA Editor.
 - ~~Build WF3 n8n workflow…~~ **Done** — ID `7G2fJmqKsr8CGVID`; live curls passed.
-- Remaining for browser E2E: BL-005 / BL-006 (WF0 provision `tracking.webhookUrl` + WF2 re-embed).
+- ~~Remaining for browser E2E: BL-005 / BL-006…~~ **Done 2026-07-27** — Prompt 3 Track C (`TRACK-C-PROOF.md`); live browser → Sheet.
 - Inspect Meta account/Page/ad account ownership read-only for WF4; do not create ads.
 
 ## Reusable Components Registry
@@ -227,12 +227,12 @@ Do not return access tokens or secrets in files.
 
 ## Production Readiness Checklist
 
-- [ ] WF0 webhook provisioning proven in sandbox.
-- [ ] WF1/WF2 canonical sandbox behavior preserved.
+- [x] WF0 webhook provisioning proven in sandbox.
+- [x] WF1/WF2 canonical sandbox behavior preserved.
 - [x] WF3 local rehearsal passes (contract frozen).
 - [x] WF3 sandbox external curl rehearsal passes for all four events (runs 1–2).
 - [x] Google Sheet append uses canonical **33-column** order (Append success + map Code).
-- [ ] Browser E2E with provisioned `tracking.webhookUrl` (BL-005/006).
+- [x] Browser E2E with provisioned `tracking.webhookUrl` (BL-005/006) — Prompt 3 Track C 2026-07-27.
 - [x] WF4 V1 dry-run revised ($1/day fixture, $10 cap, broad targeting) — local + n8n execution 35.
 - [x] WF4 Prompt A VERIFY_* resolution reconciled (`notes/meta-research-prompt-a-results.md`).
 - [x] WF4 architecture revision design pass (adapter SSOT + fixtures + rehearse PASS).
@@ -242,3 +242,4 @@ Do not return access tokens or secrets in files.
 - [x] No secrets committed or stored in `app.json`.
 - [ ] Final Spec 1.5.0 coordinated update applied (BL-031–BL-038).
 - [x] Shared component / config-driven recommendations captured (`CONFIG-DRIVEN-VS-HARDCODED.md`).
+- [x] WF4 Image V1 create-paused PASS (Prompt 2 — execs 74/94/95/96).

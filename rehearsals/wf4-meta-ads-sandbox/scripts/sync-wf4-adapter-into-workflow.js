@@ -30,12 +30,15 @@ const processBody =
   "if (!creativeSha256) {\n" +
   "  throw new Error('CREATIVE_SHA256_REQUIRED: set WF4_CREATIVE_SHA256 in Workflow Config (sandbox planning hash)');\n" +
   "}\n" +
+  "const thumbnailSha256 = input.WF4_THUMBNAIL_SHA256 || input.thumbnailSha256 || null;\n" +
   "const result = WF4MetaAdapter.buildDryRunBundle(app, {\n" +
   "  mode: mode,\n" +
   "  provider: input.provider || 'meta',\n" +
   "  environment: input.environment || 'sandbox',\n" +
   "  workflowVersion: input.workflowVersion || 'wf4-image-v1',\n" +
   "  creativeSha256: creativeSha256,\n" +
+  "  thumbnailSha256: thumbnailSha256,\n" +
+  "  creativeRevision: input.creativeRevision || null,\n" +
   "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n" +
   "  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n" +
   "  wf3GateStatus: input.wf3GateStatus || 'proven',\n" +

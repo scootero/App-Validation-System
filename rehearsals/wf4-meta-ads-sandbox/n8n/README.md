@@ -29,6 +29,22 @@ Generic nodes (bundle expressions only; no hardcoded repo/filename):
 4. Upload Ad Image (multipart binary → Meta `adimages`)  
 5. Merge Image Hash (fail closed without hash)
 
+Safety (2026-07-28, still disabled until approval):
+
+- **Already Complete Gate** → Respond Already Complete (zero Meta POSTs)
+- **Needs Campaign/AdSet Create** → skip POST when ID already on ledger
+- **Verify PAUSED Statuses** + **Assert PAUSED** before ledger verified / Drive write-back
+- **`ads.meta.variants[creativeRevision]`** SSOT; flat fields mirror `currentVariant`; migrate-on-write-back for legacy flat IDs
+
+## Manual operator steps (after this repo change)
+
+1. Import [`WF4-meta-ads-sandbox.import-ready.json`](WF4-meta-ads-sandbox.import-ready.json) into live workflow `YIc53GBq4upelYp6` (replace existing). Re-bind **Meta Marketing API - Orro** and Google SA credentials if the import drops them.
+2. Keep workflow **inactive**. Keep all create / ledger / Drive write-back nodes **disabled**. Keep `_createPausedAllowed` false / Process hard-gate false.
+3. Optional: Manual Execute with defaults (`mode=dry_run`, `approval=false`) → expect Respond Dry Run, `metaHttpCalls: 0`, no Drive write.
+4. Add video assets when ready: `media/ad-hero-feed.mp4` + `media/ad-thumb-feed.png` in `scootero/Human-Lab-WF1-Sandbox` (and local `rehearsals/github/Human-Lab-WF1-Sandbox/media/`).
+5. Do **not** enable create-paused until phrase `APPROVE WF4 VIDEO CREATE-PAUSED V1`. First successful video write-back auto-migrates Drive flat image IDs into `variants.image-v1` and adds `variants.video-feed-v1`. No manual Drive edit unless migrate fails closed.
+6. Leave existing Meta image campaigns (and orphan `120250622864710199`) **PAUSED**.
+
 ## Dry-Run Test
 
 1. Keep workflow **inactive**.

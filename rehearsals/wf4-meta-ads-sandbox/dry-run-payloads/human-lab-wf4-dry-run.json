@@ -52,10 +52,12 @@
   },
   "source": {
     "landingUrl": "https://human-lab-wf2-sandbox.vercel.app",
+    "mediaType": "image",
     "creative": {
       "kind": "githubPath",
       "value": "media/og-image.png",
       "role": "primary",
+      "type": "image",
       "resolvedFrom": "ads.media",
       "repo": "scootero/Human-Lab-WF1-Sandbox",
       "branch": "main",
@@ -65,8 +67,10 @@
       "filename": "og-image.png",
       "expectedMime": "image/png",
       "expectedMimeFamily": "image",
-      "resolutionMethod": "github_raw"
-    }
+      "resolutionMethod": "github_raw",
+      "thumbnailRef": null
+    },
+    "thumbnail": null
   },
   "computed": {
     "destinationUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
@@ -134,19 +138,6 @@
         "page_id": "1237104852815793"
       }
     },
-    "imageUpload": {
-      "endpoint": "POST /act_979257825150251/adimages",
-      "source": "ads.media githubPath or media.ogImage",
-      "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
-      "resolutionMethod": "github_raw",
-      "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
-      "filename": "og-image.png",
-      "repo": "scootero/Human-Lab-WF1-Sandbox",
-      "branch": "main",
-      "githubPath": "media/og-image.png",
-      "expectedMime": "image/png",
-      "expectedMimeFamily": "image"
-    },
     "creative": {
       "name": "human-lab-validation-creative-a",
       "object_story_spec": {
@@ -173,6 +164,19 @@
       "creative": {
         "creative_id": "CREATIVE_ID_FROM_CREATE_CREATIVE"
       }
+    },
+    "imageUpload": {
+      "endpoint": "POST /act_979257825150251/adimages",
+      "source": "ads.media githubPath or media.ogImage",
+      "image_hash": "VERIFY_AFTER_IMAGE_UPLOAD",
+      "resolutionMethod": "github_raw",
+      "downloadUrl": "https://raw.githubusercontent.com/scootero/Human-Lab-WF1-Sandbox/main/media/og-image.png",
+      "filename": "og-image.png",
+      "repo": "scootero/Human-Lab-WF1-Sandbox",
+      "branch": "main",
+      "githubPath": "media/og-image.png",
+      "expectedMime": "image/png",
+      "expectedMimeFamily": "image"
     }
   },
   "ledgerPlan": {
@@ -182,8 +186,10 @@
     "provider": "meta",
     "environment": "sandbox",
     "creativeRevision": "image-v1",
+    "mediaType": "image",
     "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
     "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+    "thumbnailSha256": null,
     "placementSet": "facebook:feed|instagram:stream",
     "phase": "planned",
     "campaignId": null,
@@ -202,6 +208,8 @@
     "operationKey": "human-lab-wf1-sandbox|sandbox|meta|image-v1",
     "contentFingerprint": "114e6616448920563bb41301292dfbddb1c48d32e2ab87df0a9e290b10881f6d",
     "creativeSha256": "ae73b936b39bb5d86c357c9bb2aab8d10b5b017f09d17e43a908ac49ce7e055d",
+    "thumbnailSha256": null,
+    "mediaType": "image",
     "creativeRevision": "image-v1",
     "environment": "sandbox",
     "placementSet": "facebook:feed|instagram:stream",
@@ -211,6 +219,8 @@
     "ads": {
       "meta": {
         "status": "created_paused",
+        "currentVariant": "image-v1",
+        "creativeRevision": "image-v1",
         "campaignId": "<campaign-id>",
         "adSetId": "<ad-set-id>",
         "creativeId": "<creative-id>",
@@ -218,12 +228,26 @@
         "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
         "dailyBudget": 1,
         "createdAt": "<iso8601>",
-        "lastSyncedAt": null
+        "lastSyncedAt": null,
+        "variants": {
+          "image-v1": {
+            "status": "created_paused",
+            "campaignId": "<campaign-id>",
+            "adSetId": "<ad-set-id>",
+            "creativeId": "<creative-id>",
+            "adId": "<ad-id>",
+            "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+            "dailyBudget": 1,
+            "createdAt": "<iso8601>",
+            "lastSyncedAt": null,
+            "mediaType": "image"
+          }
+        }
       }
     },
     "rootStatusUnchanged": true,
     "rootStatusNote": "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
-    "writeBackTiming": "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger"
+    "writeBackTiming": "verified_complete_only: merge ads.meta.variants[revision] + mirror flat currentVariant after PAUSED verify; never delete other variant keys"
   },
   "safety": {
     "externalWritePerformed": false,

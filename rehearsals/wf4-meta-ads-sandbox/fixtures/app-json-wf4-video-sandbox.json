@@ -41,15 +41,37 @@
       "adSetId": null,
       "creativeId": null,
       "adId": null,
-      "creativeRevision": "image-v1",
+      "creativeRevision": "video-feed-v1",
       "currentVariant": null,
       "variants": {}
     },
     "media": [
       {
-        "githubPath": "media/og-image.png",
-        "alt": "Human Lab \u2014 Stop guessing. Start testing.",
-        "role": "primary"
+        "githubPath": "media/ad-hero-feed.mp4",
+        "type": "video",
+        "role": "primary",
+        "mimeType": "video/mp4",
+        "width": 1080,
+        "height": 1350,
+        "durationSeconds": 20,
+        "placementRoles": [
+          "facebook_feed",
+          "instagram_stream"
+        ],
+        "eligibility": {
+          "feed": true,
+          "stories": false,
+          "reels": false
+        },
+        "thumbnailRef": "media/ad-thumb-feed.png"
+      },
+      {
+        "githubPath": "media/ad-thumb-feed.png",
+        "type": "image",
+        "role": "thumbnail",
+        "mimeType": "image/png",
+        "width": 1080,
+        "height": 1350
       }
     ]
   },

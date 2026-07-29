@@ -1,14 +1,17 @@
 # WF4 Create-Paused V1 Contract (Phases 2+3 Design)
 
-**Status:** Dual-token / Header Auth gates removed (2026-07-21). Create-path remains **disabled**; `_createPausedAllowed=false`. Live mid-phase + Drive write-back present (37 nodes, disabled). Runtime gates: `mode=create_paused` + `approval=true` + `_createPausedAllowed` + Triple IF + budget/ledger/creative. No ledger-only waiver.  
-**Date:** 2026-07-21  
+**Status:** Image V1 create-paused **PASS** (2026-07-27). One PAUSED ad exists; Drive `ads.meta` written; ledger `phase=writeback_done` / `outcome=already_complete`. Create-path remains **disabled**; `_createPausedAllowed=false`; WF4 inactive. Runtime gates: `mode=create_paused` + `approval=true` + `_createPausedAllowed` + Triple IF + budget/ledger/creative.
+
+**Variants (2026-07-28):** `ads.meta.variants[creativeRevision]` is SSOT for Meta IDs. Flat ID fields mirror `currentVariant`. New revision → new PAUSED Campaign/Ad Set (no reuse). Migrate-on-write-back seeds legacy flat IDs into `variants` (known image-v1 proof IDs → `image-v1`).
+**Date:** 2026-07-27  
 **Scope:** Image create-paused only.  
 **Related:** [`OPERATION-LEDGER.md`](OPERATION-LEDGER.md), [`../CONFIG-DRIVEN-VS-HARDCODED.md`](../CONFIG-DRIVEN-VS-HARDCODED.md), [`../CREATIVE-ASSET-SPECS.md`](../CREATIVE-ASSET-SPECS.md)
 
 ### Write-back destination (Image V1 proof)
 
-- Merge **only** `ads.meta.*` into sandbox Drive file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` (**proof-only** file ID — not long-term production lookup strategy).
-- Write **after** full PAUSED verify only; partial IDs stay in the ledger.
+- Merge **`ads.meta.variants[creativeRevision]`** plus flat mirror of `currentVariant` into sandbox Drive file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` (**proof-only** file ID — not long-term production lookup strategy).
+- Write **after** full PAUSED verify only; partial IDs stay in the ledger. Prior variant keys are never deleted.
+- On write-back, legacy flat-only IDs are migrated into `variants` in-memory (known Image V1 proof → `image-v1`) before merging the new revision.
 - Root `status` unchanged.
 
 ### Approval / create gates (no Header Auth token)
@@ -188,19 +191,21 @@ To create a **new** Image ad intentionally:
 2. Set `ads.meta.creativeRevision` to a **new** string.
 3. Obtain fresh create-paused approval (Phase 3 gates + Scott phrase when required).
 4. New `operationKey` → new ledger row → new Meta objects.
-5. Do **not** overwrite or delete the previous revision’s objects in V1.
+5. Do **not** overwrite or delete the previous revision’s Meta objects in V1. Package write-back stores the new revision under `ads.meta.variants[newRevision]` and updates the flat mirror to `currentVariant` without removing prior variant keys.
 
 Document-only in Prompt 2 Phase 8; do not execute a second revision in that chat unless Scott separately asks.
 
-### A9. Required proofs (Phase 4 / 8 — not this design phase)
+### A9. Required proofs (Phase 4 / 8)
 
-| Proof | Expectation |
-|-------|-------------|
-| Same logical op twice | `already_complete`; zero new Meta objects |
-| Partial retry | Resume; no duplicate campaign |
-| Changed creative/copy/budget without revision bump | Refuse / conflict |
-| Blind rerun after error | Forbidden — reconcile first |
-| Concurrent lock | Simulation-proven minimum; live only if safe |
+| Proof | Expectation | Result |
+|-------|-------------|--------|
+| Same logical op twice | `already_complete`; zero new Meta objects | **PASS** exec **95** (ledger evaluate) + Meta GET exec **96** (same IDs, PAUSED, $0) |
+| Partial retry | Resume; no duplicate campaign | **PASS** live exec **74** resumed from `creative` |
+| Changed creative/copy/budget without revision bump | Refuse / conflict | Local rehearse + Phase 4 |
+| Blind rerun after error | Forbidden — reconcile first | Documented; exec54 archived before retry |
+| Concurrent lock | Simulation-proven minimum; live only if safe | Simulation-proven (Phase 4) |
+
+**Graph caveat (fixed in source 2026-07-28):** `Already Complete Gate` short-circuits `already_complete` → `Respond Already Complete` (zero Meta POSTs). `Needs Campaign Create` / `Needs AdSet Create` skip POSTs when IDs already exist (prevents resume orphans). `Verify PAUSED Statuses` + `Assert PAUSED` run before ledger verified / Drive write-back. Create path remains **disabled** until operator approval. Orphan campaign `120250622864710199` from earlier resume — leave PAUSED.
 
 ---
 
@@ -267,7 +272,21 @@ N/A for approval tokens (removed). Rotate Meta Graph credential per normal n8n c
 1. Set `_createPausedAllowed = false` (redeploy/sync workflow).
 2. Disable create / upload / ledger-write / Drive write-back nodes.
 3. Clear run defaults: `mode=dry_run`, `approval=false`.
-4. If any Meta object is ACTIVE → pause immediately; stop; incident report.
+
+### B8. Operator runbook (Image V1 — post-proof)
+
+| Procedure | How |
+|-----------|-----|
+| Dry run | Config `mode=dry_run`, `approval=false`; create nodes disabled; expect Respond Dry Run; zero Meta/Drive |
+| Approve create-paused | Exact phrase `APPROVE WF4 IMAGE CREATE-PAUSED V1` only |
+| Enable one run | `mode=create_paused`, `approval=true`, `_createPausedAllowed=true`, enable create/ledger/**verified** write-back; **after** Already Complete IF exists |
+| Safety restore | Disable create path; `_createPausedAllowed=false`; `mode=dry_run`; `approval=false`; leave inactive |
+| Preview | Meta Marketing API `adpreviews` (Feed: DESKTOP_FEED_STANDARD, MOBILE_FEED_STANDARD, INSTAGRAM_STANDARD) or Ads Manager — Stories/Reels out of V1 |
+| Pause / kill | Ads Manager or Graph POST `status=PAUSED` on campaign/ad set/ad; never leave ACTIVE after incident |
+| Manual activate | Human only in Ads Manager (or explicit future activate phrase) — **not** WF4 auto |
+| New revision | Bump `ads.meta.creativeRevision` → new `operationKey` → new approval → new objects; store under `variants[revision]`; never delete prior variant keys or Meta objects |
+| Idempotent re-check | Helper `ooM24nOGKfuefHVM` (Phase8 proof) or ledger evaluate — do **not** blind re-enable create |
+| ACTIVE incident | If any Meta object is ACTIVE → pause immediately; stop; incident report |
 
 ---
 

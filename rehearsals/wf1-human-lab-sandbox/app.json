@@ -320,7 +320,10 @@
       "landingUrl": null,
       "dailyBudget": null,
       "createdAt": null,
-      "lastSyncedAt": null
+      "lastSyncedAt": null,
+      "creativeRevision": null,
+      "currentVariant": null,
+      "variants": {}
     },
     "media": [
       {
@@ -331,7 +334,7 @@
     ]
   },
   "tracking": {
-    "webhookUrl": null,
+    "webhookUrl": "https://scottyo.app.n8n.cloud/webhook/app-validation/events",
     "webhooks": {
       "validationComplete": null,
       "deployComplete": null,

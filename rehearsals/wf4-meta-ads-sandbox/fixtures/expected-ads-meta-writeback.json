@@ -2,6 +2,8 @@
   "ads": {
     "meta": {
       "status": "created_paused",
+      "currentVariant": "image-v1",
+      "creativeRevision": "image-v1",
       "campaignId": "<campaign-id>",
       "adSetId": "<ad-set-id>",
       "creativeId": "<creative-id>",
@@ -9,7 +11,21 @@
       "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
       "dailyBudget": 1,
       "createdAt": "<iso8601>",
-      "lastSyncedAt": null
+      "lastSyncedAt": null,
+      "variants": {
+        "image-v1": {
+          "status": "created_paused",
+          "campaignId": "<campaign-id>",
+          "adSetId": "<ad-set-id>",
+          "creativeId": "<creative-id>",
+          "adId": "<ad-id>",
+          "landingUrl": "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook&utm_medium=paid_social&utm_campaign=human-lab-validation",
+          "dailyBudget": 1,
+          "createdAt": "<iso8601>",
+          "lastSyncedAt": null,
+          "mediaType": "image"
+        }
+      }
     }
   },
   "rootStatusUnchanged": true,

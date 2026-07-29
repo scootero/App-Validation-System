@@ -1,8 +1,8 @@
 # Prompt 2 Progress — Image Create-Paused V1
 
-**Status:** Phase 6 PREP complete (2026-07-26). Safer probe proved new app write path (`campaignId=120250604736240199` with `is_adset_budget_sharing_enabled:false`). Adapter + live Process updated; local rehearse PASS; live dry_run exec **60** PASS (`metaHttpCalls=0`, `driveWrites=0`). Create path still disabled. **Do not run full Phase 6 until Scott sends exact approval phrase.**
+**Status:** Image V1 **PASS** (2026-07-27). Phase 8 already_complete + Phase 9 docs done. Objects remain **PAUSED**. WF4 create path stays disabled. **Not activated** — still `development_access` + business `not_verified`.
 
-**On resume:** Read this file first, then [`PROMPT-2.md`](PROMPT-2.md). Full Phase 6 only after Scott sends `APPROVE WF4 IMAGE CREATE-PAUSED V1`.
+**On resume:** Prompt 2 is **complete**. For next work, paste the Prompt 3 handoff below into a new chat with [`PROMPT-3.md`](PROMPT-3.md). Do **not** re-enable create path without a new exact approval phrase. Do **not** start Prompt 3 until Scott explicitly asks.
 
 **Related:**
 
@@ -101,70 +101,81 @@ Prompt 1 handoff summary: PASS — live WF4 `YIc53GBq4upelYp6` inactive; dry_run
 
 ### Phase 6 — One PAUSED image-ad proof
 
-- [x] Operation lock claimed *(ledger planned upsert on exec 54; no Meta IDs)*
-- [ ] Image uploaded; `image_hash` captured
-- [ ] Campaign PAUSED
-- [ ] Ad Set PAUSED
-- [ ] Creative created
-- [ ] Ad PAUSED
-- [x] Zero delivery / zero spend *(no Meta objects created)*
-- [ ] Ledger complete
-- [ ] ID write-back complete
-- [x] No ACTIVE incident (or incident paused + reported) *(none created)*
+- [x] Operation lock claimed *(exec 74 resume from creative; prior planned from 54 reconciled)*
+- [x] Image uploaded; `image_hash` captured
+- [x] Campaign created *(status PAUSED expected — Scott confirm in Ads Manager)*
+- [x] Ad Set created *(status PAUSED expected — Scott confirm in Ads Manager)*
+- [x] Creative created
+- [x] Ad created *(status PAUSED expected — Scott confirm in Ads Manager)*
+- [x] Zero delivery / zero spend *(created PAUSED via API; Scott confirm no spend in Ads Manager)*
+- [x] Ledger complete through `phase=verified` *(later promoted to writeback_done in Phase 8)*
+- [x] ID write-back complete *(repair exec **94**; live Merge node patched)*
+- [x] No ACTIVE incident reported from WF4 create nodes
 
-Meta IDs:
+Meta IDs (ledger / writeBackMeta from exec **74**):
 
-- Campaign: `_none_ — Create Campaign failed`
-- Ad Set: `_none_`
-- Creative: `_none_`
-- Ad: `_none_`
-- Image hash: `_none_`
+- Campaign: `120250607331460199`
+- Ad Set: `120250622864980199`
+- Creative: `1007406578799368`
+- Ad: `120250622866330199`
+- Image hash: `3dd4a70bea3678c35714a2d06d718c3c`
 
-**Phase 6 execution:** `54` — **FAIL**  
-**Blocker:** Meta Graph `POST /act_979257825150251/campaigns` → HTTP 400 OAuthException code **200** `"API access blocked."` fbtrace `AlDDQr1uZSKx6XygxOyZKxT`  
-**Credential used:** `Meta Marketing API - Orro` (`pphgFAkucBMaBs8A`) — attached correctly on the node  
+**Phase 6 execution:** `74` — create SUCCESS; Drive write-back later FIXED in **94**  
+**Prior fail:** exec `54` — Meta `API access blocked` (resolved via new app + budget-sharing field)  
 **Gates:** `createPathOpen=true` (mode/approval/hard-gate all passed)  
-**Drive write-back:** not reached  
+**Drive write-back:** FIXED via repair workflow `AhfEnOEMW7sbq3bR` exec **94**. Live WF4 Merge node patched to use `getBinaryDataBuffer`. File id `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` now has ads.meta IDs.  
+**Note:** run resumed `resumeFrom=creative`; Create Campaign also returned orphan id `120250622864710199` (not used in ledger chain) — leave PAUSED / do not activate.  
 **Safety restore:** applied — create path disabled; `_createPausedAllowed=false`; `mode=dry_run`; `approval=false`; workflow inactive
 
 ### Phase 7 — Feed previews
 
-- [ ] Facebook desktop Feed previewed
-- [ ] Facebook mobile Feed previewed
-- [ ] Instagram Feed previewed
-- [ ] Stories/Reels disabled or separately approved
-- [ ] Poor placements disabled or asset revision requested
-- [ ] Preview evidence captured (no secrets)
+- [x] Facebook desktop Feed previewed *(exec 93 — preview iframe OK)*
+- [x] Facebook mobile Feed previewed *(exec 93 — preview iframe OK)*
+- [x] Instagram Feed previewed *(exec 93 — preview iframe OK)*
+- [x] Stories/Reels disabled or separately approved *(V1 Feed-only; Stories/Reels out of scope)*
+- [x] Poor placements disabled or asset revision requested *(none disabled; landscape Feed accepted for V1)*
+- [x] Preview evidence captured (no secrets) *(n8n exec 93; iframe bodies present; tokens not copied into docs)*
 
 ### Phase 8 — Repeated-trigger live proof
 
-- [ ] Same logical operation re-run
-- [ ] Existing IDs reconciled; zero new objects
-- [ ] Ledger `already_complete` (or equivalent)
-- [ ] Deliberate new-revision procedure documented (not executed)
+- [x] Same logical operation re-run *(ledger evaluate on live row — create path NOT re-enabled)*
+- [x] Existing IDs reconciled; zero new objects *(exec **95** already_complete; Meta GET exec **96** same IDs still PAUSED)*
+- [x] Ledger `already_complete` (or equivalent) *(phase=`writeback_done`, outcome=`already_complete`)*
+- [x] Deliberate new-revision procedure documented (not executed)
 
 ### Phase 9 — Documentation + Prompt 3 handoff
 
-- [ ] Image-path operator docs updated
-- [ ] Canonical metadata / proof logs updated
-- [ ] Image V1 verdict recorded (PASS / PARTIAL / FAIL)
-- [ ] Prompt 3 handoff written below
+- [x] Image-path operator docs updated *(CREATE-PAUSED-V1-CONTRACT §B8 + A9)*
+- [x] Canonical metadata / proof logs updated
+- [x] Image V1 verdict recorded (PASS / PARTIAL / FAIL)
+- [x] Prompt 3 handoff written below
 
 ---
 
 ## Image V1 verdict
 
-**Verdict:** `_pending_` (PASS / PARTIAL / FAIL)
+**Verdict:** `PASS`
 
-**Notes:** `_pending_`
+**Notes:** Exec 74 created PAUSED objects; 92/93/96 confirm PAUSED+$0+Feed previews; **94** Drive `ads.meta` write-back; **95** ledger `already_complete` + `writeback_done`. Create path remains disabled. Public delivery / Standard Access / business verify remain **out of Image V1 scope** (manual Meta UI + optional future activate phrase). Graph still needs Already Complete IF before any future create re-enablement.
 
 ---
 
 ## Open blockers / wait for Scott
 
-1. **Meta Campaign POST blocked** (exec 54) — `API access blocked` OAuthException 200 / fbtrace `AlDDQr1uZSKx6XygxOyZKxT`. Read-only GETs (exec 56) show `ads_management`+`ads_read` **granted**, ad account ACTIVE+MANAGE, campaign list GET OK — **do not assume a missing scope**; use manual checklist (app mode / Access Tier / BM restriction / Meta support).
-2. Do **not** activate WF4; do **not** spend; create path stays disabled until Scott re-approves Phase 6 retry.
-3. Ledger reconcile for exec 54: **done** (exec 55).
+1. **Prompt 2 complete** — paste Prompt 3 handoff when ready for video / remaining tracks.
+2. **Real live delivery blocker:** Marketing API tier is `development_access`; Business Portfolio `verification_status=not_verified` (Scott in Meta UI).
+3. **Before next create enablement:** add Already Complete IF short-circuit (Create Campaign still POSTs on resume — orphan `120250622864710199`).
+4. Do **not** activate via WF4 create path without exact phrase; development-tier may not deliver publicly.
+
+### 2026-07-27 — Phase 8 + Phase 9 complete
+
+- Reused helper workflow `ooM24nOGKfuefHVM` as **WF4 Phase8 Idempotency Proof**
+- Exec **95** SUCCESS: ledger decision `already_complete`; IDs match exec74; upserted `phase=writeback_done`, `outcome=already_complete`; zero Meta POSTs
+- Exec **96** Meta readonly GET: campaign/adset/ad/orphan still PAUSED; `amount_spent=0`; insights empty
+- WF4 `YIc53GBq4upelYp6` re-checked: inactive; `mode=dry_run`; `approval=false`; create nodes disabled
+- Docs: CANONICAL, external-proof-status, CREATE-PAUSED-V1-CONTRACT, OPERATION-LEDGER, CREATIVE-ASSET-SPECS
+- Image V1 verdict **PASS**; Prompt 3 handoff below
+- STOP — do not start Prompt 3 until Scott asks
 
 ### 2026-07-22 — Meta read-only diagnosis + ledger reconcile (no Phase 6 retry)
 
@@ -198,12 +209,15 @@ Meta IDs:
 ## Latest compact handoff
 
 ```text
-Status: Phase 6 PREP complete; create path still DISABLED
-Probe: new app write OK — campaign 120250604736240199 PAUSED (needs is_adset_budget_sharing_enabled:false)
-Adapter+live Process: field added; Process sha c774f000…; fingerprint 114e6616… unchanged
-Local rehearse PASS; live dry_run exec 60 PASS — metaHttpCalls=0 driveWrites=0
-WF4: inactive dry_run approval=false _createPausedAllowed=false create nodes disabled; Meta creds NOT on create nodes
-Exact next: Scott sends APPROVE WF4 IMAGE CREATE-PAUSED V1 for full Phase 6
+Status: Prompt 2 COMPLETE — Image V1 PASS
+IDs: campaign 120250607331460199 | adset 120250622864980199 | creative 1007406578799368 | ad 120250622866330199 | hash 3dd4a70bea3678c35714a2d06d718c3c
+Ledger: phase=writeback_done outcome=already_complete (exec 95)
+Drive ads.meta: written (exec 94) file 1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn
+Objects: PAUSED; $0; Feed previews OK (93/96); orphan 120250622864710199 leave PAUSED
+WF4: inactive dry_run approval=false _createPausedAllowed=false create path DISABLED
+Blocker for public delivery: development_access + business not_verified
+Before next create: add Already Complete IF (Create Campaign still POSTs on resume)
+Exact next: Scott starts Prompt 3 when ready (video + remaining tracks) — do NOT auto-start
 ```
 
 ### 2026-07-26 — Phase 6 PREP (budget-sharing field; no create enablement)
@@ -214,15 +228,44 @@ Exact next: Scott sends APPROVE WF4 IMAGE CREATE-PAUSED V1 for full Phase 6
 - Live dry_run exec **60** PASS — campaign payload includes new field; zero Meta/Drive writes
 - STOP — wait for exact Phase 6 approval phrase
 
+
+
+### 2026-07-27 — Drive write-back repair (exec 94)
+
+- Root cause: Merge decoded `item.binary.data.data === "filesystem-v2"` pointer instead of using `getBinaryDataBuffer`
+- Repair workflow `AhfEnOEMW7sbq3bR` / exec **94** SUCCESS — Drive file updated `application/json`
+- Live WF4 `YIc53GBq4upelYp6` Merge node patched with same fix (create path still disabled)
+- Local `workflow.ts` + `import-ready.json` updated
+
+### 2026-07-27 — Phase 7 Feed previews (API verify)
+
+- Readonly workflow `c445mYtMEfsQsJoA` exec **92** (status) + **93** (insights+previews)
+- Campaign/AdSet/Ad/orphan: all `status=PAUSED` / `effective_status=PAUSED`
+- Account `amount_spent=0`; campaign insights `data=[]`
+- Preview iframes returned for DESKTOP_FEED_STANDARD, MOBILE_FEED_STANDARD, INSTAGRAM_STANDARD
+- Stories/Reels remain out of V1
+- STOP short of ACTIVE: development_access tier + unverified business
+
+### 2026-07-27 — Phase 6 create-paused PARTIAL (exec 74)
+
+- Exact phrase received: `APPROVE WF4 IMAGE CREATE-PAUSED V1`
+- Enabled one-run create path; manual exec **74**
+- Meta creates SUCCESS: campaign `120250607331460199`, ad set `120250622864980199`, creative `1007406578799368`, ad `120250622866330199`, image_hash `3dd4a70bea3678c35714a2d06d718c3c`
+- Ledger `phase=verified`
+- Drive write-back FAIL at Merge (invalid JSON from Drive download)
+- Safety restore applied (disabled create path; dry_run; hard gate false; inactive)
+- Verdict **PARTIAL** — STOP for Scott PAUSED confirm + Phase 7
+
 ---
 
 ## Enablement procedure (document only — do not execute)
 
 1. Exact phrase received + live mid-phase/Drive nodes present + drift PASS
-2. Set `mode=create_paused`, `approval=true`
-3. Flip `_createPausedAllowed=true`; enable create/ledger/**verified** write-back nodes for one run
-4. Execute once; verify PAUSED + zero spend; ledger complete; **then** Drive `ads.meta` merge
-5. Re-disable; `_createPausedAllowed=false`; leave inactive
+2. **Prerequisite:** Already Complete IF short-circuit before Meta POSTs (see A9 caveat)
+3. Set `mode=create_paused`, `approval=true`
+4. Flip `_createPausedAllowed=true`; enable create/ledger/**verified** write-back nodes for one run
+5. Execute once; verify PAUSED + zero spend; ledger complete; **then** Drive `ads.meta` merge
+6. Re-disable; `_createPausedAllowed=false`; leave inactive
 
 ---
 
@@ -258,6 +301,17 @@ Exact next: Scott sends APPROVE WF4 IMAGE CREATE-PAUSED V1 for full Phase 6
 | Live dry_run exec **52** | FAIL — bad fixture (missing `experiment.testBudget`); fixed |
 | Live dry_run exec **53** | PASS — `metaHttpCalls=0`; `driveWrites=0`; failures = mode/approval/hard-gate only |
 | Import-ready / drift | PASS |
+
+## Phase 8 idempotency proof summary (2026-07-27)
+
+| Test | Result |
+|------|--------|
+| Ledger evaluate same op | **PASS** exec **95** — `already_complete`; IDs match |
+| Ledger writeback_done | **PASS** — phase=`writeback_done`, outcome=`already_complete` |
+| Meta GET same IDs | **PASS** exec **96** — all PAUSED; amount_spent=0 |
+| Zero new Meta objects | **PASS** — no Meta POSTs this phase; create path stayed disabled |
+| Deliberate new revision | Documented only; not executed |
+| Full WF4 create re-trigger | **Not run** (unsafe until Already Complete IF) |
 
 ---
 
@@ -307,3 +361,34 @@ Exact next: Scott sends APPROVE WF4 IMAGE CREATE-PAUSED V1 for full Phase 6
 - Ledger: Planned upsert (`phase=planned`, `outcome=in_progress`) — reconcile before retry
 - Safety restored: create path disabled; dry_run; `_createPausedAllowed=false`; inactive
 - STOP — wait for Meta API access fix
+
+---
+
+## Prompt 3 handoff (paste-ready)
+
+```text
+Prompt 2 COMPLETE — Image V1 PASS. Do NOT re-run create-paused without a new exact approval phrase.
+
+Workspace: /Users/scott/Desktop/App-Validation/App-Validation-System
+
+Read first:
+1) rehearsals/wf4-meta-ads-sandbox/wf4-final-prompts/PROMPT-3-PROGRESS.md
+2) rehearsals/wf4-meta-ads-sandbox/wf4-final-prompts/PROMPT-3.md
+3) rehearsals/wf4-meta-ads-sandbox/wf4-final-prompts/PROMPT-2-PROGRESS.md (Image V1 PASS evidence)
+
+Image V1 proof:
+- Campaign 120250607331460199 | AdSet 120250622864980199 | Creative 1007406578799368 | Ad 120250622866330199
+- image_hash 3dd4a70bea3678c35714a2d06d718c3c | orphan campaign 120250622864710199 leave PAUSED
+- Ledger: operationKey human-lab-wf1-sandbox|sandbox|meta|image-v1 | phase=writeback_done | outcome=already_complete (exec 95)
+- Drive ads.meta written (exec 94) file 1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn
+- Feed previews OK (exec 93/96); Stories/Reels out of V1; amount_spent=0
+- WF4 YIc53GBq4upelYp6 inactive; dry_run; approval=false; _createPausedAllowed=false; create path DISABLED
+
+Known follow-ups (Prompt 3 / ops):
+1) Meta Standard Access + business verify (Scott UI) before expecting public delivery
+2) Add Already Complete IF before any future create re-enable (Create Campaign still POSTs on resume)
+3) Video /advideos track per PROMPT-3.md — plan/audit first; wait for Scott track selection
+4) Human activation remains manual — no WF4 auto-activate
+
+First response of Prompt 3 must be planning/audit only per PROMPT-3.md.
+```

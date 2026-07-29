@@ -69,7 +69,7 @@ WF0 webhook -> WF1 mockup URL -> WF2 landing URL + app-config -> WF3 Sheet rows 
 ## Current Blockers
 
 - ~~WF3 external proof~~ **Cleared** — live workflow `7G2fJmqKsr8CGVID`, curl runs passed. Canonical: `wf3-human-lab-sandbox/CANONICAL-WF3.md`.
-- Browser E2E still needs WF0 `tracking.webhookUrl` + WF2 re-embed (BL-005/006).
+- ~~Browser E2E still needs WF0 `tracking.webhookUrl` + WF2 re-embed (BL-005/006).~~ **Cleared 2026-07-27 (Prompt 3 Track C)** — shared webhook provisioned + embedded; live browser `page_view` → Sheet (e.g. WF3 execs 84, 91). See `wf4-meta-ads-sandbox/wf4-final-prompts/TRACK-C-PROOF.md`.
 - WF4 V1 dry-run is **proven** (local + n8n execution 35; $1/day; MAX_DAILY_BUDGET_USD=10). Prompt A **reconciled**. Create-paused blocked on Manual Meta setup + Prompt B IDs + operator approval. Spec/starter deferred.
 - Production `landing-template` attribution/`eventId` sync is deferred to Spec 1.5.0 (BL-028).
 - Final production update is blocked until Spec 1.5.0 coordinated pass (BL-031–BL-038) after Prompt B / create-paused design freeze.

@@ -1,6 +1,6 @@
 # CANONICAL WF4 — Meta Ads Sandbox
 
-**Status:** Meta account IDs confirmed 2026-07-16. Create-paused disabled. WF4 inactive.
+**Status:** Image Create-Paused V1 **PASS** (2026-07-27). Create-paused path disabled again; WF4 inactive. **`ads.meta.variants` storage landed 2026-07-28** (SSOT per creativeRevision; flat fields mirror `currentVariant`). Prompt 3 = video + remaining system work.
 
 ## Proven Platform Values
 
@@ -20,6 +20,15 @@
 | WF3_GATE_STATUS | `proven` |
 | META_API_VERSION | `v25.0` |
 | Adapter SSOT | `lib/meta-adapter.js` |
+| IMAGE_V1_VERDICT | `PASS` |
+| IMAGE_V1_CAMPAIGN_ID | `120250607331460199` |
+| IMAGE_V1_ADSET_ID | `120250622864980199` |
+| IMAGE_V1_CREATIVE_ID | `1007406578799368` |
+| IMAGE_V1_AD_ID | `120250622866330199` |
+| IMAGE_V1_IMAGE_HASH | `3dd4a70bea3678c35714a2d06d718c3c` |
+| IMAGE_V1_LEDGER_PHASE | `writeback_done` |
+| IMAGE_V1_LEDGER_OUTCOME | `already_complete` |
+| SANDBOX_DRIVE_APP_JSON_FILE_ID | `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` |
 
 ## Confirmed Meta account (non-secret)
 
@@ -37,10 +46,14 @@
 `OUTCOME_TRAFFIC` + `LINK_CLICKS` + `IMPRESSIONS`  
 (`LANDING_PAGE_VIEWS` = alternative, not locked)
 
-## Status after paused create (when enabled later)
+## Status after paused create (Image V1 proven)
 
-- `ads.meta.status` = **`created_paused`**
-- Root status = **preserved** (not `validating` until human activation)
+- `ads.meta.status` = **`created_paused`** (Drive write-back exec **94**)
+- Root status = **preserved** (`ready`)
+- Objects: Campaign / Ad Set / Ad **PAUSED**; account `amount_spent=0`
+- Placements V1: Facebook desktop Feed, Facebook mobile Feed, Instagram Feed (Stories/Reels out)
+- Orphan campaign `120250622864710199` from resume POST — leave **PAUSED**; do not activate
+- **Variants (repo 2026-07-28):** next write-back migrates flat image IDs → `ads.meta.variants["image-v1"]` and stores new revisions under their own keys without deleting prior variants
 
 ## Pipeline
 
@@ -54,7 +67,7 @@ app.json → Ad Plan → Meta adapter → ledger → paused create → read-back
 Manual Run → Workflow Config → Process WF4 Dry Run → Triple Approval Gate → Respond Dry Run
 ```
 
-Create-paused nodes disabled.
+Create-paused nodes disabled. Operator runbook: [`architecture/CREATE-PAUSED-V1-CONTRACT.md`](architecture/CREATE-PAUSED-V1-CONTRACT.md) §B8.
 
 ## Artifact Index
 

@@ -194,21 +194,164 @@ function testCreativeResolutionFailureMissingRepo() {
 
 function testCreativeResolutionFailureBadType() {
   const app = readJson(appJsonPath);
+  // A2: role:video alone is not enough — mp4 without type:video stays fail-closed
   app.ads.media = [{ githubPath: "media/demo.mp4", role: "video" }];
   const result = adapter.buildDryRunBundle(app, baseConfig());
-  assert(!result.ok, "must fail for non-image githubPath");
+  assert(!result.ok, "must fail for non-image githubPath without type:video");
   assert(
     String(result.error).indexOf("CREATIVE_UNSUPPORTED_TYPE") !== -1,
     "must report CREATIVE_UNSUPPORTED_TYPE"
   );
 }
 
+function testVideoDryRunPlan() {
+  const videoAppPath = path.join(root, "fixtures", "app-json-wf4-video-sandbox.json");
+  const app = readJson(videoAppPath);
+  const videoSha = crypto.createHash("sha256").update("fake-video-bytes-for-plan").digest("hex");
+  const thumbSha = crypto.createHash("sha256").update(fs.readFileSync(creativePath)).digest("hex");
+  const result = adapter.buildDryRunBundle(
+    app,
+    baseConfig({
+      creativeSha256: videoSha,
+      thumbnailSha256: thumbSha,
+      workflowVersion: "wf4-video-feed-v1",
+    })
+  );
+  assert(result.ok, result.error || "video dry-run must succeed");
+  const bundle = result.bundle;
+  assert(bundle.source.mediaType === "video", "mediaType video");
+  assert(bundle.source.creative.expectedMimeFamily === "video", "creative family video");
+  assert(bundle.source.creative.value === "media/ad-hero-feed.mp4", "feed video path");
+  assert(bundle.source.thumbnail && bundle.source.thumbnail.value === "media/ad-thumb-feed.png", "thumb");
+  assert(bundle.requests.videoUpload, "videoUpload plan required");
+  assert(
+    bundle.requests.videoUpload.endpoint.indexOf("/advideos") !== -1,
+    "advideos endpoint"
+  );
+  assert(bundle.requests.videoStatusPoll, "videoStatusPoll plan required");
+  assert(
+    bundle.requests.videoStatusPoll.timeoutMs === adapter.VIDEO_POLL_TIMEOUT_MS,
+    "poll timeout"
+  );
+  assert(bundle.requests.imageUpload.purpose === "video_thumbnail", "thumb upload purpose");
+  assert(
+    bundle.requests.creative.object_story_spec.video_data,
+    "video_data creative plan"
+  );
+  assert(
+    !bundle.requests.creative.object_story_spec.link_data,
+    "image link_data must not be used for video"
+  );
+  assert(
+    bundle.ledgerPlan.operationKey === "human-lab-wf1-sandbox|sandbox|meta|video-feed-v1",
+    "video operationKey"
+  );
+  assert(bundle.ledgerPlan.thumbnailSha256 === thumbSha, "thumb hash in ledger");
+  assert(bundle.safety.externalWritePerformed === false, "no external writes");
+  assertNoActiveStatus(bundle);
+}
+
+function testVideoMissingThumbnail() {
+  const videoAppPath = path.join(root, "fixtures", "app-json-wf4-video-sandbox.json");
+  const app = readJson(videoAppPath);
+  delete app.ads.media[0].thumbnailRef;
+  const result = adapter.buildDryRunBundle(
+    app,
+    baseConfig({
+      creativeSha256: "a".repeat(64),
+      thumbnailSha256: "b".repeat(64),
+    })
+  );
+  assert(!result.ok, "must fail without thumbnailRef");
+  assert(String(result.error).indexOf("VIDEO_THUMBNAIL_REQUIRED") !== -1, "thumb required error");
+}
+
+function testVideoMissingThumbSha() {
+  const videoAppPath = path.join(root, "fixtures", "app-json-wf4-video-sandbox.json");
+  const app = readJson(videoAppPath);
+  const result = adapter.buildDryRunBundle(
+    app,
+    baseConfig({
+      creativeSha256: "a".repeat(64),
+      thumbnailSha256: null,
+    })
+  );
+  assert(!result.ok, "must fail without thumbnailSha256");
+  assert(String(result.error).indexOf("THUMBNAIL_SHA256_REQUIRED") !== -1, "thumb sha required");
+}
+
 function testIdempotencyRefusal() {
   const app = readJson(appJsonPath);
-  app.ads.meta.campaignId = "123";
+  // Revision-scoped: same creativeRevision with complete variant IDs must refuse.
+  app.ads.meta.creativeRevision = "image-v1";
+  app.ads.meta.variants = {
+    "image-v1": {
+      status: "created_paused",
+      campaignId: "120250607331460199",
+      adSetId: "120250622864980199",
+      creativeId: "1007406578799368",
+      adId: "120250622866330199",
+      mediaType: "image",
+    },
+  };
   const result = adapter.buildDryRunBundle(app, baseConfig());
-  assert(!result.ok, "must refuse when campaignId exists");
+  assert(!result.ok, "must refuse when variants[image-v1] already complete");
   assert(result.error.includes("Idempotency refusal"), "must include refusal message");
+  assert(result.error.indexOf("image-v1") !== -1, "refusal must name the revision");
+}
+
+function testFlatIdsDoNotBlockNewRevision() {
+  const app = readJson(appJsonPath);
+  // Known image proof flat IDs — migrate to image-v1; video revision must still plan.
+  app.ads.meta = Object.assign({}, app.ads.meta, {
+    status: "created_paused",
+    campaignId: "120250607331460199",
+    adSetId: "120250622864980199",
+    creativeId: "1007406578799368",
+    adId: "120250622866330199",
+    creativeRevision: "image-v1",
+    landingUrl: "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook",
+    dailyBudget: 1,
+  });
+  // Switch package to video media + revision
+  const videoApp = readJson(path.join(root, "fixtures", "app-json-wf4-video-sandbox.json"));
+  app.ads.media = videoApp.ads.media;
+  app.ads.meta.creativeRevision = "video-feed-v1";
+  const videoSha = crypto.createHash("sha256").update("fake-video-bytes-for-plan").digest("hex");
+  const thumbSha = crypto.createHash("sha256").update(fs.readFileSync(creativePath)).digest("hex");
+  const result = adapter.buildDryRunBundle(
+    app,
+    baseConfig({
+      creativeSha256: videoSha,
+      thumbnailSha256: thumbSha,
+      workflowVersion: "wf4-video-feed-v1",
+    })
+  );
+  assert(result.ok, result.error || "new revision must not be blocked by prior flat image IDs");
+  assert(
+    result.bundle.ledgerPlan.operationKey.indexOf("video-feed-v1") !== -1,
+    "video operationKey"
+  );
+}
+
+function testNormalizeMigratesFlatKnownIds() {
+  const app = readJson(appJsonPath);
+  app.ads.meta = {
+    status: "created_paused",
+    campaignId: "120250607331460199",
+    adSetId: "120250622864980199",
+    creativeId: "1007406578799368",
+    adId: "120250622866330199",
+    landingUrl: "https://example.com",
+    dailyBudget: 1,
+    createdAt: "2026-07-27T00:00:00.000Z",
+    lastSyncedAt: null,
+  };
+  const norm = adapter.normalizeAdsMetaVariants(app);
+  assert(norm.ok, norm.error);
+  assert(norm.migrated === true, "must migrate");
+  assert(norm.variants["image-v1"], "must seed image-v1");
+  assert(norm.variants["image-v1"].campaignId === "120250607331460199", "campaign preserved");
 }
 
 function testBudgetCapExceeded() {
@@ -222,6 +365,8 @@ function testBudgetCapExceeded() {
 function testWritebackFixtureShape() {
   const expected = readJson(expectedWritebackPath);
   assert(expected.ads.meta.status === "created_paused", "fixture status created_paused");
+  assert(expected.ads.meta.variants, "fixture must include variants map");
+  assert(expected.ads.meta.currentVariant, "fixture must include currentVariant");
   assert(
     !Object.prototype.hasOwnProperty.call(expected, "status"),
     "expected writeback fixture must not set root status"
@@ -236,10 +381,11 @@ function testMergeAdsMetaWriteBack() {
   app.ads.headlines = app.ads.headlines.slice();
   const originalHeadline = app.ads.headlines[0];
   const originalRoot = app.status;
-  const originalRevision = app.ads.meta.creativeRevision;
+  const originalRevision = app.ads.meta.creativeRevision || "image-v1";
 
   const incomplete = adapter.mergeAdsMetaWriteBack(app, {
     status: "created_paused",
+    creativeRevision: originalRevision,
     campaignId: "c1",
     adSetId: "a1",
   });
@@ -248,6 +394,7 @@ function testMergeAdsMetaWriteBack() {
 
   const wrongStatus = adapter.mergeAdsMetaWriteBack(app, {
     status: "ACTIVE",
+    creativeRevision: originalRevision,
     campaignId: "c1",
     adSetId: "a1",
     creativeId: "cr1",
@@ -261,6 +408,7 @@ function testMergeAdsMetaWriteBack() {
 
   const merged = adapter.mergeAdsMetaWriteBack(app, {
     status: "created_paused",
+    creativeRevision: originalRevision,
     campaignId: "c1",
     adSetId: "a1",
     creativeId: "cr1",
@@ -278,11 +426,39 @@ function testMergeAdsMetaWriteBack() {
   assert(merged.appJson.ads.meta.status === "created_paused", "meta status written");
   assert(merged.appJson.ads.meta.campaignId === "c1", "campaignId written");
   assert(merged.appJson.ads.meta.adId === "ad1", "adId written");
+  assert(merged.appJson.ads.meta.creativeRevision === originalRevision, "creativeRevision set");
+  assert(merged.appJson.ads.meta.currentVariant === originalRevision, "currentVariant set");
   assert(
-    merged.appJson.ads.meta.creativeRevision === originalRevision,
-    "creativeRevision preserved when not supplied"
+    merged.appJson.ads.meta.variants[originalRevision].campaignId === "c1",
+    "variant SSOT written"
   );
   assert(app.ads.meta.campaignId == null, "original appJson not mutated");
+
+  // Second revision must preserve the first variant key
+  const merged2 = adapter.mergeAdsMetaWriteBack(merged.appJson, {
+    status: "created_paused",
+    creativeRevision: "video-feed-v1",
+    campaignId: "vc1",
+    adSetId: "va1",
+    creativeId: "vcr1",
+    adId: "vad1",
+    landingUrl: "https://human-lab-wf2-sandbox.vercel.app?utm_source=facebook",
+    dailyBudget: 1,
+    createdAt: "2026-07-28T00:00:00.000Z",
+    lastSyncedAt: null,
+    mediaType: "video",
+  });
+  assert(merged2.ok, merged2.error || "second revision merge must succeed");
+  assert(
+    merged2.appJson.ads.meta.variants[originalRevision].campaignId === "c1",
+    "prior variant preserved"
+  );
+  assert(
+    merged2.appJson.ads.meta.variants["video-feed-v1"].campaignId === "vc1",
+    "new variant stored"
+  );
+  assert(merged2.appJson.ads.meta.currentVariant === "video-feed-v1", "pointer updated");
+  assert(merged2.appJson.ads.meta.campaignId === "vc1", "flat mirror is current variant");
 }
 
 function testMissingCreativeSha() {
@@ -475,11 +651,16 @@ function main() {
   assertSafety(bundle);
   assertMatchesExpectedDryRun(bundle, expectedDryRun);
   testIdempotencyRefusal();
+  testFlatIdsDoNotBlockNewRevision();
+  testNormalizeMigratesFlatKnownIds();
   testBudgetCapExceeded();
   testWritebackFixtureShape();
   testMergeAdsMetaWriteBack();
   testCreativeResolutionFailureMissingRepo();
   testCreativeResolutionFailureBadType();
+  testVideoDryRunPlan();
+  testVideoMissingThumbnail();
+  testVideoMissingThumbSha();
   testMissingCreativeSha();
   testApprovalGatesNegative();
   testLedgerDecisions();

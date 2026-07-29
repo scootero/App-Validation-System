@@ -86,7 +86,7 @@ const processWf4Code =
   "    us: \"US\",\n" +
   "  };\n" +
   "\n" +
-  "  /** V1 image creative extensions only (no video). */\n" +
+  "  /** Image creative extensions (Image V1 + video thumbnails). */\n" +
   "  var IMAGE_EXTENSIONS = {\n" +
   "    png: \"image/png\",\n" +
   "    jpg: \"image/jpeg\",\n" +
@@ -94,6 +94,18 @@ const processWf4Code =
   "    gif: \"image/gif\",\n" +
   "    webp: \"image/webp\",\n" +
   "  };\n" +
+  "\n" +
+  "  /** Video creative extensions (Track A — Feed/vertical MP4/MOV). */\n" +
+  "  var VIDEO_EXTENSIONS = {\n" +
+  "    mp4: \"video/mp4\",\n" +
+  "    mov: \"video/quicktime\",\n" +
+  "  };\n" +
+  "\n" +
+  "  var DEFAULT_VIDEO_CREATIVE_REVISION = \"video-feed-v1\";\n" +
+  "  var DEFAULT_VIDEO_WORKFLOW_VERSION = \"wf4-video-feed-v1\";\n" +
+  "  /** Prefer source upload under this size; larger files use chunked /advideos. */\n" +
+  "  var VIDEO_SOURCE_UPLOAD_MAX_BYTES = 100 * 1024 * 1024;\n" +
+  "  var VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;\n" +
   "\n" +
   "  function roundBudget(value) {\n" +
   "    return Math.round(value * 100) / 100;\n" +
@@ -205,6 +217,13 @@ const processWf4Code =
   "      creativeRevision: identity.creativeRevision,\n" +
   "      placementSet: identity.placementSet,\n" +
   "    };\n" +
+  "    if (identity.thumbnailSha256) {\n" +
+  "      payload.thumbnailSha256 = identity.thumbnailSha256;\n" +
+  "    }\n" +
+  "    // Only include mediaType for video so existing image-v1 fingerprints stay stable.\n" +
+  "    if (identity.mediaType === \"video\") {\n" +
+  "      payload.mediaType = \"video\";\n" +
+  "    }\n" +
   "    return sha256Hex(stableStringify(payload));\n" +
   "  }\n" +
   "\n" +
@@ -212,6 +231,9 @@ const processWf4Code =
   "    row = row || {};\n" +
   "    if (!row.campaignId) return \"campaign\";\n" +
   "    if (!row.adSetId) return \"adset\";\n" +
+  "    // Video ops (creativeRevision starts with \"video\"): require videoId before thumb imageHash.\n" +
+  "    var rev = String(row.creativeRevision || \"\");\n" +
+  "    if (rev.indexOf(\"video\") === 0 && !row.videoId) return \"video\";\n" +
   "    if (!row.imageHash) return \"image\";\n" +
   "    if (!row.creativeId) return \"creative\";\n" +
   "    if (!row.adId) return \"ad\";\n" +
@@ -443,9 +465,18 @@ const processWf4Code =
   "  /**\n" +
   "   * Generic creative binary resolution for any app package.\n" +
   "   * Reads ads.media[] / media.ogImage + source.assetsGithubRepo ?? source.mockupGithubRepo.\n" +
+  "   * options.expectedMimeFamily: \"image\" (default) | \"video\"\n" +
   "   * Does not hardcode app ids, repos, or filenames.\n" +
   "   */\n" +
-  "  function resolveCreativeSource(app, creative) {\n" +
+  "  function resolveCreativeSource(app, creative, options) {\n" +
+  "    options = options || {};\n" +
+  "    var expectedFamily = options.expectedMimeFamily || \"image\";\n" +
+  "    var extMap = expectedFamily === \"video\" ? VIDEO_EXTENSIONS : IMAGE_EXTENSIONS;\n" +
+  "    var typeLabel =\n" +
+  "      expectedFamily === \"video\"\n" +
+  "        ? \"video extension (mp4/mov)\"\n" +
+  "        : \"image extension (png/jpg/jpeg/gif/webp)\";\n" +
+  "\n" +
   "    if (!creative || !creative.kind || !creative.value) {\n" +
   "      return { ok: false, error: \"CREATIVE_PATH_MISSING: no usable creative value\" };\n" +
   "    }\n" +
@@ -457,12 +488,10 @@ const processWf4Code =
   "      }\n" +
   "      var urlFilename = filenameFromPath(urlValue.split(\"?\")[0]);\n" +
   "      var urlExt = extensionOf(urlFilename);\n" +
-  "      if (!IMAGE_EXTENSIONS[urlExt]) {\n" +
+  "      if (!extMap[urlExt]) {\n" +
   "        return {\n" +
   "          ok: false,\n" +
-  "          error:\n" +
-  "            \"CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got \" +\n" +
-  "            (urlExt || \"none\"),\n" +
+  "          error: \"CREATIVE_UNSUPPORTED_TYPE: expected \" + typeLabel + \", got \" + (urlExt || \"none\"),\n" +
   "        };\n" +
   "      }\n" +
   "      return {\n" +
@@ -471,6 +500,7 @@ const processWf4Code =
   "          kind: \"url\",\n" +
   "          value: urlValue,\n" +
   "          role: creative.role || \"primary\",\n" +
+  "          type: expectedFamily,\n" +
   "          resolvedFrom: creative.source,\n" +
   "          repo: null,\n" +
   "          branch: null,\n" +
@@ -478,9 +508,10 @@ const processWf4Code =
   "          url: urlValue,\n" +
   "          downloadUrl: urlValue,\n" +
   "          filename: urlFilename,\n" +
-  "          expectedMime: IMAGE_EXTENSIONS[urlExt],\n" +
-  "          expectedMimeFamily: \"image\",\n" +
+  "          expectedMime: extMap[urlExt],\n" +
+  "          expectedMimeFamily: expectedFamily,\n" +
   "          resolutionMethod: \"direct_url\",\n" +
+  "          thumbnailRef: creative.thumbnailRef || null,\n" +
   "        },\n" +
   "      };\n" +
   "    }\n" +
@@ -499,12 +530,10 @@ const processWf4Code =
   "\n" +
   "    var filename = filenameFromPath(githubPath);\n" +
   "    var ext = extensionOf(filename);\n" +
-  "    if (!IMAGE_EXTENSIONS[ext]) {\n" +
+  "    if (!extMap[ext]) {\n" +
   "      return {\n" +
   "        ok: false,\n" +
-  "        error:\n" +
-  "          \"CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got \" +\n" +
-  "          (ext || \"none\"),\n" +
+  "        error: \"CREATIVE_UNSUPPORTED_TYPE: expected \" + typeLabel + \", got \" + (ext || \"none\"),\n" +
   "      };\n" +
   "    }\n" +
   "\n" +
@@ -545,6 +574,7 @@ const processWf4Code =
   "        kind: \"githubPath\",\n" +
   "        value: githubPath,\n" +
   "        role: creative.role || \"primary\",\n" +
+  "        type: expectedFamily,\n" +
   "        resolvedFrom: creative.source,\n" +
   "        repo: repo,\n" +
   "        branch: branch,\n" +
@@ -552,11 +582,100 @@ const processWf4Code =
   "        url: null,\n" +
   "        downloadUrl: downloadUrl,\n" +
   "        filename: filename,\n" +
-  "        expectedMime: IMAGE_EXTENSIONS[ext],\n" +
-  "        expectedMimeFamily: \"image\",\n" +
+  "        expectedMime: extMap[ext],\n" +
+  "        expectedMimeFamily: expectedFamily,\n" +
   "        resolutionMethod: \"github_raw\",\n" +
+  "        thumbnailRef: creative.thumbnailRef || null,\n" +
   "      },\n" +
   "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  function mediaItemRef(item) {\n" +
+  "    if (!item) return null;\n" +
+  "    if (item.url || item.githubPath) {\n" +
+  "      return {\n" +
+  "        kind: item.url ? \"url\" : \"githubPath\",\n" +
+  "        value: item.url || item.githubPath,\n" +
+  "        role: item.role || \"primary\",\n" +
+  "        type: item.type || null,\n" +
+  "        mimeType: item.mimeType || null,\n" +
+  "        thumbnailRef: item.thumbnailRef || null,\n" +
+  "        fallbackRef: item.fallbackRef || null,\n" +
+  "        placementRoles: item.placementRoles || null,\n" +
+  "        eligibility: item.eligibility || null,\n" +
+  "        width: item.width != null ? item.width : null,\n" +
+  "        height: item.height != null ? item.height : null,\n" +
+  "        durationSeconds: item.durationSeconds != null ? item.durationSeconds : null,\n" +
+  "        source: \"ads.media\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "    return null;\n" +
+  "  }\n" +
+  "\n" +
+  "  function findMediaByPath(app, refPath) {\n" +
+  "    if (!refPath) return null;\n" +
+  "    var want = String(refPath).replace(/^\\/+/, \"\");\n" +
+  "    var adsMedia = (app.ads && app.ads.media) || [];\n" +
+  "    for (var i = 0; i < adsMedia.length; i++) {\n" +
+  "      var item = adsMedia[i];\n" +
+  "      var p = item.githubPath || item.path || \"\";\n" +
+  "      if (String(p).replace(/^\\/+/, \"\") === want) return mediaItemRef(item);\n" +
+  "      if (item.url && item.url === refPath) return mediaItemRef(item);\n" +
+  "    }\n" +
+  "    return {\n" +
+  "      kind: \"githubPath\",\n" +
+  "      value: want,\n" +
+  "      role: \"thumbnail\",\n" +
+  "      type: \"image\",\n" +
+  "      source: \"thumbnailRef\",\n" +
+  "      thumbnailRef: null,\n" +
+  "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Select package media. Prefer explicit type:\"video\" (A2); else Image V1 path.\n" +
+  "   * role:\"video\" alone is NOT enough — keeps legacy mp4-without-type failing closed.\n" +
+  "   */\n" +
+  "  function selectCreative(app) {\n" +
+  "    var adsMedia = (app.ads && app.ads.media) || [];\n" +
+  "    var i;\n" +
+  "    var item;\n" +
+  "    var ref;\n" +
+  "\n" +
+  "    for (i = 0; i < adsMedia.length; i++) {\n" +
+  "      item = adsMedia[i];\n" +
+  "      if (item && item.type === \"video\" && (item.url || item.githubPath)) {\n" +
+  "        ref = mediaItemRef(item);\n" +
+  "        ref.mediaType = \"video\";\n" +
+  "        return ref;\n" +
+  "      }\n" +
+  "    }\n" +
+  "\n" +
+  "    for (i = 0; i < adsMedia.length; i++) {\n" +
+  "      item = adsMedia[i];\n" +
+  "      if (!item || !(item.url || item.githubPath)) continue;\n" +
+  "      if (item.type === \"video\") continue;\n" +
+  "      if (item.role === \"thumbnail\" || item.role === \"fallback\") continue;\n" +
+  "      if (item.type === \"image\" || !item.type) {\n" +
+  "        ref = mediaItemRef(item);\n" +
+  "        ref.mediaType = \"image\";\n" +
+  "        return ref;\n" +
+  "      }\n" +
+  "    }\n" +
+  "\n" +
+  "    var og = app.media && app.media.ogImage;\n" +
+  "    if (og && (og.url || og.githubPath)) {\n" +
+  "      return {\n" +
+  "        kind: og.url ? \"url\" : \"githubPath\",\n" +
+  "        value: og.url || og.githubPath,\n" +
+  "        role: \"fallback\",\n" +
+  "        type: \"image\",\n" +
+  "        mediaType: \"image\",\n" +
+  "        source: \"media.ogImage\",\n" +
+  "        thumbnailRef: null,\n" +
+  "      };\n" +
+  "    }\n" +
+  "    return null;\n" +
   "  }\n" +
   "\n" +
   "  function buildUtmQuery(utmTemplate) {\n" +
@@ -579,45 +698,226 @@ const processWf4Code =
   "    return countries.length ? countries : [\"VERIFY_COUNTRY_CODE\"];\n" +
   "  }\n" +
   "\n" +
-  "  function selectCreative(app) {\n" +
-  "    var adsMedia = (app.ads && app.ads.media) || [];\n" +
-  "    for (var i = 0; i < adsMedia.length; i++) {\n" +
-  "      var item = adsMedia[i];\n" +
-  "      if (item.url || item.githubPath) {\n" +
-  "        return {\n" +
-  "          kind: item.url ? \"url\" : \"githubPath\",\n" +
-  "          value: item.url || item.githubPath,\n" +
-  "          role: item.role || \"primary\",\n" +
-  "          source: \"ads.media\",\n" +
-  "        };\n" +
-  "      }\n" +
-  "    }\n" +
-  "    var og = app.media && app.media.ogImage;\n" +
-  "    if (og && (og.url || og.githubPath)) {\n" +
-  "      return {\n" +
-  "        kind: og.url ? \"url\" : \"githubPath\",\n" +
-  "        value: og.url || og.githubPath,\n" +
-  "        role: \"fallback\",\n" +
-  "        source: \"media.ogImage\",\n" +
-  "      };\n" +
-  "    }\n" +
-  "    return null;\n" +
+  "  /** Proven Human Lab Image V1 IDs — only unambiguous fallback when flat IDs lack creativeRevision. */\n" +
+  "  var KNOWN_IMAGE_V1_PROOF_IDS = {\n" +
+  "    campaignId: \"120250607331460199\",\n" +
+  "    adSetId: \"120250622864980199\",\n" +
+  "    creativeId: \"1007406578799368\",\n" +
+  "    adId: \"120250622866330199\",\n" +
+  "  };\n" +
+  "\n" +
+  "  function hasCompleteMetaIds(obj) {\n" +
+  "    if (!obj || typeof obj !== \"object\") return false;\n" +
+  "    return META_ID_FIELDS.every(function (f) {\n" +
+  "      return obj[f] != null && String(obj[f]).trim() !== \"\" && String(obj[f]).indexOf(\"<\") !== 0;\n" +
+  "    });\n" +
   "  }\n" +
   "\n" +
-  "  function checkIdempotency(app, provider) {\n" +
+  "  function extractFlatVariantRecord(meta) {\n" +
+  "    meta = meta || {};\n" +
+  "    var rec = {\n" +
+  "      status: meta.status || null,\n" +
+  "      campaignId: meta.campaignId || null,\n" +
+  "      adSetId: meta.adSetId || null,\n" +
+  "      creativeId: meta.creativeId || null,\n" +
+  "      adId: meta.adId || null,\n" +
+  "      landingUrl: meta.landingUrl || null,\n" +
+  "      dailyBudget: meta.dailyBudget != null ? meta.dailyBudget : null,\n" +
+  "      createdAt: meta.createdAt || null,\n" +
+  "      lastSyncedAt: meta.lastSyncedAt || null,\n" +
+  "    };\n" +
+  "    if (meta.videoId != null && String(meta.videoId).trim() !== \"\") {\n" +
+  "      rec.videoId = meta.videoId;\n" +
+  "    }\n" +
+  "    if (meta.mediaType) rec.mediaType = meta.mediaType;\n" +
+  "    return rec;\n" +
+  "  }\n" +
+  "\n" +
+  "  function mirrorVariantToFlat(meta, revision, variant) {\n" +
+  "    meta.currentVariant = revision;\n" +
+  "    meta.creativeRevision = revision;\n" +
+  "    meta.status = variant.status != null ? variant.status : null;\n" +
+  "    meta.campaignId = variant.campaignId != null ? variant.campaignId : null;\n" +
+  "    meta.adSetId = variant.adSetId != null ? variant.adSetId : null;\n" +
+  "    meta.creativeId = variant.creativeId != null ? variant.creativeId : null;\n" +
+  "    meta.adId = variant.adId != null ? variant.adId : null;\n" +
+  "    meta.landingUrl = variant.landingUrl != null ? variant.landingUrl : null;\n" +
+  "    meta.dailyBudget = variant.dailyBudget != null ? variant.dailyBudget : null;\n" +
+  "    meta.createdAt = variant.createdAt != null ? variant.createdAt : null;\n" +
+  "    meta.lastSyncedAt = variant.lastSyncedAt != null ? variant.lastSyncedAt : null;\n" +
+  "  }\n" +
+  "\n" +
+  "  function matchesKnownImageV1Proof(meta) {\n" +
+  "    return META_ID_FIELDS.every(function (f) {\n" +
+  "      return String(meta[f] || \"\") === String(KNOWN_IMAGE_V1_PROOF_IDS[f]);\n" +
+  "    });\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * In-memory migrate flat ads.meta IDs into variants[revision].\n" +
+  "   * Does not mutate Drive by itself — callers merge into clone before write-back.\n" +
+  "   */\n" +
+  "  function normalizeAdsMetaVariants(app) {\n" +
+  "    var meta = (app && app.ads && app.ads.meta) || {};\n" +
+  "    var variants =\n" +
+  "      meta.variants && typeof meta.variants === \"object\" ? Object.assign({}, meta.variants) : {};\n" +
+  "    var migrated = false;\n" +
+  "    var migrationNote = null;\n" +
+  "\n" +
+  "    if (Object.keys(variants).length === 0 && hasCompleteMetaIds(meta)) {\n" +
+  "      var declared =\n" +
+  "        meta.creativeRevision != null && String(meta.creativeRevision).trim() !== \"\"\n" +
+  "          ? String(meta.creativeRevision).trim()\n" +
+  "          : meta.currentVariant != null && String(meta.currentVariant).trim() !== \"\"\n" +
+  "            ? String(meta.currentVariant).trim()\n" +
+  "            : null;\n" +
+  "      var rev = declared;\n" +
+  "      if (matchesKnownImageV1Proof(meta)) {\n" +
+  "        // Flat IDs are the known image proof — never park them under a video revision key.\n" +
+  "        rev = DEFAULT_CREATIVE_REVISION;\n" +
+  "        if (declared && declared !== DEFAULT_CREATIVE_REVISION) {\n" +
+  "          migrationNote = \"flat_known_image_ids_forced_image_v1_despite_declared_\" + declared;\n" +
+  "        } else {\n" +
+  "          migrationNote = \"flat_ids_to_variants_image_v1\";\n" +
+  "        }\n" +
+  "      } else if (!rev) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error:\n" +
+  "            \"ADS_META_REVISION_AMBIGUOUS: flat Meta IDs present without creativeRevision/currentVariant — set creativeRevision explicitly (do not guess)\",\n" +
+  "          migrated: false,\n" +
+  "          variants: variants,\n" +
+  "          currentVariant: null,\n" +
+  "        };\n" +
+  "      } else if (String(rev).indexOf(\"video\") === 0) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error:\n" +
+  "            \"ADS_META_REVISION_AMBIGUOUS: flat Meta IDs present with video creativeRevision=\" +\n" +
+  "            rev +\n" +
+  "            \" but IDs are not the known image-v1 proof — set variants explicitly or clear flat IDs before video\",\n" +
+  "          migrated: false,\n" +
+  "          variants: variants,\n" +
+  "          currentVariant: null,\n" +
+  "        };\n" +
+  "      } else {\n" +
+  "        migrationNote = \"flat_ids_to_variants\";\n" +
+  "      }\n" +
+  "      variants[rev] = extractFlatVariantRecord(meta);\n" +
+  "      if (!variants[rev].mediaType) {\n" +
+  "        variants[rev].mediaType = String(rev).indexOf(\"video\") === 0 ? \"video\" : \"image\";\n" +
+  "      }\n" +
+  "      migrated = true;\n" +
+  "      return {\n" +
+  "        ok: true,\n" +
+  "        migrated: migrated,\n" +
+  "        migrationNote: migrationNote || \"flat_ids_to_variants\",\n" +
+  "        variants: variants,\n" +
+  "        currentVariant: rev,\n" +
+  "        creativeRevision: rev,\n" +
+  "      };\n" +
+  "    }\n" +
+  "\n" +
+  "    var current =\n" +
+  "      meta.currentVariant ||\n" +
+  "      meta.creativeRevision ||\n" +
+  "      (Object.keys(variants).length ? Object.keys(variants).sort()[Object.keys(variants).length - 1] : null);\n" +
+  "\n" +
+  "    return {\n" +
+  "      ok: true,\n" +
+  "      migrated: false,\n" +
+  "      migrationNote: null,\n" +
+  "      variants: variants,\n" +
+  "      currentVariant: current,\n" +
+  "      creativeRevision: meta.creativeRevision || current,\n" +
+  "    };\n" +
+  "  }\n" +
+  "\n" +
+  "  function listVariantKeys(variants) {\n" +
+  "    return Object.keys(variants || {}).filter(function (k) {\n" +
+  "      return k && String(k).trim() !== \"\";\n" +
+  "    });\n" +
+  "  }\n" +
+  "\n" +
+  "  /**\n" +
+  "   * Resolve creativeRevision: explicit wins; else auto image-vN / video-feed-vN.\n" +
+  "   * Never returns a key that already exists in variants.\n" +
+  "   */\n" +
+  "  function resolveCreativeRevision(app, config, mediaType, variants) {\n" +
+  "    config = config || {};\n" +
+  "    variants = variants || {};\n" +
+  "    var existing = listVariantKeys(variants);\n" +
+  "    var explicit =\n" +
+  "      (app.ads && app.ads.meta && app.ads.meta.creativeRevision) ||\n" +
+  "      config.creativeRevision ||\n" +
+  "      null;\n" +
+  "    if (explicit != null && String(explicit).trim() !== \"\") {\n" +
+  "      return { ok: true, creativeRevision: String(explicit).trim(), autoGenerated: false };\n" +
+  "    }\n" +
+  "\n" +
+  "    var prefix = mediaType === \"video\" ? \"video-feed-v\" : \"image-v\";\n" +
+  "    var n = 1;\n" +
+  "    var candidate = prefix + n;\n" +
+  "    while (existing.indexOf(candidate) !== -1) {\n" +
+  "      n += 1;\n" +
+  "      if (n > 100) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error:\n" +
+  "            \"CREATIVE_REVISION_AUTO_EXHAUSTED: could not allocate \" +\n" +
+  "            prefix +\n" +
+  "            \"N — set ads.meta.creativeRevision explicitly\",\n" +
+  "        };\n" +
+  "      }\n" +
+  "      candidate = prefix + n;\n" +
+  "    }\n" +
+  "    return { ok: true, creativeRevision: candidate, autoGenerated: true };\n" +
+  "  }\n" +
+  "\n" +
+  "  function checkIdempotency(app, provider, opts) {\n" +
+  "    opts = opts || {};\n" +
   "    var meta = (app.ads && app.ads.meta) || {};\n" +
   "    var runKey = {\n" +
   "      appId: app.appId,\n" +
   "      experimentRunId: app.analytics && app.analytics.experimentRunId,\n" +
   "      provider: provider || PROVIDER,\n" +
   "    };\n" +
-  "    var existing = META_ID_FIELDS.filter(function (field) {\n" +
-  "      return meta[field] != null && meta[field] !== \"\";\n" +
-  "    });\n" +
+  "    var norm = normalizeAdsMetaVariants(app);\n" +
+  "    if (!norm.ok) {\n" +
+  "      return {\n" +
+  "        runKey: runKey,\n" +
+  "        refused: true,\n" +
+  "        existingFields: [],\n" +
+  "        error: norm.error,\n" +
+  "        variantsNormalized: norm,\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var revision =\n" +
+  "      opts.creativeRevision ||\n" +
+  "      meta.creativeRevision ||\n" +
+  "      norm.creativeRevision ||\n" +
+  "      null;\n" +
+  "    if (!revision) {\n" +
+  "      return {\n" +
+  "        runKey: runKey,\n" +
+  "        refused: false,\n" +
+  "        existingFields: [],\n" +
+  "        variantsNormalized: norm,\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var variant = norm.variants[revision];\n" +
+  "    var complete = hasCompleteMetaIds(variant);\n" +
+  "    var existing = complete\n" +
+  "      ? META_ID_FIELDS.filter(function (field) {\n" +
+  "          return variant[field] != null && variant[field] !== \"\";\n" +
+  "        })\n" +
+  "      : [];\n" +
   "    return {\n" +
   "      runKey: runKey,\n" +
-  "      refused: existing.length > 0,\n" +
+  "      refused: complete,\n" +
   "      existingFields: existing,\n" +
+  "      creativeRevision: revision,\n" +
+  "      variantsNormalized: norm,\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
@@ -668,9 +968,34 @@ const processWf4Code =
   "      return { ok: false, error: \"No usable creative (ads.media[] or media.ogImage)\" };\n" +
   "    }\n" +
   "\n" +
-  "    var creativeResolved = resolveCreativeSource(app, creative);\n" +
+  "    var mediaType = creative.mediaType === \"video\" ? \"video\" : \"image\";\n" +
+  "    var creativeResolved = resolveCreativeSource(app, creative, {\n" +
+  "      expectedMimeFamily: mediaType,\n" +
+  "    });\n" +
   "    if (!creativeResolved.ok) {\n" +
   "      return { ok: false, error: creativeResolved.error };\n" +
+  "    }\n" +
+  "\n" +
+  "    var thumbnailResolved = null;\n" +
+  "    if (mediaType === \"video\") {\n" +
+  "      if (!creative.thumbnailRef) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error:\n" +
+  "            \"VIDEO_THUMBNAIL_REQUIRED: type:video assets must set thumbnailRef (A1/A2 policy — no auto-thumb)\",\n" +
+  "        };\n" +
+  "      }\n" +
+  "      var thumbCreative = findMediaByPath(app, creative.thumbnailRef);\n" +
+  "      var thumbResult = resolveCreativeSource(app, thumbCreative, {\n" +
+  "        expectedMimeFamily: \"image\",\n" +
+  "      });\n" +
+  "      if (!thumbResult.ok) {\n" +
+  "        return {\n" +
+  "          ok: false,\n" +
+  "          error: \"VIDEO_THUMBNAIL_INVALID: \" + thumbResult.error,\n" +
+  "        };\n" +
+  "      }\n" +
+  "      thumbnailResolved = thumbResult.resolved;\n" +
   "    }\n" +
   "\n" +
   "    var budget = app.experiment.testBudget;\n" +
@@ -694,32 +1019,59 @@ const processWf4Code =
   "    }\n" +
   "\n" +
   "    var idem = checkIdempotency(app, provider);\n" +
-  "    if (idem.refused) {\n" +
-  "      return {\n" +
-  "        ok: false,\n" +
-  "        error:\n" +
-  "          \"Idempotency refusal: ads.meta already has \" +\n" +
-  "          idem.existingFields.join(\", \") +\n" +
-  "          \" for runKey \" +\n" +
-  "          JSON.stringify(idem.runKey),\n" +
-  "      };\n" +
+  "    if (idem.error && !idem.variantsNormalized) {\n" +
+  "      return { ok: false, error: idem.error };\n" +
+  "    }\n" +
+  "    if (idem.variantsNormalized && !idem.variantsNormalized.ok) {\n" +
+  "      return { ok: false, error: idem.variantsNormalized.error };\n" +
   "    }\n" +
   "\n" +
   "    var landingUrl = app.deployment.landing.url;\n" +
   "    var utmQuery = buildUtmQuery(app.ads.utmTemplate);\n" +
   "    var destinationUrl = utmQuery ? landingUrl + \"?\" + utmQuery : landingUrl;\n" +
   "    var environment = config.environment || DEFAULT_ENVIRONMENT;\n" +
-  "    var creativeRevision =\n" +
-  "      (app.ads.meta && app.ads.meta.creativeRevision) ||\n" +
-  "      config.creativeRevision ||\n" +
-  "      DEFAULT_CREATIVE_REVISION;\n" +
-  "    var workflowVersion = config.workflowVersion || DEFAULT_WORKFLOW_VERSION;\n" +
+  "    var norm = idem.variantsNormalized || normalizeAdsMetaVariants(app);\n" +
+  "    if (!norm.ok) {\n" +
+  "      return { ok: false, error: norm.error };\n" +
+  "    }\n" +
+  "    var revResolved = resolveCreativeRevision(app, config, mediaType, norm.variants);\n" +
+  "    if (!revResolved.ok) {\n" +
+  "      return { ok: false, error: revResolved.error };\n" +
+  "    }\n" +
+  "    var creativeRevision = revResolved.creativeRevision;\n" +
+  "    // Re-check idempotency for the resolved revision (auto or explicit).\n" +
+  "    idem = checkIdempotency(app, provider, { creativeRevision: creativeRevision });\n" +
+  "    if (idem.refused) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error:\n" +
+  "          \"Idempotency refusal: ads.meta.variants[\" +\n" +
+  "          creativeRevision +\n" +
+  "          \"] already has \" +\n" +
+  "          idem.existingFields.join(\", \") +\n" +
+  "          \" for runKey \" +\n" +
+  "          JSON.stringify(idem.runKey),\n" +
+  "        creativeRevision: creativeRevision,\n" +
+  "        variantsNormalized: norm,\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var workflowVersion =\n" +
+  "      config.workflowVersion ||\n" +
+  "      (mediaType === \"video\" ? DEFAULT_VIDEO_WORKFLOW_VERSION : DEFAULT_WORKFLOW_VERSION);\n" +
   "    var creativeSha256 = config.creativeSha256 || null;\n" +
   "    if (!creativeSha256) {\n" +
   "      return {\n" +
   "        ok: false,\n" +
   "        error:\n" +
   "          \"CREATIVE_SHA256_REQUIRED: pass config.creativeSha256 (binary hash) for operation fingerprint\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "    var thumbnailSha256 = config.thumbnailSha256 || null;\n" +
+  "    if (mediaType === \"video\" && !thumbnailSha256) {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error:\n" +
+  "          \"THUMBNAIL_SHA256_REQUIRED: pass config.thumbnailSha256 for video operation fingerprint\",\n" +
   "      };\n" +
   "    }\n" +
   "    var placementSet = buildPlacementSet(platforms);\n" +
@@ -739,7 +1091,9 @@ const processWf4Code =
   "      environment: environment,\n" +
   "      creativeRevision: creativeRevision,\n" +
   "      workflowVersion: workflowVersion,\n" +
+  "      mediaType: mediaType,\n" +
   "      creativeSha256: creativeSha256,\n" +
+  "      thumbnailSha256: thumbnailSha256,\n" +
   "      operationKey: operationKey,\n" +
   "      placementSet: placementSet,\n" +
   "      authorObjective: app.ads.objective || \"traffic\",\n" +
@@ -757,6 +1111,7 @@ const processWf4Code =
   "      },\n" +
   "      creative: creative,\n" +
   "      creativeResolved: creativeResolved.resolved,\n" +
+  "      thumbnailResolved: thumbnailResolved,\n" +
   "      landingUrl: landingUrl,\n" +
   "      destinationUrl: destinationUrl,\n" +
   "      budget: {\n" +
@@ -786,6 +1141,8 @@ const processWf4Code =
   "      environment: environment,\n" +
   "      workflowVersion: workflowVersion,\n" +
   "      creativeSha256: creativeSha256,\n" +
+  "      thumbnailSha256: thumbnailSha256,\n" +
+  "      mediaType: mediaType,\n" +
   "      creativeRevision: creativeRevision,\n" +
   "      placementSet: placementSet,\n" +
   "    });\n" +
@@ -824,27 +1181,158 @@ const processWf4Code =
   "    var headline = adPlan.headlines[0];\n" +
   "    var primaryText = adPlan.primaryTexts[0];\n" +
   "    var description = (adPlan.descriptions && adPlan.descriptions[0]) || \"\";\n" +
+  "    var isVideo = adPlan.mediaType === \"video\";\n" +
   "\n" +
-  "    var objectStorySpec = {\n" +
-  "      page_id: pageId,\n" +
-  "      link_data: {\n" +
-  "        link: adPlan.destinationUrl,\n" +
-  "        message: primaryText,\n" +
-  "        name: headline,\n" +
-  "        description: description,\n" +
-  "        call_to_action: {\n" +
-  "          type: adPlan.callToAction,\n" +
-  "          value: { link: adPlan.destinationUrl },\n" +
+  "    var objectStorySpec;\n" +
+  "    if (isVideo) {\n" +
+  "      objectStorySpec = {\n" +
+  "        page_id: pageId,\n" +
+  "        video_data: {\n" +
+  "          video_id: \"VERIFY_AFTER_VIDEO_READY\",\n" +
+  "          image_hash: \"VERIFY_AFTER_THUMB_UPLOAD\",\n" +
+  "          message: primaryText,\n" +
+  "          title: headline,\n" +
+  "          link_description: description,\n" +
+  "          call_to_action: {\n" +
+  "            type: adPlan.callToAction,\n" +
+  "            value: { link: adPlan.destinationUrl },\n" +
+  "          },\n" +
   "        },\n" +
-  "        image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n" +
-  "      },\n" +
-  "    };\n" +
+  "      };\n" +
+  "    } else {\n" +
+  "      objectStorySpec = {\n" +
+  "        page_id: pageId,\n" +
+  "        link_data: {\n" +
+  "          link: adPlan.destinationUrl,\n" +
+  "          message: primaryText,\n" +
+  "          name: headline,\n" +
+  "          description: description,\n" +
+  "          call_to_action: {\n" +
+  "            type: adPlan.callToAction,\n" +
+  "            value: { link: adPlan.destinationUrl },\n" +
+  "          },\n" +
+  "          image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n" +
+  "        },\n" +
+  "      };\n" +
+  "    }\n" +
   "    if (\n" +
   "      instagramUserId &&\n" +
   "      adPlan.platforms &&\n" +
   "      adPlan.platforms.indexOf(\"instagram\") !== -1\n" +
   "    ) {\n" +
   "      objectStorySpec.instagram_user_id = instagramUserId;\n" +
+  "    }\n" +
+  "\n" +
+  "    var requests = {\n" +
+  "      campaign: {\n" +
+  "        name: adPlan.campaignName,\n" +
+  "        objective: metaObjective,\n" +
+  "        status: \"PAUSED\",\n" +
+  "        special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),\n" +
+  "        is_adset_budget_sharing_enabled: false,\n" +
+  "      },\n" +
+  "      adSet: {\n" +
+  "        name: adPlan.campaignName + \"-adset-v1\",\n" +
+  "        status: \"PAUSED\",\n" +
+  "        daily_budget: dailyBudgetMinor,\n" +
+  "        billing_event: V1_BILLING_EVENT,\n" +
+  "        optimization_goal: V1_OPTIMIZATION_GOAL,\n" +
+  "        bid_strategy: \"LOWEST_COST_WITHOUT_CAP\",\n" +
+  "        targeting: adSetTargeting,\n" +
+  "        promoted_object: { page_id: pageId },\n" +
+  "      },\n" +
+  "      creative: {\n" +
+  "        name: adPlan.campaignName + \"-creative-a\",\n" +
+  "        object_story_spec: objectStorySpec,\n" +
+  "      },\n" +
+  "      ad: {\n" +
+  "        name: adPlan.campaignName + \"-ad-a\",\n" +
+  "        status: \"PAUSED\",\n" +
+  "        creative: { creative_id: \"CREATIVE_ID_FROM_CREATE_CREATIVE\" },\n" +
+  "      },\n" +
+  "    };\n" +
+  "\n" +
+  "    if (isVideo) {\n" +
+  "      requests.videoUpload = {\n" +
+  "        endpoint: \"POST /\" + adAccountId + \"/advideos\",\n" +
+  "        host: \"graph-video.facebook.com\",\n" +
+  "        metaApiVersion: metaApiVersion,\n" +
+  "        method: \"source_or_chunked\",\n" +
+  "        sourceUploadMaxBytes: VIDEO_SOURCE_UPLOAD_MAX_BYTES,\n" +
+  "        uploadPhases: [\"start\", \"transfer\", \"finish\", \"cancel\"],\n" +
+  "        resolutionMethod: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.resolutionMethod\n" +
+  "          : null,\n" +
+  "        downloadUrl: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.downloadUrl\n" +
+  "          : null,\n" +
+  "        filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,\n" +
+  "        repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,\n" +
+  "        branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,\n" +
+  "        githubPath: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.githubPath\n" +
+  "          : null,\n" +
+  "        expectedMime: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.expectedMime\n" +
+  "          : null,\n" +
+  "        expectedMimeFamily: \"video\",\n" +
+  "        video_id: \"VERIFY_AFTER_VIDEO_UPLOAD\",\n" +
+  "      };\n" +
+  "      requests.videoStatusPoll = {\n" +
+  "        endpoint: \"GET /{video_id}?fields=status\",\n" +
+  "        readyWhen: \"status.video_status === ready\",\n" +
+  "        failWhen: \"status.video_status === error\",\n" +
+  "        timeoutMs: VIDEO_POLL_TIMEOUT_MS,\n" +
+  "        note: \"Never create creative until video_status is ready\",\n" +
+  "      };\n" +
+  "      requests.imageUpload = {\n" +
+  "        endpoint: \"POST /\" + adAccountId + \"/adimages\",\n" +
+  "        purpose: \"video_thumbnail\",\n" +
+  "        source: \"thumbnailRef\",\n" +
+  "        image_hash: \"VERIFY_AFTER_THUMB_UPLOAD\",\n" +
+  "        resolutionMethod: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.resolutionMethod\n" +
+  "          : null,\n" +
+  "        downloadUrl: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.downloadUrl\n" +
+  "          : null,\n" +
+  "        filename: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.filename\n" +
+  "          : null,\n" +
+  "        repo: adPlan.thumbnailResolved ? adPlan.thumbnailResolved.repo : null,\n" +
+  "        branch: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.branch\n" +
+  "          : null,\n" +
+  "        githubPath: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.githubPath\n" +
+  "          : null,\n" +
+  "        expectedMime: adPlan.thumbnailResolved\n" +
+  "          ? adPlan.thumbnailResolved.expectedMime\n" +
+  "          : null,\n" +
+  "        expectedMimeFamily: \"image\",\n" +
+  "      };\n" +
+  "    } else {\n" +
+  "      requests.imageUpload = {\n" +
+  "        endpoint: \"POST /\" + adAccountId + \"/adimages\",\n" +
+  "        source: \"ads.media githubPath or media.ogImage\",\n" +
+  "        image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n" +
+  "        resolutionMethod: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.resolutionMethod\n" +
+  "          : null,\n" +
+  "        downloadUrl: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.downloadUrl\n" +
+  "          : null,\n" +
+  "        filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,\n" +
+  "        repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,\n" +
+  "        branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,\n" +
+  "        githubPath: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.githubPath\n" +
+  "          : null,\n" +
+  "        expectedMime: adPlan.creativeResolved\n" +
+  "          ? adPlan.creativeResolved.expectedMime\n" +
+  "          : null,\n" +
+  "        expectedMimeFamily: \"image\",\n" +
+  "      };\n" +
   "    }\n" +
   "\n" +
   "    return {\n" +
@@ -865,70 +1353,22 @@ const processWf4Code =
   "      },\n" +
   "      statusForDeliveryEntities: \"PAUSED\",\n" +
   "      neverSendActive: true,\n" +
-  "      requests: {\n" +
-  "        campaign: {\n" +
-  "          name: adPlan.campaignName,\n" +
-  "          objective: metaObjective,\n" +
-  "          status: \"PAUSED\",\n" +
-  "          special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),\n" +
-  "          // Required when using ad-set budgets (not CBO). Probe-proven 2026-07-26.\n" +
-  "          is_adset_budget_sharing_enabled: false,\n" +
-  "        },\n" +
-  "        adSet: {\n" +
-  "          name: adPlan.campaignName + \"-adset-v1\",\n" +
-  "          status: \"PAUSED\",\n" +
-  "          daily_budget: dailyBudgetMinor,\n" +
-  "          billing_event: V1_BILLING_EVENT,\n" +
-  "          optimization_goal: V1_OPTIMIZATION_GOAL,\n" +
-  "          // Account requires explicit strategy; omitting triggers subcode 2490487.\n" +
-  "          bid_strategy: \"LOWEST_COST_WITHOUT_CAP\",\n" +
-  "          targeting: adSetTargeting,\n" +
-  "          promoted_object: { page_id: pageId },\n" +
-  "        },\n" +
-  "        imageUpload: {\n" +
-  "          endpoint: \"POST /\" + adAccountId + \"/adimages\",\n" +
-  "          source: \"ads.media githubPath or media.ogImage\",\n" +
-  "          image_hash: \"VERIFY_AFTER_IMAGE_UPLOAD\",\n" +
-  "          resolutionMethod: adPlan.creativeResolved\n" +
-  "            ? adPlan.creativeResolved.resolutionMethod\n" +
-  "            : null,\n" +
-  "          downloadUrl: adPlan.creativeResolved\n" +
-  "            ? adPlan.creativeResolved.downloadUrl\n" +
-  "            : null,\n" +
-  "          filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,\n" +
-  "          repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,\n" +
-  "          branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,\n" +
-  "          githubPath: adPlan.creativeResolved\n" +
-  "            ? adPlan.creativeResolved.githubPath\n" +
-  "            : null,\n" +
-  "          expectedMime: adPlan.creativeResolved\n" +
-  "            ? adPlan.creativeResolved.expectedMime\n" +
-  "            : null,\n" +
-  "          expectedMimeFamily: \"image\",\n" +
-  "        },\n" +
-  "        creative: {\n" +
-  "          name: adPlan.campaignName + \"-creative-a\",\n" +
-  "          object_story_spec: objectStorySpec,\n" +
-  "        },\n" +
-  "        ad: {\n" +
-  "          name: adPlan.campaignName + \"-ad-a\",\n" +
-  "          status: \"PAUSED\",\n" +
-  "          creative: { creative_id: \"CREATIVE_ID_FROM_CREATE_CREATIVE\" },\n" +
-  "        },\n" +
-  "      },\n" +
+  "      requests: requests,\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
   "  function buildLedgerPlan(adPlan) {\n" +
-  "    return {\n" +
+  "    var plan = {\n" +
   "      operationKey: adPlan.operationKey,\n" +
   "      appId: adPlan.appId,\n" +
   "      experimentRunId: adPlan.experimentRunId,\n" +
   "      provider: adPlan.provider,\n" +
   "      environment: adPlan.environment,\n" +
   "      creativeRevision: adPlan.creativeRevision,\n" +
+  "      mediaType: adPlan.mediaType || \"image\",\n" +
   "      contentFingerprint: adPlan.contentFingerprint,\n" +
   "      creativeSha256: adPlan.creativeSha256,\n" +
+  "      thumbnailSha256: adPlan.thumbnailSha256 || null,\n" +
   "      placementSet: adPlan.placementSet,\n" +
   "      phase: \"planned\",\n" +
   "      campaignId: null,\n" +
@@ -944,35 +1384,59 @@ const processWf4Code =
   "      reconciliation:\n" +
   "        \"V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete\",\n" +
   "    };\n" +
+  "    if (adPlan.mediaType === \"video\") {\n" +
+  "      plan.videoId = null;\n" +
+  "    }\n" +
+  "    return plan;\n" +
   "  }\n" +
   "\n" +
   "  function buildWriteBackPreview(adPlan, ids) {\n" +
   "    ids = ids || {};\n" +
+  "    var revision = adPlan.creativeRevision || DEFAULT_CREATIVE_REVISION;\n" +
+  "    var variant = {\n" +
+  "      status: \"created_paused\",\n" +
+  "      campaignId: ids.campaignId || \"<campaign-id>\",\n" +
+  "      adSetId: ids.adSetId || \"<ad-set-id>\",\n" +
+  "      creativeId: ids.creativeId || \"<creative-id>\",\n" +
+  "      adId: ids.adId || \"<ad-id>\",\n" +
+  "      landingUrl: adPlan.destinationUrl,\n" +
+  "      dailyBudget: adPlan.budget.dailyBudgetUsd,\n" +
+  "      createdAt: ids.createdAt || \"<iso8601>\",\n" +
+  "      lastSyncedAt: null,\n" +
+  "      mediaType: adPlan.mediaType === \"video\" ? \"video\" : \"image\",\n" +
+  "    };\n" +
+  "    if (ids.videoId) variant.videoId = ids.videoId;\n" +
+  "    var variants = {};\n" +
+  "    variants[revision] = variant;\n" +
   "    return {\n" +
   "      ads: {\n" +
   "        meta: {\n" +
   "          status: \"created_paused\",\n" +
-  "          campaignId: ids.campaignId || \"<campaign-id>\",\n" +
-  "          adSetId: ids.adSetId || \"<ad-set-id>\",\n" +
-  "          creativeId: ids.creativeId || \"<creative-id>\",\n" +
-  "          adId: ids.adId || \"<ad-id>\",\n" +
-  "          landingUrl: adPlan.destinationUrl,\n" +
-  "          dailyBudget: adPlan.budget.dailyBudgetUsd,\n" +
-  "          createdAt: ids.createdAt || \"<iso8601>\",\n" +
+  "          currentVariant: revision,\n" +
+  "          creativeRevision: revision,\n" +
+  "          campaignId: variant.campaignId,\n" +
+  "          adSetId: variant.adSetId,\n" +
+  "          creativeId: variant.creativeId,\n" +
+  "          adId: variant.adId,\n" +
+  "          landingUrl: variant.landingUrl,\n" +
+  "          dailyBudget: variant.dailyBudget,\n" +
+  "          createdAt: variant.createdAt,\n" +
   "          lastSyncedAt: null,\n" +
+  "          variants: variants,\n" +
   "        },\n" +
   "      },\n" +
   "      rootStatusUnchanged: true,\n" +
   "      rootStatusNote:\n" +
   "        \"Preserve existing root status (e.g. ready). Set validating only after human-approved activation.\",\n" +
   "      writeBackTiming:\n" +
-  "        \"verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger\",\n" +
+  "        \"verified_complete_only: merge ads.meta.variants[revision] + mirror flat currentVariant after PAUSED verify; never delete other variant keys\",\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
   "  /**\n" +
   "   * Merge verified-complete ads.meta into an existing app.json without touching\n" +
-  "   * root status or author fields. Partial-step IDs must not call this — ledger only.\n" +
+  "   * root status or author fields. Writes variants[revision] and mirrors flat fields.\n" +
+  "   * Preserves other variant keys. Migrates legacy flat IDs into variants first.\n" +
   "   */\n" +
   "  function mergeAdsMetaWriteBack(appJson, writeBackMeta, options) {\n" +
   "    options = options || {};\n" +
@@ -983,9 +1447,25 @@ const processWf4Code =
   "    if (metaIn.ads && metaIn.ads.meta) {\n" +
   "      metaIn = metaIn.ads.meta;\n" +
   "    }\n" +
+  "    var revision =\n" +
+  "      metaIn.creativeRevision ||\n" +
+  "      metaIn.currentVariant ||\n" +
+  "      (metaIn.variants && Object.keys(metaIn.variants)[0]) ||\n" +
+  "      null;\n" +
+  "    var variantIn =\n" +
+  "      (revision && metaIn.variants && metaIn.variants[revision]) ||\n" +
+  "      extractFlatVariantRecord(metaIn);\n" +
+  "    if (revision && metaIn.variants && metaIn.variants[revision]) {\n" +
+  "      variantIn = Object.assign({}, metaIn.variants[revision]);\n" +
+  "    }\n" +
+  "\n" +
   "    var requiredIds = [\"campaignId\", \"adSetId\", \"creativeId\", \"adId\"];\n" +
   "    var missing = requiredIds.filter(function (k) {\n" +
-  "      return metaIn[k] == null || String(metaIn[k]).trim() === \"\" || String(metaIn[k]).indexOf(\"<\") === 0;\n" +
+  "      return (\n" +
+  "        variantIn[k] == null ||\n" +
+  "        String(variantIn[k]).trim() === \"\" ||\n" +
+  "        String(variantIn[k]).indexOf(\"<\") === 0\n" +
+  "      );\n" +
   "    });\n" +
   "    if (options.requireCompleteIds !== false && missing.length) {\n" +
   "      return {\n" +
@@ -994,42 +1474,51 @@ const processWf4Code =
   "        missingIds: missing,\n" +
   "      };\n" +
   "    }\n" +
-  "    if (options.requireVerifiedStatus !== false && metaIn.status !== \"created_paused\") {\n" +
+  "    if (options.requireVerifiedStatus !== false && variantIn.status !== \"created_paused\") {\n" +
   "      return {\n" +
   "        ok: false,\n" +
   "        error: \"WRITEBACK_STATUS_REQUIRED: status must be created_paused before Drive merge\",\n" +
   "      };\n" +
   "    }\n" +
+  "    if (!revision || String(revision).trim() === \"\") {\n" +
+  "      return {\n" +
+  "        ok: false,\n" +
+  "        error: \"WRITEBACK_REVISION_REQUIRED: creativeRevision/currentVariant required for variants write-back\",\n" +
+  "      };\n" +
+  "    }\n" +
+  "    revision = String(revision).trim();\n" +
   "\n" +
   "    var clone = JSON.parse(JSON.stringify(appJson));\n" +
   "    var rootBefore = clone.status;\n" +
   "    if (!clone.ads || typeof clone.ads !== \"object\") clone.ads = {};\n" +
   "    if (!clone.ads.meta || typeof clone.ads.meta !== \"object\") clone.ads.meta = {};\n" +
   "\n" +
-  "    var keys = [\n" +
-  "      \"status\",\n" +
-  "      \"campaignId\",\n" +
-  "      \"adSetId\",\n" +
-  "      \"creativeId\",\n" +
-  "      \"adId\",\n" +
-  "      \"landingUrl\",\n" +
-  "      \"dailyBudget\",\n" +
-  "      \"createdAt\",\n" +
-  "      \"lastSyncedAt\",\n" +
-  "    ];\n" +
-  "    for (var i = 0; i < keys.length; i++) {\n" +
-  "      var key = keys[i];\n" +
-  "      if (Object.prototype.hasOwnProperty.call(metaIn, key)) {\n" +
-  "        clone.ads.meta[key] = metaIn[key];\n" +
+  "    var norm = normalizeAdsMetaVariants(clone);\n" +
+  "    if (!norm.ok) {\n" +
+  "      return { ok: false, error: norm.error };\n" +
+  "    }\n" +
+  "    if (!clone.ads.meta.variants || typeof clone.ads.meta.variants !== \"object\") {\n" +
+  "      clone.ads.meta.variants = {};\n" +
+  "    }\n" +
+  "    // Seed migrated variants without wiping\n" +
+  "    Object.keys(norm.variants || {}).forEach(function (k) {\n" +
+  "      if (!clone.ads.meta.variants[k]) {\n" +
+  "        clone.ads.meta.variants[k] = norm.variants[k];\n" +
   "      }\n" +
+  "    });\n" +
+  "\n" +
+  "    var nowIso = new Date().toISOString();\n" +
+  "    var stored = Object.assign({}, variantIn, {\n" +
+  "      status: \"created_paused\",\n" +
+  "      lastSyncedAt: nowIso,\n" +
+  "    });\n" +
+  "    if (!stored.mediaType) {\n" +
+  "      stored.mediaType = String(revision).indexOf(\"video\") === 0 ? \"video\" : \"image\";\n" +
   "    }\n" +
-  "    // Preserve creativeRevision if already present and not supplied\n" +
-  "    if (\n" +
-  "      metaIn.creativeRevision != null &&\n" +
-  "      String(metaIn.creativeRevision).trim() !== \"\"\n" +
-  "    ) {\n" +
-  "      clone.ads.meta.creativeRevision = metaIn.creativeRevision;\n" +
-  "    }\n" +
+  "    clone.ads.meta.variants[revision] = stored;\n" +
+  "    mirrorVariantToFlat(clone.ads.meta, revision, stored);\n" +
+  "    // Ensure variants object retained\n" +
+  "    clone.ads.meta.variants = clone.ads.meta.variants;\n" +
   "\n" +
   "    clone.status = rootBefore;\n" +
   "    return {\n" +
@@ -1038,6 +1527,8 @@ const processWf4Code =
   "      rootStatusUnchanged: clone.status === rootBefore,\n" +
   "      rootStatus: clone.status,\n" +
   "      adsMeta: clone.ads.meta,\n" +
+  "      migrated: norm.migrated,\n" +
+  "      migrationNote: norm.migrationNote,\n" +
   "    };\n" +
   "  }\n" +
   "\n" +
@@ -1080,10 +1571,12 @@ const processWf4Code =
   "        },\n" +
   "        source: {\n" +
   "          landingUrl: adPlan.landingUrl,\n" +
+  "          mediaType: adPlan.mediaType || \"image\",\n" +
   "          creative: {\n" +
   "            kind: adPlan.creativeResolved.kind,\n" +
   "            value: adPlan.creativeResolved.value,\n" +
   "            role: adPlan.creativeResolved.role,\n" +
+  "            type: adPlan.creativeResolved.type || adPlan.mediaType || \"image\",\n" +
   "            resolvedFrom: adPlan.creativeResolved.resolvedFrom,\n" +
   "            repo: adPlan.creativeResolved.repo,\n" +
   "            branch: adPlan.creativeResolved.branch,\n" +
@@ -1094,7 +1587,22 @@ const processWf4Code =
   "            expectedMime: adPlan.creativeResolved.expectedMime,\n" +
   "            expectedMimeFamily: adPlan.creativeResolved.expectedMimeFamily,\n" +
   "            resolutionMethod: adPlan.creativeResolved.resolutionMethod,\n" +
+  "            thumbnailRef: adPlan.creativeResolved.thumbnailRef || null,\n" +
   "          },\n" +
+  "          thumbnail: adPlan.thumbnailResolved\n" +
+  "            ? {\n" +
+  "                kind: adPlan.thumbnailResolved.kind,\n" +
+  "                value: adPlan.thumbnailResolved.value,\n" +
+  "                role: adPlan.thumbnailResolved.role,\n" +
+  "                downloadUrl: adPlan.thumbnailResolved.downloadUrl,\n" +
+  "                filename: adPlan.thumbnailResolved.filename,\n" +
+  "                expectedMime: adPlan.thumbnailResolved.expectedMime,\n" +
+  "                expectedMimeFamily: \"image\",\n" +
+  "                repo: adPlan.thumbnailResolved.repo,\n" +
+  "                branch: adPlan.thumbnailResolved.branch,\n" +
+  "                githubPath: adPlan.thumbnailResolved.githubPath,\n" +
+  "              }\n" +
+  "            : null,\n" +
   "        },\n" +
   "        computed: {\n" +
   "          destinationUrl: adPlan.destinationUrl,\n" +
@@ -1113,6 +1621,8 @@ const processWf4Code =
   "          operationKey: adPlan.operationKey,\n" +
   "          contentFingerprint: adPlan.contentFingerprint,\n" +
   "          creativeSha256: adPlan.creativeSha256,\n" +
+  "          thumbnailSha256: adPlan.thumbnailSha256 || null,\n" +
+  "          mediaType: adPlan.mediaType || \"image\",\n" +
   "          creativeRevision: adPlan.creativeRevision,\n" +
   "          environment: adPlan.environment,\n" +
   "          placementSet: adPlan.placementSet,\n" +
@@ -1170,8 +1680,18 @@ const processWf4Code =
   "  exports.mapAuthorObjective = mapAuthorObjective;\n" +
   "  exports.selectCreative = selectCreative;\n" +
   "  exports.resolveCreativeSource = resolveCreativeSource;\n" +
+  "  exports.findMediaByPath = findMediaByPath;\n" +
   "  exports.checkIdempotency = checkIdempotency;\n" +
+  "  exports.normalizeAdsMetaVariants = normalizeAdsMetaVariants;\n" +
+  "  exports.resolveCreativeRevision = resolveCreativeRevision;\n" +
+  "  exports.hasCompleteMetaIds = hasCompleteMetaIds;\n" +
+  "  exports.KNOWN_IMAGE_V1_PROOF_IDS = KNOWN_IMAGE_V1_PROOF_IDS;\n" +
   "  exports.IMAGE_EXTENSIONS = IMAGE_EXTENSIONS;\n" +
+  "  exports.VIDEO_EXTENSIONS = VIDEO_EXTENSIONS;\n" +
+  "  exports.DEFAULT_VIDEO_CREATIVE_REVISION = DEFAULT_VIDEO_CREATIVE_REVISION;\n" +
+  "  exports.DEFAULT_VIDEO_WORKFLOW_VERSION = DEFAULT_VIDEO_WORKFLOW_VERSION;\n" +
+  "  exports.VIDEO_SOURCE_UPLOAD_MAX_BYTES = VIDEO_SOURCE_UPLOAD_MAX_BYTES;\n" +
+  "  exports.VIDEO_POLL_TIMEOUT_MS = VIDEO_POLL_TIMEOUT_MS;\n" +
   "})(__wf4Exports);\n" +
   "\n" +
   "const input = $input.first().json;\n" +
@@ -1189,12 +1709,15 @@ const processWf4Code =
   "if (!creativeSha256) {\n" +
   "  throw new Error('CREATIVE_SHA256_REQUIRED: set WF4_CREATIVE_SHA256 in Workflow Config (sandbox planning hash)');\n" +
   "}\n" +
+  "const thumbnailSha256 = input.WF4_THUMBNAIL_SHA256 || input.thumbnailSha256 || null;\n" +
   "const result = WF4MetaAdapter.buildDryRunBundle(app, {\n" +
   "  mode: mode,\n" +
   "  provider: input.provider || 'meta',\n" +
   "  environment: input.environment || 'sandbox',\n" +
   "  workflowVersion: input.workflowVersion || 'wf4-image-v1',\n" +
   "  creativeSha256: creativeSha256,\n" +
+  "  thumbnailSha256: thumbnailSha256,\n" +
+  "  creativeRevision: input.creativeRevision || null,\n" +
   "  maxDailyBudgetUsd: input.MAX_DAILY_BUDGET_USD != null ? Number(input.MAX_DAILY_BUDGET_USD) : 2,\n" +
   "  metaApiVersion: input.metaApiVersion || input.META_API_VERSION || 'v25.0',\n" +
   "  wf3GateStatus: input.wf3GateStatus || 'proven',\n" +
@@ -1266,6 +1789,8 @@ const ledgerIdempotencyCode =
   "  row = row || {};\n" +
   "  if (!row.campaignId) return 'campaign';\n" +
   "  if (!row.adSetId) return 'adset';\n" +
+  "  var rev = String(row.creativeRevision || '');\n" +
+  "  if (rev.indexOf('video') === 0 && !row.videoId) return 'video';\n" +
   "  if (!row.imageHash) return 'image';\n" +
   "  if (!row.creativeId) return 'creative';\n" +
   "  if (!row.adId) return 'ad';\n" +
@@ -1348,9 +1873,86 @@ const mergeAfterCampaignCode =
 const mergeAfterAdSetCode =
   "const prev = $('Merge Campaign Id').first().json;\n" +
   "const created = $input.first().json;\n" +
-  "const adSetId = created.id || created.adset_id;\n" +
+  "// Prefer resume/ledger adSetId first — skipped Create Ad Set passes prior metaCreate.\n" +
+  "const adSetId =\n" +
+  "  (prev.metaCreate && prev.metaCreate.adSetId) ||\n" +
+  "  created.id ||\n" +
+  "  created.adset_id;\n" +
   "if (!adSetId) throw new Error('Create Ad Set PAUSED returned no id');\n" +
+  "if (String(adSetId).length < 10) {\n" +
+  "  throw new Error('Create Ad Set PAUSED returned non-Meta id: ' + adSetId);\n" +
+  "}\n" +
   "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { adSetId: String(adSetId) }) }) }];";
+
+const respondAlreadyCompleteCode =
+  "const item = $input.first().json;\n" +
+  "const mc = item.metaCreate || {};\n" +
+  "return [{ json: {\n" +
+  "  ok: true,\n" +
+  "  mode: item.mode || 'create_paused',\n" +
+  "  outcome: 'already_complete',\n" +
+  "  ledgerAction: 'already_complete',\n" +
+  "  operationKey: item.bundle && item.bundle.ledgerPlan && item.bundle.ledgerPlan.operationKey,\n" +
+  "  metaCreate: mc,\n" +
+  "  externalWritePerformed: false,\n" +
+  "  metaHttpCalls: 0,\n" +
+  "  driveWrites: 0,\n" +
+  "  note: 'Already complete — zero Meta POSTs (Already Complete IF short-circuit)',\n" +
+  "} }];";
+
+const skipCampaignCreateCode =
+  "const item = $input.first().json;\n" +
+  "if (!(item.metaCreate && item.metaCreate.campaignId)) {\n" +
+  "  throw new Error('SKIP_CAMPAIGN_REQUIRES_ID: expected metaCreate.campaignId when skipping Create Campaign');\n" +
+  "}\n" +
+  "return [{ json: Object.assign({}, item, { skippedCreateCampaign: true }) }];";
+
+const skipAdSetCreateCode =
+  "const item = $input.first().json;\n" +
+  "if (!(item.metaCreate && item.metaCreate.adSetId)) {\n" +
+  "  throw new Error('SKIP_ADSET_REQUIRES_ID: expected metaCreate.adSetId when skipping Create Ad Set');\n" +
+  "}\n" +
+  "return [{ json: Object.assign({}, item, { skippedCreateAdSet: true }) }];";
+
+const mergeAfterAdCode =
+  "const prev = $('Merge Creative Id').first().json;\n" +
+  "const created = $input.first().json;\n" +
+  "const adId =\n" +
+  "  (prev.metaCreate && prev.metaCreate.adId) ||\n" +
+  "  created.id ||\n" +
+  "  created.ad_id;\n" +
+  "if (!adId) throw new Error('Create Ad PAUSED returned no id');\n" +
+  "if (String(adId).length < 10) {\n" +
+  "  throw new Error('Create Ad PAUSED returned non-Meta id: ' + adId);\n" +
+  "}\n" +
+  "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { adId: String(adId) }) }) }];";
+
+const assertPausedCode =
+  "const prev = $('Merge Ad Id').first().json;\n" +
+  "const raw = $input.first().json;\n" +
+  "const mc = prev.metaCreate || {};\n" +
+  "const ids = [mc.campaignId, mc.adSetId, mc.adId].filter(Boolean);\n" +
+  "if (ids.length !== 3) throw new Error('PAUSED_VERIFY_MISSING_IDS: need campaignId, adSetId, adId');\n" +
+  "function pick(id) {\n" +
+  "  if (raw && raw[id]) return raw[id];\n" +
+  "  if (raw && raw.data && raw.data[id]) return raw.data[id];\n" +
+  "  return null;\n" +
+  "}\n" +
+  "const checks = [];\n" +
+  "['campaignId','adSetId','adId'].forEach(function (key) {\n" +
+  "  var id = mc[key];\n" +
+  "  var o = pick(id);\n" +
+  "  if (!o) throw new Error('PAUSED_VERIFY_MISSING_OBJECT: ' + key + '=' + id);\n" +
+  "  var status = String(o.status || '').toUpperCase();\n" +
+  "  if (status !== 'PAUSED') {\n" +
+  "    throw new Error('PAUSED_VERIFY_FAILED: ' + key + '=' + id + ' status=' + status + ' (expected PAUSED)');\n" +
+  "  }\n" +
+  "  checks.push({ key: key, id: id, status: status, effective_status: o.effective_status || null, name: o.name || null });\n" +
+  "});\n" +
+  "return [{ json: Object.assign({}, prev, {\n" +
+  "  pausedVerified: true,\n" +
+  "  pausedVerify: { ok: true, checks: checks },\n" +
+  "}) }];";
 
 const resolveCreativeDownloadPlanCode =
   "const prev = $('Merge AdSet Id').first().json;\n" +
@@ -1444,11 +2046,12 @@ const mergeAfterCreativeCode =
   "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { creativeId: String(creativeId) }) }) }];";
 
 const prepareLedgerVerifiedCode =
-  "const prev = $('Merge Creative Id').first().json;\n" +
-  "const created = $input.first().json;\n" +
-  "const adId = created.id || created.ad_id;\n" +
-  "if (!adId) throw new Error('Create Ad PAUSED returned no id');\n" +
-  "const mc = Object.assign({}, prev.metaCreate || {}, { adId: String(adId) });\n" +
+  "const prev = $('Assert PAUSED').first().json;\n" +
+  "if (prev.pausedVerified !== true) {\n" +
+  "  throw new Error('PAUSED_VERIFY_REQUIRED: Assert PAUSED must pass before ledger verified / Drive write-back');\n" +
+  "}\n" +
+  "const mc = prev.metaCreate || {};\n" +
+  "if (!mc.adId) throw new Error('Create Ad PAUSED returned no id');\n" +
   "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
   "const claim = prev.ledgerClaim || {};\n" +
   "return [{ json: Object.assign({}, prev, {\n" +
@@ -1519,10 +2122,15 @@ const prepareLedgerCreativeCode = buildPrepareLedgerStageCode('Merge Creative Id
 
 const prepareWriteBackCode =
   "const prev = $('Prepare Ledger Verified').first().json;\n" +
+  "if (prev.pausedVerified !== true) {\n" +
+  "  throw new Error('PAUSED_VERIFY_REQUIRED: Drive write-back blocked until Assert PAUSED passes');\n" +
+  "}\n" +
   "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
   "const mc = prev.metaCreate || {};\n" +
   "const preview = (prev.bundle && prev.bundle.writeBackAfterCreatePausedOnly && prev.bundle.writeBackAfterCreatePausedOnly.ads && prev.bundle.writeBackAfterCreatePausedOnly.ads.meta) || {};\n" +
-  "const writeBackMeta = {\n" +
+  "const revision = plan.creativeRevision || preview.creativeRevision || 'image-v1';\n" +
+  "const mediaType = (prev.bundle && prev.bundle.source && prev.bundle.source.mediaType) || (String(revision).indexOf('video') === 0 ? 'video' : 'image');\n" +
+  "const variant = {\n" +
   "  status: 'created_paused',\n" +
   "  campaignId: mc.campaignId,\n" +
   "  adSetId: mc.adSetId,\n" +
@@ -1532,7 +2140,24 @@ const prepareWriteBackCode =
   "  dailyBudget: preview.dailyBudget != null ? preview.dailyBudget : (prev.bundle && prev.bundle.computed && prev.bundle.computed.dailyBudget),\n" +
   "  createdAt: new Date().toISOString(),\n" +
   "  lastSyncedAt: null,\n" +
-  "  creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+  "  mediaType: mediaType,\n" +
+  "};\n" +
+  "if (mc.videoId) variant.videoId = mc.videoId;\n" +
+  "const variants = {};\n" +
+  "variants[revision] = variant;\n" +
+  "const writeBackMeta = {\n" +
+  "  status: 'created_paused',\n" +
+  "  currentVariant: revision,\n" +
+  "  creativeRevision: revision,\n" +
+  "  campaignId: variant.campaignId,\n" +
+  "  adSetId: variant.adSetId,\n" +
+  "  creativeId: variant.creativeId,\n" +
+  "  adId: variant.adId,\n" +
+  "  landingUrl: variant.landingUrl,\n" +
+  "  dailyBudget: variant.dailyBudget,\n" +
+  "  createdAt: variant.createdAt,\n" +
+  "  lastSyncedAt: null,\n" +
+  "  variants: variants,\n" +
   "};\n" +
   "const required = ['campaignId','adSetId','creativeId','adId'];\n" +
   "const missing = required.filter(function (k) { return !writeBackMeta[k]; });\n" +
@@ -1549,27 +2174,82 @@ const mergeAdsMetaWriteBackCode =
   "const prev = $('Prepare Write-Back').first().json;\n" +
   "const item = $input.first();\n" +
   "let appJson = null;\n" +
-  "if (item.json && item.json.ads) appJson = item.json;\n" +
-  "else if (item.binary && item.binary.data) {\n" +
-  "  const bin = item.binary.data;\n" +
-  "  const raw = bin.data;\n" +
-  "  if (typeof raw === 'string') {\n" +
-  "    const text = Buffer.from(raw, bin.encoding === 'base64' || !bin.encoding ? 'base64' : bin.encoding).toString('utf8');\n" +
-  "    appJson = JSON.parse(text);\n" +
+  "if (item.json && item.json.ads && !(item.binary && item.binary.data)) {\n" +
+  "  appJson = item.json;\n" +
+  "} else {\n" +
+  "  try {\n" +
+  "    const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\n" +
+  "    appJson = JSON.parse(buf.toString('utf8'));\n" +
+  "  } catch (e) {\n" +
+  "    throw new Error('WRITEBACK_APPJSON_REQUIRED: Drive download did not yield app.json (' + e.message + ')');\n" +
   "  }\n" +
   "}\n" +
   "if (!appJson || typeof appJson !== 'object') throw new Error('WRITEBACK_APPJSON_REQUIRED: Drive download did not yield app.json');\n" +
-  "const rootBefore = appJson.status;\n" +
   "const metaIn = prev.writeBackMeta || {};\n" +
+  "const META_ID_FIELDS = ['campaignId','adSetId','creativeId','adId'];\n" +
+  "const KNOWN = { campaignId: '120250607331460199', adSetId: '120250622864980199', creativeId: '1007406578799368', adId: '120250622866330199' };\n" +
+  "function hasComplete(obj) {\n" +
+  "  return obj && META_ID_FIELDS.every(function (f) {\n" +
+  "    return obj[f] != null && String(obj[f]).trim() !== '' && String(obj[f]).indexOf('<') !== 0;\n" +
+  "  });\n" +
+  "}\n" +
+  "function extractFlat(meta) {\n" +
+  "  return {\n" +
+  "    status: meta.status || null,\n" +
+  "    campaignId: meta.campaignId || null,\n" +
+  "    adSetId: meta.adSetId || null,\n" +
+  "    creativeId: meta.creativeId || null,\n" +
+  "    adId: meta.adId || null,\n" +
+  "    landingUrl: meta.landingUrl || null,\n" +
+  "    dailyBudget: meta.dailyBudget != null ? meta.dailyBudget : null,\n" +
+  "    createdAt: meta.createdAt || null,\n" +
+  "    lastSyncedAt: meta.lastSyncedAt || null,\n" +
+  "    mediaType: meta.mediaType || null,\n" +
+  "    videoId: meta.videoId || undefined,\n" +
+  "  };\n" +
+  "}\n" +
   "const clone = JSON.parse(JSON.stringify(appJson));\n" +
+  "const rootBefore = clone.status;\n" +
   "if (!clone.ads) clone.ads = {};\n" +
   "if (!clone.ads.meta) clone.ads.meta = {};\n" +
-  "['status','campaignId','adSetId','creativeId','adId','landingUrl','dailyBudget','createdAt','lastSyncedAt','creativeRevision'].forEach(function (k) {\n" +
-  "  if (Object.prototype.hasOwnProperty.call(metaIn, k) && metaIn[k] != null) clone.ads.meta[k] = metaIn[k];\n" +
-  "});\n" +
+  "if (!clone.ads.meta.variants || typeof clone.ads.meta.variants !== 'object') clone.ads.meta.variants = {};\n" +
+  "const existingMeta = clone.ads.meta;\n" +
+  "if (Object.keys(existingMeta.variants).length === 0 && hasComplete(existingMeta)) {\n" +
+  "  var migRev = 'image-v1';\n" +
+  "  var known = META_ID_FIELDS.every(function (f) { return String(existingMeta[f] || '') === String(KNOWN[f]); });\n" +
+  "  if (known) migRev = 'image-v1';\n" +
+  "  else if (existingMeta.creativeRevision && String(existingMeta.creativeRevision).indexOf('video') !== 0) migRev = String(existingMeta.creativeRevision);\n" +
+  "  else if (!known && existingMeta.creativeRevision && String(existingMeta.creativeRevision).indexOf('video') === 0) {\n" +
+  "    throw new Error('ADS_META_REVISION_AMBIGUOUS: flat IDs with video revision — set variants explicitly');\n" +
+  "  } else if (!existingMeta.creativeRevision && !known) {\n" +
+  "    throw new Error('ADS_META_REVISION_AMBIGUOUS: flat Meta IDs without creativeRevision');\n" +
+  "  }\n" +
+  "  existingMeta.variants[migRev] = extractFlat(existingMeta);\n" +
+  "  if (!existingMeta.variants[migRev].mediaType) existingMeta.variants[migRev].mediaType = 'image';\n" +
+  "}\n" +
+  "const revision = metaIn.creativeRevision || metaIn.currentVariant;\n" +
+  "if (!revision) throw new Error('WRITEBACK_REVISION_REQUIRED');\n" +
+  "const variantIn = (metaIn.variants && metaIn.variants[revision]) || extractFlat(metaIn);\n" +
+  "if (!hasComplete(variantIn)) throw new Error('WRITEBACK_INCOMPLETE_IDS');\n" +
+  "if (variantIn.status !== 'created_paused') throw new Error('WRITEBACK_STATUS_REQUIRED: status must be created_paused before Drive merge');\n" +
+  "const nowIso = new Date().toISOString();\n" +
+  "const stored = Object.assign({}, variantIn, { status: 'created_paused', lastSyncedAt: nowIso });\n" +
+  "if (!stored.mediaType) stored.mediaType = String(revision).indexOf('video') === 0 ? 'video' : 'image';\n" +
+  "clone.ads.meta.variants[revision] = stored;\n" +
+  "clone.ads.meta.currentVariant = revision;\n" +
+  "clone.ads.meta.creativeRevision = revision;\n" +
+  "clone.ads.meta.status = stored.status;\n" +
+  "clone.ads.meta.campaignId = stored.campaignId;\n" +
+  "clone.ads.meta.adSetId = stored.adSetId;\n" +
+  "clone.ads.meta.creativeId = stored.creativeId;\n" +
+  "clone.ads.meta.adId = stored.adId;\n" +
+  "clone.ads.meta.landingUrl = stored.landingUrl;\n" +
+  "clone.ads.meta.dailyBudget = stored.dailyBudget;\n" +
+  "clone.ads.meta.createdAt = stored.createdAt;\n" +
+  "clone.ads.meta.lastSyncedAt = nowIso;\n" +
   "clone.status = rootBefore;\n" +
-  "const outBin = Buffer.from(JSON.stringify(clone, null, 2), 'utf8').toString('base64');\n" +
-  "const claim = prev.ledgerClaim || {};\n" +
+  "const outText = JSON.stringify(clone, null, 2);\n" +
+  "const binary = await this.helpers.prepareBinaryData(Buffer.from(outText, 'utf8'), 'app.json', 'application/json');\n" +
   "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
   "const mc = prev.metaCreate || {};\n" +
   "return [{\n" +
@@ -1583,15 +2263,15 @@ const mergeAdsMetaWriteBackCode =
   "      experimentRunId: plan.experimentRunId || '',\n" +
   "      provider: plan.provider || 'meta',\n" +
   "      environment: plan.environment || 'sandbox',\n" +
-  "      creativeRevision: plan.creativeRevision || 'image-v1',\n" +
+  "      creativeRevision: plan.creativeRevision || revision,\n" +
   "      contentFingerprint: plan.contentFingerprint || '',\n" +
   "      creativeSha256: plan.creativeSha256 || '',\n" +
   "      phase: 'writeback_done',\n" +
-  "      campaignId: mc.campaignId || '',\n" +
-  "      adSetId: mc.adSetId || '',\n" +
+  "      campaignId: mc.campaignId || metaIn.campaignId || '',\n" +
+  "      adSetId: mc.adSetId || metaIn.adSetId || '',\n" +
   "      imageHash: mc.imageHash || '',\n" +
-  "      creativeId: mc.creativeId || '',\n" +
-  "      adId: mc.adId || '',\n" +
+  "      creativeId: mc.creativeId || metaIn.creativeId || '',\n" +
+  "      adId: mc.adId || metaIn.adId || '',\n" +
   "      lockOwner: '',\n" +
   "      lockExpiresAt: '',\n" +
   "      resumeFrom: '',\n" +
@@ -1599,7 +2279,7 @@ const mergeAdsMetaWriteBackCode =
   "      lastError: '',\n" +
   "    },\n" +
   "  }),\n" +
-  "  binary: { data: { data: outBin, mimeType: 'application/json', fileName: 'app.json', encoding: 'base64' } },\n" +
+  "  binary: { data: binary },\n" +
   "}];";
 
 const fixtureAppJson = JSON.stringify({
@@ -1631,6 +2311,8 @@ const fixtureAppJson = JSON.stringify({
       createdAt: null,
       lastSyncedAt: null,
       creativeRevision: 'image-v1',
+      currentVariant: null,
+      variants: {},
     },
     media: [
       {
@@ -1797,6 +2479,121 @@ const ledgerIdempotencyCheck = node({
       mode: 'runOnceForAllItems',
       language: 'javaScript',
       jsCode: ledgerIdempotencyCode,
+    },
+  },
+});
+
+const alreadyCompleteGate = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Already Complete Gate',
+    disabled: true,
+    parameters: {
+      conditions: {
+        combinator: 'and',
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+        conditions: [
+          {
+            id: 'already-complete',
+            leftValue: expr(
+              "{{ $json.ledgerAction === 'already_complete' || $json.outcome === 'already_complete' }}"
+            ),
+            rightValue: true,
+            operator: { type: 'boolean', operation: 'true' },
+          },
+        ],
+      },
+      looseTypeValidation: true,
+    },
+  },
+});
+
+const respondAlreadyComplete = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Respond Already Complete',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: respondAlreadyCompleteCode,
+    },
+  },
+});
+
+const needsCampaignCreateGate = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Needs Campaign Create',
+    disabled: true,
+    parameters: {
+      conditions: {
+        combinator: 'and',
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+        conditions: [
+          {
+            id: 'needs-campaign',
+            leftValue: expr(
+              "{{ !($json.metaCreate && $json.metaCreate.campaignId) }}"
+            ),
+            rightValue: true,
+            operator: { type: 'boolean', operation: 'true' },
+          },
+        ],
+      },
+      looseTypeValidation: true,
+    },
+  },
+});
+
+const skipCampaignCreate = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Skip Campaign Create',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: skipCampaignCreateCode,
+    },
+  },
+});
+
+const needsAdSetCreateGate = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Needs AdSet Create',
+    disabled: true,
+    parameters: {
+      conditions: {
+        combinator: 'and',
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+        conditions: [
+          {
+            id: 'needs-adset',
+            leftValue: expr("{{ !($json.metaCreate && $json.metaCreate.adSetId) }}"),
+            rightValue: true,
+            operator: { type: 'boolean', operation: 'true' },
+          },
+        ],
+      },
+      looseTypeValidation: true,
+    },
+  },
+});
+
+const skipAdSetCreate = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Skip AdSet Create',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: skipAdSetCreateCode,
     },
   },
 });
@@ -2167,6 +2964,54 @@ const createAdPaused = node({
   },
 });
 
+const mergeAdId = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Merge Ad Id',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: mergeAfterAdCode,
+    },
+  },
+});
+
+const verifyPausedStatuses = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Verify PAUSED Statuses',
+    disabled: true,
+    parameters: {
+      method: 'GET',
+      url: expr(
+        "={{ 'https://graph.facebook.com/v25.0/?ids=' + [$('Merge Ad Id').item.json.metaCreate.campaignId, $('Merge Ad Id').item.json.metaCreate.adSetId, $('Merge Ad Id').item.json.metaCreate.adId].join(',') + '&fields=id,name,status,effective_status,configured_status' }}"
+      ),
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'facebookGraphApi',
+    },
+    credentials: {
+      facebookGraphApi: metaCredential,
+    },
+  },
+});
+
+const assertPaused = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Assert PAUSED',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: assertPausedCode,
+    },
+  },
+});
+
 const prepareLedgerVerified = node({
   type: 'n8n-nodes-base.code',
   version: 2,
@@ -2282,13 +3127,29 @@ const ledgerUpsertWritebackDone = makeLedgerUpsertNode('Ledger Upsert Writeback 
 const createPausedChain = createPausedBlocked
   .to(ledgerLookup)
   .to(ledgerIdempotencyCheck)
-  .to(ledgerUpsertPlanned)
-  .to(createCampaignPaused)
-  .to(mergeCampaignId)
+  .to(
+    alreadyCompleteGate
+      .onTrue(respondAlreadyComplete)
+      .onFalse(
+        ledgerUpsertPlanned.to(
+          needsCampaignCreateGate
+            .onTrue(createCampaignPaused.to(mergeCampaignId))
+            .onFalse(skipCampaignCreate.to(mergeCampaignId))
+        )
+      )
+  );
+
+// Shared continuation after campaign merge (both create + skip paths).
+mergeCampaignId
   .to(prepareLedgerCampaign)
   .to(ledgerUpsertCampaign)
-  .to(createAdSetPaused)
-  .to(mergeAdSetId)
+  .to(
+    needsAdSetCreateGate
+      .onTrue(createAdSetPaused.to(mergeAdSetId))
+      .onFalse(skipAdSetCreate.to(mergeAdSetId))
+  );
+
+mergeAdSetId
   .to(prepareLedgerAdSet)
   .to(ledgerUpsertAdSet)
   .to(resolveCreativeDownloadPlan)
@@ -2303,6 +3164,9 @@ const createPausedChain = createPausedBlocked
   .to(prepareLedgerCreative)
   .to(ledgerUpsertCreative)
   .to(createAdPaused)
+  .to(mergeAdId)
+  .to(verifyPausedStatuses)
+  .to(assertPaused)
   .to(prepareLedgerVerified)
   .to(ledgerMarkVerified)
   .to(prepareWriteBack)

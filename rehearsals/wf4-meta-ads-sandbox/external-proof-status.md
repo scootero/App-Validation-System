@@ -1,7 +1,7 @@
 # WF4 External Proof Status
 
-**Last updated:** 2026-07-18  
-**Phase:** Prompt 1 PASS — live dry_run verified; create-paused still disabled; WF4 inactive; clean graph; zero external writes
+**Last updated:** 2026-07-28  
+**Phase:** Prompt 3 Track C **PASS** — Image V1 complete; measurement loop closed; WF4 create-paused disabled; **`ads.meta.variants` storage in repo** (await live import); Track A waiting on Scott media
 
 ## Continuity / left off
 
@@ -10,12 +10,14 @@
 | V1 creative (sandbox fixture) | `media/og-image.png` |
 | Asset repo (fixture only) | `scootero/Human-Lab-WF1-Sandbox` @ `main` |
 | Local file | `rehearsals/github/Human-Lab-WF1-Sandbox/media/og-image.png` (2,077,914 bytes, PNG, **1734 × 907**) |
-| Resolution | Generic: `ads.media[].githubPath` → `source.assetsGithubRepo ?? source.mockupGithubRepo` → raw download → (later) Meta `adimages` → `image_hash` |
-| Template hardcodes | None in adapter / download nodes (fixture holds Human Lab values) |
+| Image V1 Meta IDs | campaign `120250607331460199` / adset `120250622864980199` / creative `1007406578799368` / ad `120250622866330199` / hash `3dd4a70bea3678c35714a2d06d718c3c` |
+| Orphan (leave PAUSED) | campaign `120250622864710199` |
+| Ledger | `phase=writeback_done`, `outcome=already_complete` (exec **95**) |
+| Drive write-back | exec **94** → file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` (flat IDs today; next create write-back migrates to `variants.image-v1`) |
 | Create-paused | **Disabled**; `_createPausedAllowed: false` |
-| Prompt 1 reconciliation | **Not required** — live matched clean import-ready (23 nodes, identical Process/Respond/Config) |
-| Prompt 1 live dry_run | Execution **`48`** — PASS (`metaHttpCalls: 0`, `driveWrites: 0`, `externalWritePerformed: false`) |
-| Next phase | **Prompt 2** — Image Create-Paused V1 (approval token, idempotency, one PAUSED ad). Do not start until operator pastes Prompt 1 handoff. |
+| Safety + variants (repo) | Already Complete IF + skip + PAUSED verify + `ads.meta.variants` in `workflow.ts` / import-ready — **import to live still required** |
+| Track C | **PASS** — shared webhook live; browser E2E (WF3 execs 81–91); see `wf4-final-prompts/TRACK-C-PROOF.md` |
+| Next phase | Import import-ready → A6 video assets → A7 video create-paused |
 
 ## Returned values
 
@@ -60,6 +62,16 @@ WF4_PRECREATE_DRY_RUN_EXECUTION_ID: "39"
 WF4_PROMPT1_DRY_RUN_EXECUTION_ID: "48"
 WF4_PROMPT1_DRY_RUN_STATUS: "success"
 WF4_PROMPT1_DRY_RUN_AT: "2026-07-19T03:44:47.931Z"
+WF4_IMAGE_V1_VERDICT: "PASS"
+WF4_IMAGE_V1_CREATE_EXECUTION_ID: "74"
+WF4_IMAGE_V1_WRITEBACK_EXECUTION_ID: "94"
+WF4_IMAGE_V1_IDEMPOTENCY_EXECUTION_ID: "95"
+WF4_IMAGE_V1_META_VERIFY_EXECUTION_ID: "96"
+WF4_IMAGE_V1_CAMPAIGN_ID: "120250607331460199"
+WF4_IMAGE_V1_ADSET_ID: "120250622864980199"
+WF4_IMAGE_V1_CREATIVE_ID: "1007406578799368"
+WF4_IMAGE_V1_AD_ID: "120250622866330199"
+WF4_IMAGE_V1_IMAGE_HASH: "3dd4a70bea3678c35714a2d06d718c3c"
 WF4_CREATIVE_BINARY_LOCAL_PROOF: "2026-07-18 PASS (wf4-resolve-creative.js; metaHttpCalls=0; byteSize=2077914; 1734x907)"
 WF4_CREATIVE_BINARY_N8N_DRY_RUN: "2026-07-18 PASS execution 48 (planning only; create/download/upload nodes remain disabled)"
 _createPausedAllowed: false
@@ -130,22 +142,23 @@ _createPausedAllowed: false
 | Prompt 1 live dry_run (creative SDK synced) | **PASS** execution `48` |
 | Live == import-ready structural match | Verified (23 nodes; no `...1` duplicates; Process/Respond hashes match) |
 | Meta token in repo | Never (credential only) |
+| Image V1 PAUSED create (exec 74) | **PASS** — campaign/adset/creative/ad PAUSED |
+| Drive ads.meta write-back (exec 94) | **PASS** |
+| Feed previews (exec 93/96) | **PASS** — FB desktop/mobile + IG Feed |
+| Idempotency already_complete (exec 95) | **PASS** — zero Meta POSTs; ledger writeback_done |
+| Image V1 verdict | **PASS** |
 
-## Blocking (create-paused) — Prompt 2
+## Blocking (post–Image V1 / post–Track C) — ops
 
 | Item | Owner |
 |------|-------|
-| Exact phrase `APPROVE WF4 IMAGE CREATE-PAUSED V1` | Operator — **received** |
-| Flip `_createPausedAllowed` + enable create nodes | Explicit operator enablement — **not yet** |
-| Attach Meta Graph credential on create HTTP nodes | Agent/operator at enablement (`Meta Marketing API - Orro`) |
-| Meta credential validity/permissions (live write) | **FAIL** exec 54 — `API access blocked` (OAuthException 200) on Campaign POST |
-| Billing readiness / Page / Instagram permissions | Still unproven — blocked before create |
-| Operation ledger write path | Nodes exist but disabled — not exercised |
-| Image-upload / create chain | Disabled — local binary proof only |
-| Idempotency / repeated-trigger protection | Validate in Prompt 2 |
-| Preview capability | Validate in Prompt 2 |
+| Meta Standard Access + business verify | Scott (Meta UI) — blocks public delivery |
+| Already Complete IF before next create enablement | Agent — Create Campaign still POSTs on resume |
+| Track A video `/advideos` | Prompt 3 — wait for Scott to approve Track A; A1 research first |
+| Human activation | Manual only — no WF4 auto-activate |
 | Spec 1.5.0 root-status ownership note | Spec pass |
 | Human Lab Drive `500/14` vs `$2` cap | Do not use that package for create-paused without budget change |
+| Sheet Meta ID columns population | Design done (TRACK-C-PROOF); implement via URL dynamic params / Decision |
 
 ## Approval gates (updated 2026-07-21)
 
@@ -155,3 +168,4 @@ Header Auth vault + Config dual-token compare **removed**. Create-paused require
 2. `mode=create_paused` + `approval=true`
 3. `_createPausedAllowed=true` + create path enabled for one run
 4. Budget / Meta IDs / creative / ledger gates
+5. **Already Complete IF** must exist before re-enablement (see CREATE-PAUSED-V1-CONTRACT A9)

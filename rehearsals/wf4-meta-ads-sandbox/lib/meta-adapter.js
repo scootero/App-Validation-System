@@ -60,7 +60,7 @@ if (typeof globalThis !== "undefined") {
     us: "US",
   };
 
-  /** V1 image creative extensions only (no video). */
+  /** Image creative extensions (Image V1 + video thumbnails). */
   var IMAGE_EXTENSIONS = {
     png: "image/png",
     jpg: "image/jpeg",
@@ -68,6 +68,18 @@ if (typeof globalThis !== "undefined") {
     gif: "image/gif",
     webp: "image/webp",
   };
+
+  /** Video creative extensions (Track A — Feed/vertical MP4/MOV). */
+  var VIDEO_EXTENSIONS = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+  };
+
+  var DEFAULT_VIDEO_CREATIVE_REVISION = "video-feed-v1";
+  var DEFAULT_VIDEO_WORKFLOW_VERSION = "wf4-video-feed-v1";
+  /** Prefer source upload under this size; larger files use chunked /advideos. */
+  var VIDEO_SOURCE_UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
+  var VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
   function roundBudget(value) {
     return Math.round(value * 100) / 100;
@@ -179,6 +191,13 @@ if (typeof globalThis !== "undefined") {
       creativeRevision: identity.creativeRevision,
       placementSet: identity.placementSet,
     };
+    if (identity.thumbnailSha256) {
+      payload.thumbnailSha256 = identity.thumbnailSha256;
+    }
+    // Only include mediaType for video so existing image-v1 fingerprints stay stable.
+    if (identity.mediaType === "video") {
+      payload.mediaType = "video";
+    }
     return sha256Hex(stableStringify(payload));
   }
 
@@ -186,6 +205,9 @@ if (typeof globalThis !== "undefined") {
     row = row || {};
     if (!row.campaignId) return "campaign";
     if (!row.adSetId) return "adset";
+    // Video ops (creativeRevision starts with "video"): require videoId before thumb imageHash.
+    var rev = String(row.creativeRevision || "");
+    if (rev.indexOf("video") === 0 && !row.videoId) return "video";
     if (!row.imageHash) return "image";
     if (!row.creativeId) return "creative";
     if (!row.adId) return "ad";
@@ -417,9 +439,18 @@ if (typeof globalThis !== "undefined") {
   /**
    * Generic creative binary resolution for any app package.
    * Reads ads.media[] / media.ogImage + source.assetsGithubRepo ?? source.mockupGithubRepo.
+   * options.expectedMimeFamily: "image" (default) | "video"
    * Does not hardcode app ids, repos, or filenames.
    */
-  function resolveCreativeSource(app, creative) {
+  function resolveCreativeSource(app, creative, options) {
+    options = options || {};
+    var expectedFamily = options.expectedMimeFamily || "image";
+    var extMap = expectedFamily === "video" ? VIDEO_EXTENSIONS : IMAGE_EXTENSIONS;
+    var typeLabel =
+      expectedFamily === "video"
+        ? "video extension (mp4/mov)"
+        : "image extension (png/jpg/jpeg/gif/webp)";
+
     if (!creative || !creative.kind || !creative.value) {
       return { ok: false, error: "CREATIVE_PATH_MISSING: no usable creative value" };
     }
@@ -431,12 +462,10 @@ if (typeof globalThis !== "undefined") {
       }
       var urlFilename = filenameFromPath(urlValue.split("?")[0]);
       var urlExt = extensionOf(urlFilename);
-      if (!IMAGE_EXTENSIONS[urlExt]) {
+      if (!extMap[urlExt]) {
         return {
           ok: false,
-          error:
-            "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
-            (urlExt || "none"),
+          error: "CREATIVE_UNSUPPORTED_TYPE: expected " + typeLabel + ", got " + (urlExt || "none"),
         };
       }
       return {
@@ -445,6 +474,7 @@ if (typeof globalThis !== "undefined") {
           kind: "url",
           value: urlValue,
           role: creative.role || "primary",
+          type: expectedFamily,
           resolvedFrom: creative.source,
           repo: null,
           branch: null,
@@ -452,9 +482,10 @@ if (typeof globalThis !== "undefined") {
           url: urlValue,
           downloadUrl: urlValue,
           filename: urlFilename,
-          expectedMime: IMAGE_EXTENSIONS[urlExt],
-          expectedMimeFamily: "image",
+          expectedMime: extMap[urlExt],
+          expectedMimeFamily: expectedFamily,
           resolutionMethod: "direct_url",
+          thumbnailRef: creative.thumbnailRef || null,
         },
       };
     }
@@ -473,12 +504,10 @@ if (typeof globalThis !== "undefined") {
 
     var filename = filenameFromPath(githubPath);
     var ext = extensionOf(filename);
-    if (!IMAGE_EXTENSIONS[ext]) {
+    if (!extMap[ext]) {
       return {
         ok: false,
-        error:
-          "CREATIVE_UNSUPPORTED_TYPE: expected image extension (png/jpg/jpeg/gif/webp), got " +
-          (ext || "none"),
+        error: "CREATIVE_UNSUPPORTED_TYPE: expected " + typeLabel + ", got " + (ext || "none"),
       };
     }
 
@@ -519,6 +548,7 @@ if (typeof globalThis !== "undefined") {
         kind: "githubPath",
         value: githubPath,
         role: creative.role || "primary",
+        type: expectedFamily,
         resolvedFrom: creative.source,
         repo: repo,
         branch: branch,
@@ -526,11 +556,100 @@ if (typeof globalThis !== "undefined") {
         url: null,
         downloadUrl: downloadUrl,
         filename: filename,
-        expectedMime: IMAGE_EXTENSIONS[ext],
-        expectedMimeFamily: "image",
+        expectedMime: extMap[ext],
+        expectedMimeFamily: expectedFamily,
         resolutionMethod: "github_raw",
+        thumbnailRef: creative.thumbnailRef || null,
       },
     };
+  }
+
+  function mediaItemRef(item) {
+    if (!item) return null;
+    if (item.url || item.githubPath) {
+      return {
+        kind: item.url ? "url" : "githubPath",
+        value: item.url || item.githubPath,
+        role: item.role || "primary",
+        type: item.type || null,
+        mimeType: item.mimeType || null,
+        thumbnailRef: item.thumbnailRef || null,
+        fallbackRef: item.fallbackRef || null,
+        placementRoles: item.placementRoles || null,
+        eligibility: item.eligibility || null,
+        width: item.width != null ? item.width : null,
+        height: item.height != null ? item.height : null,
+        durationSeconds: item.durationSeconds != null ? item.durationSeconds : null,
+        source: "ads.media",
+      };
+    }
+    return null;
+  }
+
+  function findMediaByPath(app, refPath) {
+    if (!refPath) return null;
+    var want = String(refPath).replace(/^\/+/, "");
+    var adsMedia = (app.ads && app.ads.media) || [];
+    for (var i = 0; i < adsMedia.length; i++) {
+      var item = adsMedia[i];
+      var p = item.githubPath || item.path || "";
+      if (String(p).replace(/^\/+/, "") === want) return mediaItemRef(item);
+      if (item.url && item.url === refPath) return mediaItemRef(item);
+    }
+    return {
+      kind: "githubPath",
+      value: want,
+      role: "thumbnail",
+      type: "image",
+      source: "thumbnailRef",
+      thumbnailRef: null,
+    };
+  }
+
+  /**
+   * Select package media. Prefer explicit type:"video" (A2); else Image V1 path.
+   * role:"video" alone is NOT enough — keeps legacy mp4-without-type failing closed.
+   */
+  function selectCreative(app) {
+    var adsMedia = (app.ads && app.ads.media) || [];
+    var i;
+    var item;
+    var ref;
+
+    for (i = 0; i < adsMedia.length; i++) {
+      item = adsMedia[i];
+      if (item && item.type === "video" && (item.url || item.githubPath)) {
+        ref = mediaItemRef(item);
+        ref.mediaType = "video";
+        return ref;
+      }
+    }
+
+    for (i = 0; i < adsMedia.length; i++) {
+      item = adsMedia[i];
+      if (!item || !(item.url || item.githubPath)) continue;
+      if (item.type === "video") continue;
+      if (item.role === "thumbnail" || item.role === "fallback") continue;
+      if (item.type === "image" || !item.type) {
+        ref = mediaItemRef(item);
+        ref.mediaType = "image";
+        return ref;
+      }
+    }
+
+    var og = app.media && app.media.ogImage;
+    if (og && (og.url || og.githubPath)) {
+      return {
+        kind: og.url ? "url" : "githubPath",
+        value: og.url || og.githubPath,
+        role: "fallback",
+        type: "image",
+        mediaType: "image",
+        source: "media.ogImage",
+        thumbnailRef: null,
+      };
+    }
+    return null;
   }
 
   function buildUtmQuery(utmTemplate) {
@@ -553,45 +672,226 @@ if (typeof globalThis !== "undefined") {
     return countries.length ? countries : ["VERIFY_COUNTRY_CODE"];
   }
 
-  function selectCreative(app) {
-    var adsMedia = (app.ads && app.ads.media) || [];
-    for (var i = 0; i < adsMedia.length; i++) {
-      var item = adsMedia[i];
-      if (item.url || item.githubPath) {
-        return {
-          kind: item.url ? "url" : "githubPath",
-          value: item.url || item.githubPath,
-          role: item.role || "primary",
-          source: "ads.media",
-        };
-      }
-    }
-    var og = app.media && app.media.ogImage;
-    if (og && (og.url || og.githubPath)) {
-      return {
-        kind: og.url ? "url" : "githubPath",
-        value: og.url || og.githubPath,
-        role: "fallback",
-        source: "media.ogImage",
-      };
-    }
-    return null;
+  /** Proven Human Lab Image V1 IDs — only unambiguous fallback when flat IDs lack creativeRevision. */
+  var KNOWN_IMAGE_V1_PROOF_IDS = {
+    campaignId: "120250607331460199",
+    adSetId: "120250622864980199",
+    creativeId: "1007406578799368",
+    adId: "120250622866330199",
+  };
+
+  function hasCompleteMetaIds(obj) {
+    if (!obj || typeof obj !== "object") return false;
+    return META_ID_FIELDS.every(function (f) {
+      return obj[f] != null && String(obj[f]).trim() !== "" && String(obj[f]).indexOf("<") !== 0;
+    });
   }
 
-  function checkIdempotency(app, provider) {
+  function extractFlatVariantRecord(meta) {
+    meta = meta || {};
+    var rec = {
+      status: meta.status || null,
+      campaignId: meta.campaignId || null,
+      adSetId: meta.adSetId || null,
+      creativeId: meta.creativeId || null,
+      adId: meta.adId || null,
+      landingUrl: meta.landingUrl || null,
+      dailyBudget: meta.dailyBudget != null ? meta.dailyBudget : null,
+      createdAt: meta.createdAt || null,
+      lastSyncedAt: meta.lastSyncedAt || null,
+    };
+    if (meta.videoId != null && String(meta.videoId).trim() !== "") {
+      rec.videoId = meta.videoId;
+    }
+    if (meta.mediaType) rec.mediaType = meta.mediaType;
+    return rec;
+  }
+
+  function mirrorVariantToFlat(meta, revision, variant) {
+    meta.currentVariant = revision;
+    meta.creativeRevision = revision;
+    meta.status = variant.status != null ? variant.status : null;
+    meta.campaignId = variant.campaignId != null ? variant.campaignId : null;
+    meta.adSetId = variant.adSetId != null ? variant.adSetId : null;
+    meta.creativeId = variant.creativeId != null ? variant.creativeId : null;
+    meta.adId = variant.adId != null ? variant.adId : null;
+    meta.landingUrl = variant.landingUrl != null ? variant.landingUrl : null;
+    meta.dailyBudget = variant.dailyBudget != null ? variant.dailyBudget : null;
+    meta.createdAt = variant.createdAt != null ? variant.createdAt : null;
+    meta.lastSyncedAt = variant.lastSyncedAt != null ? variant.lastSyncedAt : null;
+  }
+
+  function matchesKnownImageV1Proof(meta) {
+    return META_ID_FIELDS.every(function (f) {
+      return String(meta[f] || "") === String(KNOWN_IMAGE_V1_PROOF_IDS[f]);
+    });
+  }
+
+  /**
+   * In-memory migrate flat ads.meta IDs into variants[revision].
+   * Does not mutate Drive by itself — callers merge into clone before write-back.
+   */
+  function normalizeAdsMetaVariants(app) {
+    var meta = (app && app.ads && app.ads.meta) || {};
+    var variants =
+      meta.variants && typeof meta.variants === "object" ? Object.assign({}, meta.variants) : {};
+    var migrated = false;
+    var migrationNote = null;
+
+    if (Object.keys(variants).length === 0 && hasCompleteMetaIds(meta)) {
+      var declared =
+        meta.creativeRevision != null && String(meta.creativeRevision).trim() !== ""
+          ? String(meta.creativeRevision).trim()
+          : meta.currentVariant != null && String(meta.currentVariant).trim() !== ""
+            ? String(meta.currentVariant).trim()
+            : null;
+      var rev = declared;
+      if (matchesKnownImageV1Proof(meta)) {
+        // Flat IDs are the known image proof — never park them under a video revision key.
+        rev = DEFAULT_CREATIVE_REVISION;
+        if (declared && declared !== DEFAULT_CREATIVE_REVISION) {
+          migrationNote = "flat_known_image_ids_forced_image_v1_despite_declared_" + declared;
+        } else {
+          migrationNote = "flat_ids_to_variants_image_v1";
+        }
+      } else if (!rev) {
+        return {
+          ok: false,
+          error:
+            "ADS_META_REVISION_AMBIGUOUS: flat Meta IDs present without creativeRevision/currentVariant — set creativeRevision explicitly (do not guess)",
+          migrated: false,
+          variants: variants,
+          currentVariant: null,
+        };
+      } else if (String(rev).indexOf("video") === 0) {
+        return {
+          ok: false,
+          error:
+            "ADS_META_REVISION_AMBIGUOUS: flat Meta IDs present with video creativeRevision=" +
+            rev +
+            " but IDs are not the known image-v1 proof — set variants explicitly or clear flat IDs before video",
+          migrated: false,
+          variants: variants,
+          currentVariant: null,
+        };
+      } else {
+        migrationNote = "flat_ids_to_variants";
+      }
+      variants[rev] = extractFlatVariantRecord(meta);
+      if (!variants[rev].mediaType) {
+        variants[rev].mediaType = String(rev).indexOf("video") === 0 ? "video" : "image";
+      }
+      migrated = true;
+      return {
+        ok: true,
+        migrated: migrated,
+        migrationNote: migrationNote || "flat_ids_to_variants",
+        variants: variants,
+        currentVariant: rev,
+        creativeRevision: rev,
+      };
+    }
+
+    var current =
+      meta.currentVariant ||
+      meta.creativeRevision ||
+      (Object.keys(variants).length ? Object.keys(variants).sort()[Object.keys(variants).length - 1] : null);
+
+    return {
+      ok: true,
+      migrated: false,
+      migrationNote: null,
+      variants: variants,
+      currentVariant: current,
+      creativeRevision: meta.creativeRevision || current,
+    };
+  }
+
+  function listVariantKeys(variants) {
+    return Object.keys(variants || {}).filter(function (k) {
+      return k && String(k).trim() !== "";
+    });
+  }
+
+  /**
+   * Resolve creativeRevision: explicit wins; else auto image-vN / video-feed-vN.
+   * Never returns a key that already exists in variants.
+   */
+  function resolveCreativeRevision(app, config, mediaType, variants) {
+    config = config || {};
+    variants = variants || {};
+    var existing = listVariantKeys(variants);
+    var explicit =
+      (app.ads && app.ads.meta && app.ads.meta.creativeRevision) ||
+      config.creativeRevision ||
+      null;
+    if (explicit != null && String(explicit).trim() !== "") {
+      return { ok: true, creativeRevision: String(explicit).trim(), autoGenerated: false };
+    }
+
+    var prefix = mediaType === "video" ? "video-feed-v" : "image-v";
+    var n = 1;
+    var candidate = prefix + n;
+    while (existing.indexOf(candidate) !== -1) {
+      n += 1;
+      if (n > 100) {
+        return {
+          ok: false,
+          error:
+            "CREATIVE_REVISION_AUTO_EXHAUSTED: could not allocate " +
+            prefix +
+            "N — set ads.meta.creativeRevision explicitly",
+        };
+      }
+      candidate = prefix + n;
+    }
+    return { ok: true, creativeRevision: candidate, autoGenerated: true };
+  }
+
+  function checkIdempotency(app, provider, opts) {
+    opts = opts || {};
     var meta = (app.ads && app.ads.meta) || {};
     var runKey = {
       appId: app.appId,
       experimentRunId: app.analytics && app.analytics.experimentRunId,
       provider: provider || PROVIDER,
     };
-    var existing = META_ID_FIELDS.filter(function (field) {
-      return meta[field] != null && meta[field] !== "";
-    });
+    var norm = normalizeAdsMetaVariants(app);
+    if (!norm.ok) {
+      return {
+        runKey: runKey,
+        refused: true,
+        existingFields: [],
+        error: norm.error,
+        variantsNormalized: norm,
+      };
+    }
+    var revision =
+      opts.creativeRevision ||
+      meta.creativeRevision ||
+      norm.creativeRevision ||
+      null;
+    if (!revision) {
+      return {
+        runKey: runKey,
+        refused: false,
+        existingFields: [],
+        variantsNormalized: norm,
+      };
+    }
+    var variant = norm.variants[revision];
+    var complete = hasCompleteMetaIds(variant);
+    var existing = complete
+      ? META_ID_FIELDS.filter(function (field) {
+          return variant[field] != null && variant[field] !== "";
+        })
+      : [];
     return {
       runKey: runKey,
-      refused: existing.length > 0,
+      refused: complete,
       existingFields: existing,
+      creativeRevision: revision,
+      variantsNormalized: norm,
     };
   }
 
@@ -642,9 +942,34 @@ if (typeof globalThis !== "undefined") {
       return { ok: false, error: "No usable creative (ads.media[] or media.ogImage)" };
     }
 
-    var creativeResolved = resolveCreativeSource(app, creative);
+    var mediaType = creative.mediaType === "video" ? "video" : "image";
+    var creativeResolved = resolveCreativeSource(app, creative, {
+      expectedMimeFamily: mediaType,
+    });
     if (!creativeResolved.ok) {
       return { ok: false, error: creativeResolved.error };
+    }
+
+    var thumbnailResolved = null;
+    if (mediaType === "video") {
+      if (!creative.thumbnailRef) {
+        return {
+          ok: false,
+          error:
+            "VIDEO_THUMBNAIL_REQUIRED: type:video assets must set thumbnailRef (A1/A2 policy — no auto-thumb)",
+        };
+      }
+      var thumbCreative = findMediaByPath(app, creative.thumbnailRef);
+      var thumbResult = resolveCreativeSource(app, thumbCreative, {
+        expectedMimeFamily: "image",
+      });
+      if (!thumbResult.ok) {
+        return {
+          ok: false,
+          error: "VIDEO_THUMBNAIL_INVALID: " + thumbResult.error,
+        };
+      }
+      thumbnailResolved = thumbResult.resolved;
     }
 
     var budget = app.experiment.testBudget;
@@ -668,32 +993,59 @@ if (typeof globalThis !== "undefined") {
     }
 
     var idem = checkIdempotency(app, provider);
-    if (idem.refused) {
-      return {
-        ok: false,
-        error:
-          "Idempotency refusal: ads.meta already has " +
-          idem.existingFields.join(", ") +
-          " for runKey " +
-          JSON.stringify(idem.runKey),
-      };
+    if (idem.error && !idem.variantsNormalized) {
+      return { ok: false, error: idem.error };
+    }
+    if (idem.variantsNormalized && !idem.variantsNormalized.ok) {
+      return { ok: false, error: idem.variantsNormalized.error };
     }
 
     var landingUrl = app.deployment.landing.url;
     var utmQuery = buildUtmQuery(app.ads.utmTemplate);
     var destinationUrl = utmQuery ? landingUrl + "?" + utmQuery : landingUrl;
     var environment = config.environment || DEFAULT_ENVIRONMENT;
-    var creativeRevision =
-      (app.ads.meta && app.ads.meta.creativeRevision) ||
-      config.creativeRevision ||
-      DEFAULT_CREATIVE_REVISION;
-    var workflowVersion = config.workflowVersion || DEFAULT_WORKFLOW_VERSION;
+    var norm = idem.variantsNormalized || normalizeAdsMetaVariants(app);
+    if (!norm.ok) {
+      return { ok: false, error: norm.error };
+    }
+    var revResolved = resolveCreativeRevision(app, config, mediaType, norm.variants);
+    if (!revResolved.ok) {
+      return { ok: false, error: revResolved.error };
+    }
+    var creativeRevision = revResolved.creativeRevision;
+    // Re-check idempotency for the resolved revision (auto or explicit).
+    idem = checkIdempotency(app, provider, { creativeRevision: creativeRevision });
+    if (idem.refused) {
+      return {
+        ok: false,
+        error:
+          "Idempotency refusal: ads.meta.variants[" +
+          creativeRevision +
+          "] already has " +
+          idem.existingFields.join(", ") +
+          " for runKey " +
+          JSON.stringify(idem.runKey),
+        creativeRevision: creativeRevision,
+        variantsNormalized: norm,
+      };
+    }
+    var workflowVersion =
+      config.workflowVersion ||
+      (mediaType === "video" ? DEFAULT_VIDEO_WORKFLOW_VERSION : DEFAULT_WORKFLOW_VERSION);
     var creativeSha256 = config.creativeSha256 || null;
     if (!creativeSha256) {
       return {
         ok: false,
         error:
           "CREATIVE_SHA256_REQUIRED: pass config.creativeSha256 (binary hash) for operation fingerprint",
+      };
+    }
+    var thumbnailSha256 = config.thumbnailSha256 || null;
+    if (mediaType === "video" && !thumbnailSha256) {
+      return {
+        ok: false,
+        error:
+          "THUMBNAIL_SHA256_REQUIRED: pass config.thumbnailSha256 for video operation fingerprint",
       };
     }
     var placementSet = buildPlacementSet(platforms);
@@ -713,7 +1065,9 @@ if (typeof globalThis !== "undefined") {
       environment: environment,
       creativeRevision: creativeRevision,
       workflowVersion: workflowVersion,
+      mediaType: mediaType,
       creativeSha256: creativeSha256,
+      thumbnailSha256: thumbnailSha256,
       operationKey: operationKey,
       placementSet: placementSet,
       authorObjective: app.ads.objective || "traffic",
@@ -731,6 +1085,7 @@ if (typeof globalThis !== "undefined") {
       },
       creative: creative,
       creativeResolved: creativeResolved.resolved,
+      thumbnailResolved: thumbnailResolved,
       landingUrl: landingUrl,
       destinationUrl: destinationUrl,
       budget: {
@@ -760,6 +1115,8 @@ if (typeof globalThis !== "undefined") {
       environment: environment,
       workflowVersion: workflowVersion,
       creativeSha256: creativeSha256,
+      thumbnailSha256: thumbnailSha256,
+      mediaType: mediaType,
       creativeRevision: creativeRevision,
       placementSet: placementSet,
     });
@@ -798,27 +1155,158 @@ if (typeof globalThis !== "undefined") {
     var headline = adPlan.headlines[0];
     var primaryText = adPlan.primaryTexts[0];
     var description = (adPlan.descriptions && adPlan.descriptions[0]) || "";
+    var isVideo = adPlan.mediaType === "video";
 
-    var objectStorySpec = {
-      page_id: pageId,
-      link_data: {
-        link: adPlan.destinationUrl,
-        message: primaryText,
-        name: headline,
-        description: description,
-        call_to_action: {
-          type: adPlan.callToAction,
-          value: { link: adPlan.destinationUrl },
+    var objectStorySpec;
+    if (isVideo) {
+      objectStorySpec = {
+        page_id: pageId,
+        video_data: {
+          video_id: "VERIFY_AFTER_VIDEO_READY",
+          image_hash: "VERIFY_AFTER_THUMB_UPLOAD",
+          message: primaryText,
+          title: headline,
+          link_description: description,
+          call_to_action: {
+            type: adPlan.callToAction,
+            value: { link: adPlan.destinationUrl },
+          },
         },
-        image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
-      },
-    };
+      };
+    } else {
+      objectStorySpec = {
+        page_id: pageId,
+        link_data: {
+          link: adPlan.destinationUrl,
+          message: primaryText,
+          name: headline,
+          description: description,
+          call_to_action: {
+            type: adPlan.callToAction,
+            value: { link: adPlan.destinationUrl },
+          },
+          image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+        },
+      };
+    }
     if (
       instagramUserId &&
       adPlan.platforms &&
       adPlan.platforms.indexOf("instagram") !== -1
     ) {
       objectStorySpec.instagram_user_id = instagramUserId;
+    }
+
+    var requests = {
+      campaign: {
+        name: adPlan.campaignName,
+        objective: metaObjective,
+        status: "PAUSED",
+        special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),
+        is_adset_budget_sharing_enabled: false,
+      },
+      adSet: {
+        name: adPlan.campaignName + "-adset-v1",
+        status: "PAUSED",
+        daily_budget: dailyBudgetMinor,
+        billing_event: V1_BILLING_EVENT,
+        optimization_goal: V1_OPTIMIZATION_GOAL,
+        bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+        targeting: adSetTargeting,
+        promoted_object: { page_id: pageId },
+      },
+      creative: {
+        name: adPlan.campaignName + "-creative-a",
+        object_story_spec: objectStorySpec,
+      },
+      ad: {
+        name: adPlan.campaignName + "-ad-a",
+        status: "PAUSED",
+        creative: { creative_id: "CREATIVE_ID_FROM_CREATE_CREATIVE" },
+      },
+    };
+
+    if (isVideo) {
+      requests.videoUpload = {
+        endpoint: "POST /" + adAccountId + "/advideos",
+        host: "graph-video.facebook.com",
+        metaApiVersion: metaApiVersion,
+        method: "source_or_chunked",
+        sourceUploadMaxBytes: VIDEO_SOURCE_UPLOAD_MAX_BYTES,
+        uploadPhases: ["start", "transfer", "finish", "cancel"],
+        resolutionMethod: adPlan.creativeResolved
+          ? adPlan.creativeResolved.resolutionMethod
+          : null,
+        downloadUrl: adPlan.creativeResolved
+          ? adPlan.creativeResolved.downloadUrl
+          : null,
+        filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,
+        repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,
+        branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,
+        githubPath: adPlan.creativeResolved
+          ? adPlan.creativeResolved.githubPath
+          : null,
+        expectedMime: adPlan.creativeResolved
+          ? adPlan.creativeResolved.expectedMime
+          : null,
+        expectedMimeFamily: "video",
+        video_id: "VERIFY_AFTER_VIDEO_UPLOAD",
+      };
+      requests.videoStatusPoll = {
+        endpoint: "GET /{video_id}?fields=status",
+        readyWhen: "status.video_status === ready",
+        failWhen: "status.video_status === error",
+        timeoutMs: VIDEO_POLL_TIMEOUT_MS,
+        note: "Never create creative until video_status is ready",
+      };
+      requests.imageUpload = {
+        endpoint: "POST /" + adAccountId + "/adimages",
+        purpose: "video_thumbnail",
+        source: "thumbnailRef",
+        image_hash: "VERIFY_AFTER_THUMB_UPLOAD",
+        resolutionMethod: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.resolutionMethod
+          : null,
+        downloadUrl: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.downloadUrl
+          : null,
+        filename: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.filename
+          : null,
+        repo: adPlan.thumbnailResolved ? adPlan.thumbnailResolved.repo : null,
+        branch: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.branch
+          : null,
+        githubPath: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.githubPath
+          : null,
+        expectedMime: adPlan.thumbnailResolved
+          ? adPlan.thumbnailResolved.expectedMime
+          : null,
+        expectedMimeFamily: "image",
+      };
+    } else {
+      requests.imageUpload = {
+        endpoint: "POST /" + adAccountId + "/adimages",
+        source: "ads.media githubPath or media.ogImage",
+        image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
+        resolutionMethod: adPlan.creativeResolved
+          ? adPlan.creativeResolved.resolutionMethod
+          : null,
+        downloadUrl: adPlan.creativeResolved
+          ? adPlan.creativeResolved.downloadUrl
+          : null,
+        filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,
+        repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,
+        branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,
+        githubPath: adPlan.creativeResolved
+          ? adPlan.creativeResolved.githubPath
+          : null,
+        expectedMime: adPlan.creativeResolved
+          ? adPlan.creativeResolved.expectedMime
+          : null,
+        expectedMimeFamily: "image",
+      };
     }
 
     return {
@@ -839,70 +1327,22 @@ if (typeof globalThis !== "undefined") {
       },
       statusForDeliveryEntities: "PAUSED",
       neverSendActive: true,
-      requests: {
-        campaign: {
-          name: adPlan.campaignName,
-          objective: metaObjective,
-          status: "PAUSED",
-          special_ad_categories: SPECIAL_AD_CATEGORIES.slice(),
-          // Required when using ad-set budgets (not CBO). Probe-proven 2026-07-26.
-          is_adset_budget_sharing_enabled: false,
-        },
-        adSet: {
-          name: adPlan.campaignName + "-adset-v1",
-          status: "PAUSED",
-          daily_budget: dailyBudgetMinor,
-          billing_event: V1_BILLING_EVENT,
-          optimization_goal: V1_OPTIMIZATION_GOAL,
-          // Account requires explicit strategy; omitting triggers subcode 2490487.
-          bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-          targeting: adSetTargeting,
-          promoted_object: { page_id: pageId },
-        },
-        imageUpload: {
-          endpoint: "POST /" + adAccountId + "/adimages",
-          source: "ads.media githubPath or media.ogImage",
-          image_hash: "VERIFY_AFTER_IMAGE_UPLOAD",
-          resolutionMethod: adPlan.creativeResolved
-            ? adPlan.creativeResolved.resolutionMethod
-            : null,
-          downloadUrl: adPlan.creativeResolved
-            ? adPlan.creativeResolved.downloadUrl
-            : null,
-          filename: adPlan.creativeResolved ? adPlan.creativeResolved.filename : null,
-          repo: adPlan.creativeResolved ? adPlan.creativeResolved.repo : null,
-          branch: adPlan.creativeResolved ? adPlan.creativeResolved.branch : null,
-          githubPath: adPlan.creativeResolved
-            ? adPlan.creativeResolved.githubPath
-            : null,
-          expectedMime: adPlan.creativeResolved
-            ? adPlan.creativeResolved.expectedMime
-            : null,
-          expectedMimeFamily: "image",
-        },
-        creative: {
-          name: adPlan.campaignName + "-creative-a",
-          object_story_spec: objectStorySpec,
-        },
-        ad: {
-          name: adPlan.campaignName + "-ad-a",
-          status: "PAUSED",
-          creative: { creative_id: "CREATIVE_ID_FROM_CREATE_CREATIVE" },
-        },
-      },
+      requests: requests,
     };
   }
 
   function buildLedgerPlan(adPlan) {
-    return {
+    var plan = {
       operationKey: adPlan.operationKey,
       appId: adPlan.appId,
       experimentRunId: adPlan.experimentRunId,
       provider: adPlan.provider,
       environment: adPlan.environment,
       creativeRevision: adPlan.creativeRevision,
+      mediaType: adPlan.mediaType || "image",
       contentFingerprint: adPlan.contentFingerprint,
       creativeSha256: adPlan.creativeSha256,
+      thumbnailSha256: adPlan.thumbnailSha256 || null,
       placementSet: adPlan.placementSet,
       phase: "planned",
       campaignId: null,
@@ -918,35 +1358,59 @@ if (typeof globalThis !== "undefined") {
       reconciliation:
         "V1: claim-lock → already_complete | resume same fingerprint | revision_conflict | lock_held; no auto-delete",
     };
+    if (adPlan.mediaType === "video") {
+      plan.videoId = null;
+    }
+    return plan;
   }
 
   function buildWriteBackPreview(adPlan, ids) {
     ids = ids || {};
+    var revision = adPlan.creativeRevision || DEFAULT_CREATIVE_REVISION;
+    var variant = {
+      status: "created_paused",
+      campaignId: ids.campaignId || "<campaign-id>",
+      adSetId: ids.adSetId || "<ad-set-id>",
+      creativeId: ids.creativeId || "<creative-id>",
+      adId: ids.adId || "<ad-id>",
+      landingUrl: adPlan.destinationUrl,
+      dailyBudget: adPlan.budget.dailyBudgetUsd,
+      createdAt: ids.createdAt || "<iso8601>",
+      lastSyncedAt: null,
+      mediaType: adPlan.mediaType === "video" ? "video" : "image",
+    };
+    if (ids.videoId) variant.videoId = ids.videoId;
+    var variants = {};
+    variants[revision] = variant;
     return {
       ads: {
         meta: {
           status: "created_paused",
-          campaignId: ids.campaignId || "<campaign-id>",
-          adSetId: ids.adSetId || "<ad-set-id>",
-          creativeId: ids.creativeId || "<creative-id>",
-          adId: ids.adId || "<ad-id>",
-          landingUrl: adPlan.destinationUrl,
-          dailyBudget: adPlan.budget.dailyBudgetUsd,
-          createdAt: ids.createdAt || "<iso8601>",
+          currentVariant: revision,
+          creativeRevision: revision,
+          campaignId: variant.campaignId,
+          adSetId: variant.adSetId,
+          creativeId: variant.creativeId,
+          adId: variant.adId,
+          landingUrl: variant.landingUrl,
+          dailyBudget: variant.dailyBudget,
+          createdAt: variant.createdAt,
           lastSyncedAt: null,
+          variants: variants,
         },
       },
       rootStatusUnchanged: true,
       rootStatusNote:
         "Preserve existing root status (e.g. ready). Set validating only after human-approved activation.",
       writeBackTiming:
-        "verified_complete_only: merge ads.meta into app.json only after Campaign/AdSet/Creative/Ad are created and verified PAUSED; partial IDs stay in the ledger",
+        "verified_complete_only: merge ads.meta.variants[revision] + mirror flat currentVariant after PAUSED verify; never delete other variant keys",
     };
   }
 
   /**
    * Merge verified-complete ads.meta into an existing app.json without touching
-   * root status or author fields. Partial-step IDs must not call this — ledger only.
+   * root status or author fields. Writes variants[revision] and mirrors flat fields.
+   * Preserves other variant keys. Migrates legacy flat IDs into variants first.
    */
   function mergeAdsMetaWriteBack(appJson, writeBackMeta, options) {
     options = options || {};
@@ -957,9 +1421,25 @@ if (typeof globalThis !== "undefined") {
     if (metaIn.ads && metaIn.ads.meta) {
       metaIn = metaIn.ads.meta;
     }
+    var revision =
+      metaIn.creativeRevision ||
+      metaIn.currentVariant ||
+      (metaIn.variants && Object.keys(metaIn.variants)[0]) ||
+      null;
+    var variantIn =
+      (revision && metaIn.variants && metaIn.variants[revision]) ||
+      extractFlatVariantRecord(metaIn);
+    if (revision && metaIn.variants && metaIn.variants[revision]) {
+      variantIn = Object.assign({}, metaIn.variants[revision]);
+    }
+
     var requiredIds = ["campaignId", "adSetId", "creativeId", "adId"];
     var missing = requiredIds.filter(function (k) {
-      return metaIn[k] == null || String(metaIn[k]).trim() === "" || String(metaIn[k]).indexOf("<") === 0;
+      return (
+        variantIn[k] == null ||
+        String(variantIn[k]).trim() === "" ||
+        String(variantIn[k]).indexOf("<") === 0
+      );
     });
     if (options.requireCompleteIds !== false && missing.length) {
       return {
@@ -968,42 +1448,51 @@ if (typeof globalThis !== "undefined") {
         missingIds: missing,
       };
     }
-    if (options.requireVerifiedStatus !== false && metaIn.status !== "created_paused") {
+    if (options.requireVerifiedStatus !== false && variantIn.status !== "created_paused") {
       return {
         ok: false,
         error: "WRITEBACK_STATUS_REQUIRED: status must be created_paused before Drive merge",
       };
     }
+    if (!revision || String(revision).trim() === "") {
+      return {
+        ok: false,
+        error: "WRITEBACK_REVISION_REQUIRED: creativeRevision/currentVariant required for variants write-back",
+      };
+    }
+    revision = String(revision).trim();
 
     var clone = JSON.parse(JSON.stringify(appJson));
     var rootBefore = clone.status;
     if (!clone.ads || typeof clone.ads !== "object") clone.ads = {};
     if (!clone.ads.meta || typeof clone.ads.meta !== "object") clone.ads.meta = {};
 
-    var keys = [
-      "status",
-      "campaignId",
-      "adSetId",
-      "creativeId",
-      "adId",
-      "landingUrl",
-      "dailyBudget",
-      "createdAt",
-      "lastSyncedAt",
-    ];
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i];
-      if (Object.prototype.hasOwnProperty.call(metaIn, key)) {
-        clone.ads.meta[key] = metaIn[key];
+    var norm = normalizeAdsMetaVariants(clone);
+    if (!norm.ok) {
+      return { ok: false, error: norm.error };
+    }
+    if (!clone.ads.meta.variants || typeof clone.ads.meta.variants !== "object") {
+      clone.ads.meta.variants = {};
+    }
+    // Seed migrated variants without wiping
+    Object.keys(norm.variants || {}).forEach(function (k) {
+      if (!clone.ads.meta.variants[k]) {
+        clone.ads.meta.variants[k] = norm.variants[k];
       }
+    });
+
+    var nowIso = new Date().toISOString();
+    var stored = Object.assign({}, variantIn, {
+      status: "created_paused",
+      lastSyncedAt: nowIso,
+    });
+    if (!stored.mediaType) {
+      stored.mediaType = String(revision).indexOf("video") === 0 ? "video" : "image";
     }
-    // Preserve creativeRevision if already present and not supplied
-    if (
-      metaIn.creativeRevision != null &&
-      String(metaIn.creativeRevision).trim() !== ""
-    ) {
-      clone.ads.meta.creativeRevision = metaIn.creativeRevision;
-    }
+    clone.ads.meta.variants[revision] = stored;
+    mirrorVariantToFlat(clone.ads.meta, revision, stored);
+    // Ensure variants object retained
+    clone.ads.meta.variants = clone.ads.meta.variants;
 
     clone.status = rootBefore;
     return {
@@ -1012,6 +1501,8 @@ if (typeof globalThis !== "undefined") {
       rootStatusUnchanged: clone.status === rootBefore,
       rootStatus: clone.status,
       adsMeta: clone.ads.meta,
+      migrated: norm.migrated,
+      migrationNote: norm.migrationNote,
     };
   }
 
@@ -1054,10 +1545,12 @@ if (typeof globalThis !== "undefined") {
         },
         source: {
           landingUrl: adPlan.landingUrl,
+          mediaType: adPlan.mediaType || "image",
           creative: {
             kind: adPlan.creativeResolved.kind,
             value: adPlan.creativeResolved.value,
             role: adPlan.creativeResolved.role,
+            type: adPlan.creativeResolved.type || adPlan.mediaType || "image",
             resolvedFrom: adPlan.creativeResolved.resolvedFrom,
             repo: adPlan.creativeResolved.repo,
             branch: adPlan.creativeResolved.branch,
@@ -1068,7 +1561,22 @@ if (typeof globalThis !== "undefined") {
             expectedMime: adPlan.creativeResolved.expectedMime,
             expectedMimeFamily: adPlan.creativeResolved.expectedMimeFamily,
             resolutionMethod: adPlan.creativeResolved.resolutionMethod,
+            thumbnailRef: adPlan.creativeResolved.thumbnailRef || null,
           },
+          thumbnail: adPlan.thumbnailResolved
+            ? {
+                kind: adPlan.thumbnailResolved.kind,
+                value: adPlan.thumbnailResolved.value,
+                role: adPlan.thumbnailResolved.role,
+                downloadUrl: adPlan.thumbnailResolved.downloadUrl,
+                filename: adPlan.thumbnailResolved.filename,
+                expectedMime: adPlan.thumbnailResolved.expectedMime,
+                expectedMimeFamily: "image",
+                repo: adPlan.thumbnailResolved.repo,
+                branch: adPlan.thumbnailResolved.branch,
+                githubPath: adPlan.thumbnailResolved.githubPath,
+              }
+            : null,
         },
         computed: {
           destinationUrl: adPlan.destinationUrl,
@@ -1087,6 +1595,8 @@ if (typeof globalThis !== "undefined") {
           operationKey: adPlan.operationKey,
           contentFingerprint: adPlan.contentFingerprint,
           creativeSha256: adPlan.creativeSha256,
+          thumbnailSha256: adPlan.thumbnailSha256 || null,
+          mediaType: adPlan.mediaType || "image",
           creativeRevision: adPlan.creativeRevision,
           environment: adPlan.environment,
           placementSet: adPlan.placementSet,
@@ -1144,6 +1654,16 @@ if (typeof globalThis !== "undefined") {
   exports.mapAuthorObjective = mapAuthorObjective;
   exports.selectCreative = selectCreative;
   exports.resolveCreativeSource = resolveCreativeSource;
+  exports.findMediaByPath = findMediaByPath;
   exports.checkIdempotency = checkIdempotency;
+  exports.normalizeAdsMetaVariants = normalizeAdsMetaVariants;
+  exports.resolveCreativeRevision = resolveCreativeRevision;
+  exports.hasCompleteMetaIds = hasCompleteMetaIds;
+  exports.KNOWN_IMAGE_V1_PROOF_IDS = KNOWN_IMAGE_V1_PROOF_IDS;
   exports.IMAGE_EXTENSIONS = IMAGE_EXTENSIONS;
+  exports.VIDEO_EXTENSIONS = VIDEO_EXTENSIONS;
+  exports.DEFAULT_VIDEO_CREATIVE_REVISION = DEFAULT_VIDEO_CREATIVE_REVISION;
+  exports.DEFAULT_VIDEO_WORKFLOW_VERSION = DEFAULT_VIDEO_WORKFLOW_VERSION;
+  exports.VIDEO_SOURCE_UPLOAD_MAX_BYTES = VIDEO_SOURCE_UPLOAD_MAX_BYTES;
+  exports.VIDEO_POLL_TIMEOUT_MS = VIDEO_POLL_TIMEOUT_MS;
 })(__wf4Exports);

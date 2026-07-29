@@ -1,6 +1,6 @@
 # WF4 Operation Ledger (n8n Data Table)
 
-**Status:** Live columns (incl. Phase 4 schema) added **2026-07-20**. Dry-run does **not** write rows. Create-path ledger nodes stay **disabled** until create-paused is approved.  
+**Status:** Image V1 row complete **2026-07-27** — `operationKey=human-lab-wf1-sandbox|sandbox|meta|image-v1`, `phase=writeback_done`, `outcome=already_complete` (exec **95**). Dry-run does **not** write rows. Create-path ledger nodes stay **disabled** after safety restore.  
 **Design SSOT:** [`CREATE-PAUSED-V1-CONTRACT.md`](CREATE-PAUSED-V1-CONTRACT.md).  
 **Live table:** `WF4 Operation Ledger` (`Yys4vVmQGk8fTxag`) in personal project `3H7cB0ckKR59RwsE`  
 **Store:** n8n Data Table only — **not** Google Sheets (WF3 landing events stay separate).
