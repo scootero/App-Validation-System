@@ -98,9 +98,9 @@ Audit stance: **you as a new operator**, duplicating the starter, wanting WF0 �
 
 | # | Gap | Why it matters | Suggested fix (later) |
 |---|-----|----------------|------------------------|
-| G1 | **`START_HERE` / README jump WF2 → WF-Ads → WF-Decision** and barely mention **WF3** create-paused / video | New user skips event proof and approval phrases | Add WF3 + WF4 PAUSED steps + approval phrases to START_HERE |
-| G2 | **`n8n-workflows/README.md` still says “no workflow JSON exported yet”** | False; WF0/WF1 JSON + rehearsal exports exist | Refresh index; point to live/canonical IDs |
-| G3 | Starter **`ads.objective`: `"conversions"`** vs proven WF4 V1 **`traffic` / OUTCOME_TRAFFIC** | Wrong objective may fail or create wrong campaign type | Align starter default to `traffic` for V1 |
+| G1 | ~~START_HERE jumped WF2 → WF-Ads~~ | — | **Fixed 2026-07-31** — operator path WF0→WF4 in starter |
+| G2 | ~~n8n-workflows README “no JSON”~~ | — | **Fixed 2026-07-31** |
+| G3 | ~~Starter `ads.objective: conversions`~~ | — | **Fixed 2026-07-31** — default `traffic` + `LEARN_MORE` |
 | G4 | Starter **`ads.media`** is image/`og-image` only; no video + `thumbnailRef` example | Video path won’t work without A2 media model | Add optional video example + link `CREATIVE-ASSET-SPECS.md` |
 | G5 | Spec / starter **not fully synced** to live WF4 (`variants`, video SHA, ledger `videoId`) | Second app may miss write-back / idempotency fields | Track D Spec 1.5.0 coordinated pass |
 | G6 | **WF3** proven for Human Lab Sheet/webhook; **multi-app parameterization** incomplete | New `appId` may need new Sheet tab / webhook path / WF3 config | BL-038 / parameterized WF3 |
@@ -143,10 +143,10 @@ Secrets: **n8n Credentials only** — never in `app.json` / git.
 
 ## 3. Suggested priority order (when you resume build work)
 
-1. **Docs only (cheap):** Fix G1–G3 in starter + `n8n-workflows/README.md` (traffic default, WF3/WF4 steps, stale “no JSON” claim).
-2. **Operator runbook (Track F):** One page: credentials, Drive, Vercel×2, WF0→WF4, approval phrases, Ads Manager activate.
-3. **Multi-app WF3 (G6):** Parameterize Sheet / webhook / appId.
-4. **NTD-ADS-01…06:** Multi-copy + Optimize text + naming + LEARN_MORE (after Meta API verify).
+1. **Docs / starter smooth path — DONE 2026-07-31:** Starter `ads.objective: traffic`, `callToAction: LEARN_MORE`; `START_HERE` / README operator path (duplicate package only; WF0→WF4; landing shells); `n8n-workflows/README` refreshed (no longer claims “no JSON”).
+2. **Operator runbook (Track F):** One-pager credentials inventory if needed beyond starter.
+3. **Multi-app WF3 (G6):** Parameterize Sheet / webhook / appId only if a second live app hits friction.
+4. **NTD-ADS-01…06:** Multi-copy + Optimize text + naming + LEARN_MORE API mapping (after Meta API verify).
 5. **Track D / Spec sync + Track E Decision** when you want full Def D.
 
 ---
