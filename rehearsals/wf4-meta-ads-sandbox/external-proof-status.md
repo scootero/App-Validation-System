@@ -1,23 +1,21 @@
 # WF4 External Proof Status
 
-**Last updated:** 2026-07-28  
-**Phase:** Prompt 3 Track C **PASS** — Image V1 complete; measurement loop closed; WF4 create-paused disabled; **`ads.meta.variants` storage in repo** (await live import); Track A waiting on Scott media
+**Last updated:** 2026-07-30  
+**Phase:** Prompt 3 Track A **A7 PASS** — video create-paused complete; create path disabled; Track C still PASS
 
 ## Continuity / left off
 
 | Item | Value |
 |------|-------|
-| V1 creative (sandbox fixture) | `media/og-image.png` |
-| Asset repo (fixture only) | `scootero/Human-Lab-WF1-Sandbox` @ `main` |
-| Local file | `rehearsals/github/Human-Lab-WF1-Sandbox/media/og-image.png` (2,077,914 bytes, PNG, **1734 × 907**) |
+| Asset repo | `scootero/Human-Lab-WF1-Sandbox` @ `main` |
 | Image V1 Meta IDs | campaign `120250607331460199` / adset `120250622864980199` / creative `1007406578799368` / ad `120250622866330199` / hash `3dd4a70bea3678c35714a2d06d718c3c` |
-| Orphan (leave PAUSED) | campaign `120250622864710199` |
-| Ledger | `phase=writeback_done`, `outcome=already_complete` (exec **95**) |
-| Drive write-back | exec **94** → file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` (flat IDs today; next create write-back migrates to `variants.image-v1`) |
-| Create-paused | **Disabled**; `_createPausedAllowed: false` |
-| Safety + variants (repo) | Already Complete IF + skip + PAUSED verify + `ads.meta.variants` in `workflow.ts` / import-ready — **import to live still required** |
-| Track C | **PASS** — shared webhook live; browser E2E (WF3 execs 81–91); see `wf4-final-prompts/TRACK-C-PROOF.md` |
-| Next phase | Import import-ready → A6 video assets → A7 video create-paused |
+| Video V1 Meta IDs | campaign `120250720019360199` / adset `120250720020290199` / creative `935428952921305` / ad `120250720289310199` / videoId `1340974838103452` / thumb hash `345dec661253cd35c1e8bb414e90433a` |
+| Orphans (leave PAUSED) | `120250622864710199`; `120250720277100199`; `120250720277300199` |
+| Ledger video | `operationKey=…\|video-feed-v1`, `phase=writeback_done`, exec **105** |
+| Drive write-back | exec **105** → `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` — `variants.image-v1` + `variants.video-feed-v1` |
+| Create-paused | **Disabled**; Config `dry_run` / `approval=false`; create nodes off |
+| Track C | **PASS** — see `wf4-final-prompts/TRACK-C-PROOF.md` |
+| Next phase | A8 Feed previews for video-feed-v1 |
 
 ## Returned values
 

@@ -2038,8 +2038,161 @@ const mergeAfterImageCode =
   "if (!imageHash) throw new Error('Upload Ad Image returned no image_hash');\n" +
   "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { imageHash: String(imageHash) }) }) }];";
 
+const resolveVideoDownloadPlanCode =
+  "const prev = $('Merge AdSet Id').first().json;\n" +
+  "const creative = prev.bundle && prev.bundle.source && prev.bundle.source.creative;\n" +
+  "const videoUpload = prev.bundle && prev.bundle.requests && prev.bundle.requests.videoUpload;\n" +
+  "if (!creative || !creative.downloadUrl) {\n" +
+  "  throw new Error('VIDEO_REPO_UNRESOLVED: bundle.source.creative.downloadUrl missing');\n" +
+  "}\n" +
+  "if (!creative.filename) {\n" +
+  "  throw new Error('VIDEO_PATH_MISSING: bundle.source.creative.filename missing');\n" +
+  "}\n" +
+  "if (creative.expectedMimeFamily !== 'video') {\n" +
+  "  throw new Error('VIDEO_UNSUPPORTED_TYPE: expectedMimeFamily must be video');\n" +
+  "}\n" +
+  "const plan = {\n" +
+  "  downloadUrl: creative.downloadUrl,\n" +
+  "  filename: creative.filename,\n" +
+  "  expectedMime: creative.expectedMime || (videoUpload && videoUpload.expectedMime) || null,\n" +
+  "  expectedMimeFamily: 'video',\n" +
+  "  resolutionMethod: creative.resolutionMethod || (videoUpload && videoUpload.resolutionMethod),\n" +
+  "  repo: creative.repo || null,\n" +
+  "  branch: creative.branch || null,\n" +
+  "  githubPath: creative.githubPath || null,\n" +
+  "  kind: creative.kind,\n" +
+  "};\n" +
+  "return [{ json: Object.assign({}, prev, { creativeDownloadPlan: plan }) }];";
+
+const validateVideoBinaryCode =
+  "const prev = $('Resolve Video Download Plan').first().json;\n" +
+  "const item = $input.first();\n" +
+  "const plan = prev.creativeDownloadPlan;\n" +
+  "const binary = item.binary && (item.binary.data || item.binary[Object.keys(item.binary)[0]]);\n" +
+  "if (!binary) throw new Error('VIDEO_BINARY_EMPTY: download returned no binary');\n" +
+  "const mime = String(binary.mimeType || binary.fileType || '').toLowerCase();\n" +
+  "const looksVideo = mime.indexOf('video/') === 0 || mime === 'application/octet-stream' || mime === 'video/mp4';\n" +
+  "if (mime && !looksVideo) throw new Error('CREATIVE_NOT_VIDEO: content-type=' + mime);\n" +
+  "if (plan.expectedMime && mime && mime !== plan.expectedMime && !looksVideo) {\n" +
+  "  throw new Error('CREATIVE_NOT_VIDEO: expected ' + plan.expectedMime + ' got ' + mime);\n" +
+  "}\n" +
+  "let byteSize = 0;\n" +
+  "if (typeof binary.fileSize === 'number') byteSize = binary.fileSize;\n" +
+  "else if (binary.data && typeof binary.data === 'string') byteSize = binary.data.length;\n" +
+  "if (!(byteSize > 0)) throw new Error('VIDEO_BINARY_EMPTY: downloaded video has zero bytes');\n" +
+  "const meta = {\n" +
+  "  filename: binary.fileName || plan.filename,\n" +
+  "  mimeType: mime || plan.expectedMime || 'video/mp4',\n" +
+  "  byteSize: byteSize,\n" +
+  "  downloadUrl: plan.downloadUrl,\n" +
+  "  resolutionMethod: plan.resolutionMethod,\n" +
+  "};\n" +
+  "return [{ json: Object.assign({}, prev, {\n" +
+  "  metaCreate: Object.assign({}, prev.metaCreate || {}, { videoBinaryMeta: meta }),\n" +
+  "}), binary: item.binary }];";
+
+const mergeAfterVideoCode =
+  "const prev = $('Validate Video Binary').first().json;\n" +
+  "const created = $input.first().json;\n" +
+  "const videoId = created.id || created.video_id;\n" +
+  "if (!videoId) throw new Error('Upload Ad Video returned no id');\n" +
+  "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate || {}, { videoId: String(videoId) }) }) }];";
+
+const pollVideoReadyCode =
+  "const prev = $('Merge Video Id').first().json;\n" +
+  "const videoId = prev.metaCreate && prev.metaCreate.videoId;\n" +
+  "if (!videoId) throw new Error('VIDEO_STATUS_MISSING_ID: metaCreate.videoId missing');\n" +
+  "const maxTries = 60;\n" +
+  "let lastStatus = null;\n" +
+  "for (let attempt = 1; attempt <= maxTries; attempt++) {\n" +
+  "  const response = await this.helpers.httpRequestWithAuthentication.call(this, 'facebookGraphApi', {\n" +
+  "    method: 'GET',\n" +
+  "    url: 'https://graph.facebook.com/v25.0/' + encodeURIComponent(videoId),\n" +
+  "    qs: { fields: 'status' },\n" +
+  "    json: true,\n" +
+  "  });\n" +
+  "  const status = response && response.status ? response.status : {};\n" +
+  "  lastStatus = status.video_status || status.status || null;\n" +
+  "  if (String(lastStatus).toLowerCase() === 'ready') {\n" +
+  "    return [{ json: Object.assign({}, prev, { videoStatus: status, videoStatusPollAttempts: attempt }) }];\n" +
+  "  }\n" +
+  "  if (String(lastStatus).toLowerCase() === 'error' || response.error) {\n" +
+  "    throw new Error('VIDEO_PROCESSING_FAILED: ' + JSON.stringify(response.error || status));\n" +
+  "  }\n" +
+  "  if (attempt < maxTries) await new Promise(function (resolve) { setTimeout(resolve, 5000); });\n" +
+  "}\n" +
+  "throw new Error('VIDEO_PROCESSING_TIMEOUT: videoId=' + videoId + ' lastStatus=' + lastStatus);";
+
+const resolveThumbDownloadPlanCode =
+  "const prev = $('Poll Video Ready').first().json;\n" +
+  "const thumbnail = prev.bundle && prev.bundle.source && prev.bundle.source.thumbnail;\n" +
+  "const imageUpload = prev.bundle && prev.bundle.requests && prev.bundle.requests.imageUpload;\n" +
+  "const source = thumbnail || imageUpload;\n" +
+  "if (!source || !source.downloadUrl) {\n" +
+  "  throw new Error('VIDEO_THUMBNAIL_UNRESOLVED: thumbnail downloadUrl missing');\n" +
+  "}\n" +
+  "if (!source.filename) throw new Error('VIDEO_THUMBNAIL_PATH_MISSING: filename missing');\n" +
+  "if (source.expectedMimeFamily && source.expectedMimeFamily !== 'image') {\n" +
+  "  throw new Error('VIDEO_THUMBNAIL_UNSUPPORTED_TYPE: expectedMimeFamily must be image');\n" +
+  "}\n" +
+  "const plan = {\n" +
+  "  downloadUrl: source.downloadUrl,\n" +
+  "  filename: source.filename,\n" +
+  "  expectedMime: source.expectedMime || (imageUpload && imageUpload.expectedMime) || null,\n" +
+  "  expectedMimeFamily: 'image',\n" +
+  "  resolutionMethod: source.resolutionMethod || (imageUpload && imageUpload.resolutionMethod),\n" +
+  "  repo: source.repo || null,\n" +
+  "  branch: source.branch || null,\n" +
+  "  githubPath: source.githubPath || null,\n" +
+  "  kind: source.kind,\n" +
+  "};\n" +
+  "return [{ json: Object.assign({}, prev, { thumbDownloadPlan: plan }) }];";
+
+const validateThumbBinaryCode =
+  "const prev = $('Resolve Thumb Download Plan').first().json;\n" +
+  "const item = $input.first();\n" +
+  "const plan = prev.thumbDownloadPlan;\n" +
+  "const binary = item.binary && (item.binary.data || item.binary[Object.keys(item.binary)[0]]);\n" +
+  "if (!binary) throw new Error('THUMB_BINARY_EMPTY: download returned no binary');\n" +
+  "const mime = String(binary.mimeType || binary.fileType || '').toLowerCase();\n" +
+  "const allowed = ['image/png','image/jpeg','image/jpg','image/gif','image/webp'];\n" +
+  "const looksImage = mime.indexOf('image/') === 0 || allowed.indexOf(mime) !== -1;\n" +
+  "if (mime && !looksImage) throw new Error('THUMB_NOT_IMAGE: content-type=' + mime);\n" +
+  "if (plan.expectedMime && mime && mime !== 'image/jpg' && mime !== plan.expectedMime && !(plan.expectedMime === 'image/jpeg' && mime === 'image/jpg')) {\n" +
+  "  if (mime.indexOf('image/') !== 0) throw new Error('THUMB_NOT_IMAGE: expected ' + plan.expectedMime + ' got ' + mime);\n" +
+  "}\n" +
+  "let byteSize = 0;\n" +
+  "if (typeof binary.fileSize === 'number') byteSize = binary.fileSize;\n" +
+  "else if (binary.data && typeof binary.data === 'string') byteSize = binary.data.length;\n" +
+  "if (!(byteSize > 0)) throw new Error('THUMB_BINARY_EMPTY: downloaded thumbnail has zero bytes');\n" +
+  "const meta = {\n" +
+  "  filename: binary.fileName || plan.filename,\n" +
+  "  mimeType: mime || plan.expectedMime || 'image/png',\n" +
+  "  byteSize: byteSize,\n" +
+  "  downloadUrl: plan.downloadUrl,\n" +
+  "  resolutionMethod: plan.resolutionMethod,\n" +
+  "};\n" +
+  "return [{ json: Object.assign({}, prev, {\n" +
+  "  metaCreate: Object.assign({}, prev.metaCreate || {}, { thumbBinaryMeta: meta }),\n" +
+  "}), binary: item.binary }];";
+
+const mergeVideoAssetsCode =
+  "const prev = $('Validate Thumb Binary').first().json;\n" +
+  "const created = $input.first().json;\n" +
+  "let imageHash = null;\n" +
+  "if (created.images) {\n" +
+  "  const keys = Object.keys(created.images);\n" +
+  "  if (keys.length) imageHash = created.images[keys[0]].hash || null;\n" +
+  "}\n" +
+  "imageHash = imageHash || created.hash || created.image_hash;\n" +
+  "if (!imageHash) throw new Error('Upload Video Thumb returned no image_hash');\n" +
+  "if (!(prev.metaCreate && prev.metaCreate.videoId)) throw new Error('Merge Video Assets missing videoId');\n" +
+  "return [{ json: Object.assign({}, prev, { metaCreate: Object.assign({}, prev.metaCreate, { imageHash: String(imageHash) }) }) }];";
+
 const mergeAfterCreativeCode =
-  "const prev = $('Merge Image Hash').first().json;\n" +
+  "let prev;\n" +
+  "try { prev = $('Merge Video Assets').first().json; } catch (e) { prev = null; }\n" +
+  "if (!prev) prev = $('Merge Image Hash').first().json;\n" +
   "const created = $input.first().json;\n" +
   "const creativeId = created.id || created.creative_id;\n" +
   "if (!creativeId) throw new Error('Create Creative returned no id');\n" +
@@ -2079,11 +2232,19 @@ const prepareLedgerVerifiedCode =
   "  }\n" +
   "}) }];";
 
-function buildPrepareLedgerStageCode(prevNodeName: string, phase: string): string {
+function buildPrepareLedgerStageCode(
+  prevNodeName: string,
+  phase: string,
+  fallbackPrevNodeName?: string
+): string {
   return (
-    "const prev = $('" +
-    prevNodeName +
-    "').first().json;\n" +
+    (fallbackPrevNodeName
+      ? "let prev;\ntry { prev = $('" +
+        prevNodeName +
+        "').first().json; } catch (e) { prev = null; }\nif (!prev) prev = $('" +
+        fallbackPrevNodeName +
+        "').first().json;\n"
+      : "const prev = $('" + prevNodeName + "').first().json;\n") +
     "const plan = (prev.bundle && prev.bundle.ledgerPlan) || {};\n" +
     "const mc = prev.metaCreate || {};\n" +
     "const claim = prev.ledgerClaim || {};\n" +
@@ -2117,7 +2278,11 @@ function buildPrepareLedgerStageCode(prevNodeName: string, phase: string): strin
 
 const prepareLedgerCampaignCode = buildPrepareLedgerStageCode('Merge Campaign Id', 'campaign');
 const prepareLedgerAdSetCode = buildPrepareLedgerStageCode('Merge AdSet Id', 'adset');
-const prepareLedgerImageCode = buildPrepareLedgerStageCode('Merge Image Hash', 'image');
+const prepareLedgerImageCode = buildPrepareLedgerStageCode(
+  'Merge Video Assets',
+  'image',
+  'Merge Image Hash'
+);
 const prepareLedgerCreativeCode = buildPrepareLedgerStageCode('Merge Creative Id', 'creative');
 
 const prepareWriteBackCode =
@@ -2799,6 +2964,31 @@ const mergeAdSetId = node({
 const prepareLedgerAdSet = makePrepareLedgerNode('Prepare Ledger AdSet', prepareLedgerAdSetCode);
 const ledgerUpsertAdSet = makeLedgerUpsertNode('Ledger Upsert AdSet');
 
+const isVideoMediaGate = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Is Video Media',
+    disabled: true,
+    parameters: {
+      conditions: {
+        combinator: 'and',
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+        conditions: [
+          {
+            id: 'is-video-media',
+            leftValue: expr(
+              "{{ $json.bundle && $json.bundle.source && $json.bundle.source.mediaType === 'video' }}"
+            ),
+            rightValue: true,
+            operator: { type: 'boolean', operation: 'true' },
+          },
+        ],
+      },
+      looseTypeValidation: true,
+    },
+  },
+});
+
 const resolveCreativeDownloadPlan = node({
   type: 'n8n-nodes-base.code',
   version: 2,
@@ -2895,6 +3085,208 @@ const mergeImageHash = node({
   },
 });
 
+const resolveVideoDownloadPlan = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Resolve Video Download Plan',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: resolveVideoDownloadPlanCode,
+    },
+  },
+});
+
+const downloadVideoBinary = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Download Video Binary',
+    disabled: true,
+    parameters: {
+      method: 'GET',
+      url: expr(
+        "{{ $('Resolve Video Download Plan').item.json.creativeDownloadPlan.downloadUrl }}"
+      ),
+      authentication: 'none',
+      options: {
+        response: {
+          response: {
+            responseFormat: 'file',
+            outputPropertyName: 'data',
+          },
+        },
+      },
+    },
+  },
+});
+
+const validateVideoBinary = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Validate Video Binary',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: validateVideoBinaryCode,
+    },
+  },
+});
+
+const uploadAdVideo = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Upload Ad Video',
+    disabled: true,
+    parameters: {
+      method: 'POST',
+      url: `${META_GRAPH_BASE}/advideos`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'facebookGraphApi',
+      sendBody: true,
+      contentType: 'multipart-form-data',
+      bodyParameters: {
+        parameters: [
+          {
+            parameterType: 'formBinaryData',
+            name: 'source',
+            inputDataFieldName: 'data',
+          },
+        ],
+      },
+    },
+    credentials: {
+      facebookGraphApi: metaCredential,
+    },
+  },
+});
+
+const mergeVideoId = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Merge Video Id',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: mergeAfterVideoCode,
+    },
+  },
+});
+
+const pollVideoReady = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Poll Video Ready',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: pollVideoReadyCode,
+    },
+  },
+});
+
+const resolveThumbDownloadPlan = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Resolve Thumb Download Plan',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: resolveThumbDownloadPlanCode,
+    },
+  },
+});
+
+const downloadThumbBinary = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Download Thumb Binary',
+    disabled: true,
+    parameters: {
+      method: 'GET',
+      url: expr("{{ $('Resolve Thumb Download Plan').item.json.thumbDownloadPlan.downloadUrl }}"),
+      authentication: 'none',
+      options: {
+        response: {
+          response: {
+            responseFormat: 'file',
+            outputPropertyName: 'data',
+          },
+        },
+      },
+    },
+  },
+});
+
+const validateThumbBinary = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Validate Thumb Binary',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: validateThumbBinaryCode,
+    },
+  },
+});
+
+const uploadVideoThumb = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.3,
+  config: {
+    name: 'Upload Video Thumb',
+    disabled: true,
+    parameters: {
+      method: 'POST',
+      url: `${META_GRAPH_BASE}/adimages`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'facebookGraphApi',
+      sendBody: true,
+      contentType: 'multipart-form-data',
+      bodyParameters: {
+        parameters: [
+          {
+            parameterType: 'formBinaryData',
+            name: 'filename',
+            inputDataFieldName: 'data',
+          },
+        ],
+      },
+    },
+    credentials: {
+      facebookGraphApi: metaCredential,
+    },
+  },
+});
+
+const mergeVideoAssets = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Merge Video Assets',
+    disabled: true,
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: mergeVideoAssetsCode,
+    },
+  },
+});
+
 const prepareLedgerImage = makePrepareLedgerNode('Prepare Ledger Image', prepareLedgerImageCode);
 const ledgerUpsertImage = makeLedgerUpsertNode('Ledger Upsert Image');
 
@@ -2912,7 +3304,7 @@ const createCreative = node({
       sendBody: true,
       specifyBody: 'json',
       jsonBody: expr(
-        "{{ JSON.stringify((function () { var c = JSON.parse(JSON.stringify($('Merge Image Hash').item.json.bundle.requests.creative)); c.object_story_spec.link_data.image_hash = $('Merge Image Hash').item.json.metaCreate.imageHash; return c; })()) }}"
+        "{{ JSON.stringify((function () { var prev; try { prev = $('Merge Video Assets').first().json; } catch (e) { prev = null; } if (!prev) prev = $('Merge Image Hash').first().json; var c = JSON.parse(JSON.stringify(prev.bundle.requests.creative)); var mc = prev.metaCreate || {}; var isVideo = prev.bundle && prev.bundle.source && prev.bundle.source.mediaType === 'video'; if (isVideo) { if (!c.object_story_spec.video_data) c.object_story_spec.video_data = {}; c.object_story_spec.video_data.video_id = mc.videoId; c.object_story_spec.video_data.image_hash = mc.imageHash; } else { c.object_story_spec.link_data.image_hash = mc.imageHash; } return c; })()) }}"
       ),
     },
     credentials: {
@@ -3152,12 +3544,35 @@ mergeCampaignId
 mergeAdSetId
   .to(prepareLedgerAdSet)
   .to(ledgerUpsertAdSet)
-  .to(resolveCreativeDownloadPlan)
-  .to(downloadCreativeBinary)
-  .to(validateCreativeBinary)
-  .to(uploadAdImage)
-  .to(mergeImageHash)
-  .to(prepareLedgerImage)
+  .to(
+    isVideoMediaGate
+      .onTrue(
+        resolveVideoDownloadPlan
+          .to(downloadVideoBinary)
+          .to(validateVideoBinary)
+          .to(uploadAdVideo)
+          .to(mergeVideoId)
+          .to(pollVideoReady)
+          .to(resolveThumbDownloadPlan)
+          .to(downloadThumbBinary)
+          .to(validateThumbBinary)
+          .to(uploadVideoThumb)
+          .to(mergeVideoAssets)
+      )
+      .onFalse(
+        resolveCreativeDownloadPlan
+          .to(downloadCreativeBinary)
+          .to(validateCreativeBinary)
+          .to(uploadAdImage)
+          .to(mergeImageHash)
+      )
+  );
+
+// Shared continuation after image hash merge (image creative or video thumbnail).
+mergeImageHash.to(prepareLedgerImage);
+mergeVideoAssets.to(prepareLedgerImage);
+
+prepareLedgerImage
   .to(ledgerUpsertImage)
   .to(createCreative)
   .to(mergeCreativeId)

@@ -1,8 +1,8 @@
 # Prompt 3 Progress — Platform Completion After Image V1
 
-**Status:** Track A — **A1/A2 approved**; **A3–A5 local PASS**. **Safety graph + `ads.meta.variants` storage** in `workflow.ts` / import-ready (2026-07-28) — create path still DISABLED. Need Scott video assets (A6) before live video create.
+**Status:** Track A — **A7 video create-paused PASS** (exec **105**, 2026-07-30). Create path DISABLED again; Config `dry_run` / `approval=false`. Next: A8 Feed previews.
 
-**On resume:** Read this file + `CREATIVE-ASSET-SPECS.md`. Next: import updated import-ready into live WF4; A6 Scott supplies mp4+thumb; then A7 phrase `APPROVE WF4 VIDEO CREATE-PAUSED V1`.
+**On resume:** Read this file + `CREATIVE-ASSET-SPECS.md`. Live WF4 has 60 nodes (video Wait/Check/Assert status). Create nodes disabled. Process wrapper still has hardcoded `createPausedAllowed: true` in source text — safe because create nodes are off + mode dry_run; re-apply hard-gate false from `.phase4-sync/process-hard-gate-false-ops.json` when MCP can accept full jsCode.
 
 **Related:**
 
@@ -55,20 +55,26 @@ Prompt 2 handoff summary: Campaign `120250607331460199` | AdSet `120250622864980
 - [x] A5 Local + dry_run proofs PASS (zero Meta writes in dry_run) *(wf4-rehearse.js incl. video plan tests)*
 - [x] Safety: Already Complete IF + skip campaign/adset when IDs exist + Meta GET PAUSED assert before write-back *(source + import-ready 2026-07-28; create nodes still disabled)*
 - [x] `ads.meta.variants[creativeRevision]` SSOT + revision-scoped idempotency + migrate-on-write-back *(local rehearse PASS; create still disabled)*
-- [ ] A6 Sandbox video/thumb assets validated (Scott-supplied)
-- [ ] A7 Preflight + exact phrase `APPROVE WF4 VIDEO CREATE-PAUSED V1` + one PAUSED video ad
+- [x] A6 Sandbox video/thumb assets validated — GitHub remux H.264/AAC MP4 (`66c1557…`); dry_run exec **102** PASS
+- [x] Video create path wired + disabled on live WF4 (upload → poll ready → thumb → creative) — create still OFF
+- [x] A7 Preflight + exact phrase `APPROVE WF4 VIDEO CREATE-PAUSED V1` + one PAUSED video ad — exec **105** PASS
 - [ ] A8 Feed / Stories / Reels previews for enabled placements
 - [ ] A9 Video definition of done met; docs updated
 
-Video Meta IDs:
+Video Meta IDs (`video-feed-v1`, exec **105**):
 
-- Campaign: `_pending_`
-- Ad Set: `_pending_`
-- Creative: `_pending_`
-- Ad: `_pending_`
-- video_id: `_pending_`
+- Campaign: `120250720019360199`
+- Ad Set: `120250720020290199`
+- Creative: `935428952921305`
+- Ad: `120250720289310199`
+- video_id: `1340974838103452`
+- thumb image_hash: `345dec661253cd35c1e8bb414e90433a`
+- Ledger: `writeback_done` / `already_complete`
+- Drive: proof file `1V1UQP4vH3O8xYexn-Jphfn29Sv30Z6xn` — `variants.image-v1` preserved + `variants.video-feed-v1` added; `currentVariant=video-feed-v1`
 
-Track A verdict: `_pending_` (A3–A5 local PASS; safety IF/verify in repo; wait A6 assets + A7 phrase)
+**Orphans (leave PAUSED, never delete):** image `120250622864710199`; video resume extras from exec 105 `120250720277100199` (campaign) / `120250720277300199` (adset) — Needs gate read ledger row without `metaCreate` (fixed on live before disable).
+
+Track A verdict: **A7 PASS** (A8 previews remaining)
 
 **A3 notes:** Adapter plans `/advideos` upload, status poll (`ready` / 10 min), thumb `adimages`, `video_data` creative. Fixture `app-json-wf4-video-sandbox.json`. Live create chain not enabled. Video HTTP upload/poll nodes still deferred until A6 binaries exist (image create chain remains the wired path).
 
